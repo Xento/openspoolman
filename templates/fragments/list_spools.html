@@ -39,7 +39,8 @@
       <small class="text-muted">{{ spool.filament.name }}</small>
     </div>
 
-	<a href="{{ url_for('spool_info', tag_id=spool.extra.get("tag").strip('"')) }}">
+	<a href="{{ url_for('spool_info', spool_id=spool.id) }}">
+
 	<span class="badge bg-primary rounded-pill">
                 <i class="bi bi-info-circle"></i> Spool info
             </span>

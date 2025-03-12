@@ -81,8 +81,8 @@ def spool_info():
     return render_template('error.html', exception="MQTT is disconnected. Is the printer online?")
     
   try:
-    tag_id = request.args.get("tag_id")
-
+    tag_id = request.args.get("tag_id", "-1")
+    spool_id = request.args.get("spool_id", -1)
     last_ams_config = getLastAMSConfig()
     ams_data = last_ams_config.get("ams", [])
     vt_tray_data = last_ams_config.get("vt_tray", {})
@@ -104,11 +104,17 @@ def spool_info():
     spools = fetchSpools()
     current_spool = None
     for spool in spools:
+      if spool['id'] == spool_id:
+        current_spool = spool
+        break
+
       if not spool.get("extra", {}).get("tag"):
         continue
+
       tag = json.loads(spool["extra"]["tag"])
       if tag != tag_id:
         continue
+
       current_spool = spool
 
     # TODO: missing current_spool
@@ -128,8 +134,8 @@ def tray_load():
   tray_id = request.args.get("tray")
   spool_id = request.args.get("spool_id")
 
-  if not all([tag_id, ams_id, tray_id, spool_id]):
-    return render_template('error.html', exception="Missing RFID, AMS ID, or Tray ID or spool_id.")
+  if not all([ams_id, tray_id, spool_id]):
+    return render_template('error.html', exception="Missing AMS ID, or Tray ID or spool_id.")
 
   try:
     # Update Spoolman with the selected tray
