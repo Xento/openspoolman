@@ -1,0 +1,9 @@
+{
+  "log": "mqtt.log",
+  "3mf": "dummy.3mf",
+  "expected_assignment": {"1": 10, "2": 20},
+  "spools": [
+    {"id": 10, "ams": 0, "tray": 1},
+    {"id": 20, "ams": 1, "tray": 1}
+  ]
+}
