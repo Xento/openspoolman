@@ -21,7 +21,7 @@
         <div class="text-start">
           <div class="fw-semibold">Filament type mismatch</div>
           <small>
-            AMS reports {{ tray_data.tray_type }}{% if tray_data.tray_sub_brands %} ({{ tray_data.tray_sub_brands }}){% endif %}, but the assigned spool is {{ tray_data.vendor }} {{ tray_data.name }}{% if tray_data.spool_material %} ({{ tray_data.spool_material }}){% endif %}.
+            AMS reports {{ tray_data.tray_type }}{% if tray_data.tray_sub_brands %} ({{ tray_data.tray_sub_brands }}){% endif %}, but the assigned spool is {{ tray_data.vendor }} {{ tray_data.name }}{% if tray_data.spool_material %} ({{ tray_data.spool_material }}{% if tray_data.spool_sub_brand %}, {{ tray_data.spool_sub_brand }}{% endif %}){% endif %}.
           </small>
         </div>
       </div>

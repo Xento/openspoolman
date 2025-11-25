@@ -58,6 +58,7 @@ def augmentTrayDataWithSpoolMan(spool_list, tray_data, tray_id):
       tray_data["name"] = spool["filament"]["name"]
       tray_data["vendor"] = spool["filament"]["vendor"]["name"]
       tray_data["spool_material"] = spool["filament"].get("material", "")
+      tray_data["spool_sub_brand"] = (spool["filament"].get("extra", {}).get("type") or "").strip().lower()
       tray_data["remaining_weight"] = spool["remaining_weight"]
 
       if "last_used" in spool:
@@ -81,10 +82,14 @@ def augmentTrayDataWithSpoolMan(spool_list, tray_data, tray_id):
       material_mismatch = bool(tray_material and spool_material and tray_material != spool_material)
 
       tray_sub_brand = (tray_data.get("tray_sub_brands") or "").strip().lower()
-      vendor_name = (spool["filament"].get("vendor", {}).get("name") or "").strip().lower()
-      filament_type = (spool["filament"].get("extra", {}).get("type") or "").strip().lower()
-      brand_matches = {value for value in [vendor_name, filament_type, f"{vendor_name} {filament_type}".strip()] if value}
-      sub_brand_mismatch = bool(tray_sub_brand and (not brand_matches or tray_sub_brand not in brand_matches))
+      filament_sub_brand = tray_data["spool_sub_brand"]
+
+      if not filament_sub_brand and spool_material == "pla":
+        filament_sub_brand = "basic"
+
+      tray_data["spool_sub_brand"] = filament_sub_brand
+
+      sub_brand_mismatch = bool(tray_sub_brand and tray_sub_brand != filament_sub_brand)
 
       tray_data["mismatch"] = material_mismatch or sub_brand_mismatch
       tray_data["issue"] = tray_data["mismatch"]
