@@ -82,14 +82,14 @@ def augmentTrayDataWithSpoolMan(spool_list, tray_data, tray_id):
       material_mismatch = bool(tray_material and spool_material and tray_material != spool_material)
 
       tray_sub_brand = (tray_data.get("tray_sub_brands") or "").strip().lower()
-      filament_sub_brand = tray_data["spool_sub_brand"]
+      filament_sub_brand =  tray_data["spool_sub_brand"].replace('"', '').strip().lower()
 
-      if not filament_sub_brand and spool_material == "pla":
-        filament_sub_brand = "basic"
+      if tray_sub_brand:
+        filament_sub_brand = spool_material + " " + filament_sub_brand
 
       tray_data["spool_sub_brand"] = filament_sub_brand
 
-      sub_brand_mismatch = bool(tray_sub_brand and tray_sub_brand != filament_sub_brand)
+      sub_brand_mismatch = bool(tray_sub_brand and tray_sub_brand != tray_data["spool_sub_brand"])
 
       tray_data["mismatch"] = material_mismatch or sub_brand_mismatch
       tray_data["issue"] = tray_data["mismatch"]
