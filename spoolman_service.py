@@ -69,7 +69,6 @@ def augmentTrayDataWithSpoolMan(spool_list, tray_data, tray_id):
 
         local_time = dt.astimezone()
         tray_data["last_used"] = local_time.strftime("%d.%m.%Y %H:%M:%S")
-
       else:
           tray_data["last_used"] = "-"
           
