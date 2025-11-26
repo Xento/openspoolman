@@ -22,16 +22,18 @@
     {% endif %}
     {% if header_color %}
       <div class="d-flex align-items-center gap-2">
-        {% if tray_data.color_mismatch %}
-          <i class="bi bi-exclamation-triangle-fill text-warning" role="button" tabindex="0"
-             data-bs-toggle="popover"
-             data-bs-container="body"
-             data-bs-trigger="hover focus click"
-             data-bs-placement="bottom"
-             data-bs-content="{{ tray_data.color_mismatch_message }}">
-          </i>
-        {% endif %}
-        <span class="ms-2 border rounded" style="width: 24px; height: 24px; background-color: #{{ header_color | replace('#', '') }}; display: inline-block;"></span>
+        <div class="tray-color-wrapper">
+          <span class="ms-2 border rounded tray-color-swatch" style="background-color: #{{ header_color | replace('#', '') }};"></span>
+          {% if tray_data.color_mismatch %}
+            <i class="bi bi-exclamation-triangle-fill text-warning tray-color-warning" role="button" tabindex="0"
+               data-bs-toggle="popover"
+               data-bs-container="body"
+               data-bs-trigger="manual"
+               data-bs-placement="bottom"
+               data-bs-content="{{ tray_data.color_mismatch_message }}">
+            </i>
+          {% endif %}
+        </div>
       </div>
     {% endif %}
   </div>

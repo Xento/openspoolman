@@ -129,7 +129,7 @@
   </footer>
 </div>
 
-<script src="{{ url_for('static', filename='js/bootstrap.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
 <script>
   ;(function () {
     const htmlElement = document.querySelector("html")
@@ -145,8 +145,29 @@
   })()
   document.addEventListener('DOMContentLoaded', function () {
     const popoverTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="popover"]'))
-    popoverTriggerList.map(function (popoverTriggerEl) {
-      return new bootstrap.Popover(popoverTriggerEl, {container: 'body'})
+    popoverTriggerList.forEach(function (popoverTriggerEl) {
+      const popover = new bootstrap.Popover(popoverTriggerEl, {container: 'body', trigger: 'manual'})
+      const showPopover = () => popover.show()
+      const hidePopover = () => {
+        popover.hide()
+        popoverTriggerEl.classList.remove('popover-visible')
+      }
+
+      popoverTriggerEl.addEventListener('mouseenter', showPopover)
+      popoverTriggerEl.addEventListener('mouseleave', hidePopover)
+      popoverTriggerEl.addEventListener('focus', showPopover)
+      popoverTriggerEl.addEventListener('blur', hidePopover)
+      popoverTriggerEl.addEventListener('click', function (event) {
+        event.preventDefault()
+        popoverTriggerEl.classList.toggle('popover-visible')
+        popoverTriggerEl.classList.contains('popover-visible') ? showPopover() : hidePopover()
+      })
+
+      document.addEventListener('click', function (event) {
+        if (!popoverTriggerEl.contains(event.target)) {
+          hidePopover()
+        }
+      })
     })
   })
 </script>
