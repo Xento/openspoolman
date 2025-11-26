@@ -73,7 +73,6 @@ def augmentTrayDataWithSpoolMan(spool_list, tray_data, tray_id):
       else:
           tray_data["last_used"] = "-"
           
-<<<<<<< HEAD
       if "multi_color_hexes" in spool["filament"]:
         tray_data["tray_color"] = spool["filament"]["multi_color_hexes"]
         tray_data["tray_color_orientation"] = spool["filament"]["multi_color_direction"]
@@ -99,53 +98,6 @@ def augmentTrayDataWithSpoolMan(spool_list, tray_data, tray_id):
 
   if tray_data.get("tray_type") and tray_data["tray_type"] != "" and tray_data["matched"] == False:
     tray_data["issue"] = True
-=======
-      if "multi_color_hexes" in spool["filament"]:
-        tray_data["tray_color"] = spool["filament"]["multi_color_hexes"]
-        tray_data["tray_color_orientation"] = spool["filament"]["multi_color_direction"]
-
-      tray_material = (tray_data.get("tray_type") or "").strip().lower()
-      spool_material = (spool["filament"].get("material") or "").strip().lower()
-
-      tray_material_suffix = ""
-      material_mismatch = False
-      if tray_material and spool_material:
-        if tray_material == spool_material:
-          material_mismatch = False
-        elif tray_material.startswith(spool_material):
-          tray_material_suffix = tray_material[len(spool_material):].strip()
-        else:
-          material_mismatch = True
-
-      tray_sub_brand = (tray_data.get("tray_sub_brands") or "").strip().lower()
-      tray_sub_brand_normalized = tray_sub_brand
-
-      if tray_sub_brand_normalized and spool_material and tray_sub_brand_normalized.startswith(spool_material):
-        tray_sub_brand_normalized = tray_sub_brand_normalized[len(spool_material):].strip()
-
-      if not tray_sub_brand_normalized and tray_material_suffix:
-        tray_sub_brand_normalized = tray_material_suffix
-
-      filament_sub_brand = tray_data["spool_sub_brand"]
-
-      if not filament_sub_brand and spool_material == "pla":
-        filament_sub_brand = "basic"
-
-      if not tray_sub_brand_normalized and spool_material == "pla":
-        tray_sub_brand_normalized = "basic"
-
-      tray_data["spool_sub_brand"] = filament_sub_brand
-
-      sub_brand_mismatch = bool(tray_sub_brand_normalized and tray_sub_brand_normalized != filament_sub_brand)
-
-      tray_data["mismatch"] = material_mismatch or sub_brand_mismatch
-      tray_data["issue"] = tray_data["mismatch"]
-      tray_data["matched"] = True
-      break
-
-  if tray_data.get("tray_type") and tray_data["tray_type"] != "" and tray_data["matched"] == False:
-    tray_data["issue"] = True
->>>>>>> c7a32b7fb286c0f2e79e581f3ed04a9a563bfcc9
 
 def spendFilaments(printdata):
   if printdata["ams_mapping"]:
