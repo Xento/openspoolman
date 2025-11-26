@@ -152,16 +152,27 @@
         popover.hide()
         popoverTriggerEl.classList.remove('popover-visible')
       }
+      let touchActivated = false
 
       popoverTriggerEl.addEventListener('mouseenter', showPopover)
       popoverTriggerEl.addEventListener('mouseleave', hidePopover)
       popoverTriggerEl.addEventListener('focus', showPopover)
       popoverTriggerEl.addEventListener('blur', hidePopover)
       popoverTriggerEl.addEventListener('click', function (event) {
+        if (touchActivated) {
+          touchActivated = false
+          return
+        }
         event.preventDefault()
         popoverTriggerEl.classList.toggle('popover-visible')
         popoverTriggerEl.classList.contains('popover-visible') ? showPopover() : hidePopover()
       })
+      popoverTriggerEl.addEventListener('touchstart', function (event) {
+        touchActivated = true
+        event.preventDefault()
+        popoverTriggerEl.classList.toggle('popover-visible')
+        popoverTriggerEl.classList.contains('popover-visible') ? showPopover() : hidePopover()
+      }, { passive: false })
 
       document.addEventListener('click', function (event) {
         if (!popoverTriggerEl.contains(event.target)) {

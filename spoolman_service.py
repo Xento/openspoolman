@@ -146,7 +146,7 @@ def augmentTrayDataWithSpoolMan(spool_list, tray_data, tray_id):
       color_difference = color_distance(tray_data.get("ams_tray_color"), spool_color)
       if color_difference is not None and color_difference > COLOR_DISTANCE_TOLERANCE:
         tray_data["color_mismatch"] = True
-        tray_data["color_mismatch_message"] = "Die Farben sind nicht ähnlich."
+        tray_data["color_mismatch_message"] = "Colors are not similar."
 
       break
 
