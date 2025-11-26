@@ -1,6 +1,17 @@
 {% extends 'base.html' %}
 
 {% block content %}
+{% if issue %}
+<div class="card border-warning shadow-sm mb-4">
+  <div class="card-header bg-warning text-dark fw-bold">
+    Warning
+  </div>
+  <div class="card-body">
+    <h5 class="card-title">AMS filament type does not match the assigned spool</h5>
+    <p class="card-text">Fix the issue by clicking "Fix this tray" on any tray marked with <i class="bi bi-exclamation-triangle-fill text-danger me-2"></i> to reconcile the AMS filament type/brand with the linked SpoolMan spool.</p>
+  </div>
+</div>
+{% endif %}
 {% include 'fragments/spool_details.html' %}
 
 <h1 class="mb-4">Assign Tray</h1>
@@ -15,9 +26,9 @@
     <div class="card shadow-sm">
       <div class="card-header d-flex justify-content-between align-items-center">
         <h5 class="mb-0">AMS{% if ams_data|length > 1 %} {{ ams.id|int +1 }} {% endif %}</h5>
-		{% if ams.temp != "0.0" %}
+                {% if ams.temp != "0.0" %}
         <span class="text-muted small">Humidity: {{ ams.humidity }}%, Temp: {{ ams.temp }}°C</span>
-		{% endif %}
+                {% endif %}
       </div>
       <div class="card-body">
         <div class="row">

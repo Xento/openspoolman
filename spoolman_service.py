@@ -51,13 +51,22 @@ def getAMSFromTray(n):
 
 def augmentTrayDataWithSpoolMan(spool_list, tray_data, tray_id):
   tray_data["matched"] = False
+  tray_data["mismatch"] = False
+  tray_data["issue"] = False
   for spool in spool_list:
     if spool.get("extra") and spool["extra"].get("active_tray") and spool["extra"]["active_tray"] == json.dumps(tray_id):
-      #TODO: check for mismatch
       tray_data["name"] = spool["filament"]["name"]
       tray_data["vendor"] = spool["filament"]["vendor"]["name"]
+      tray_data["spool_material"] = spool["filament"].get("material", "")
+      spool_sub_brand_raw = (spool["filament"].get("extra", {}).get("type") or "").strip()
+      tray_data["spool_sub_brand_raw"] = spool_sub_brand_raw
+      tray_data["spool_sub_brand"] = spool_sub_brand_raw.lower()
       tray_data["remaining_weight"] = spool["remaining_weight"]
-      
+
+      spool_color = (spool["filament"].get("color_hex") or "").lstrip("#")
+      if spool_color:
+        tray_data["spool_color"] = spool_color
+
       if "last_used" in spool:
         try:
             dt = datetime.strptime(spool["last_used"], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=ZoneInfo("UTC"))
@@ -73,14 +82,55 @@ def augmentTrayDataWithSpoolMan(spool_list, tray_data, tray_id):
       if "multi_color_hexes" in spool["filament"]:
         tray_data["tray_color"] = spool["filament"]["multi_color_hexes"]
         tray_data["tray_color_orientation"] = spool["filament"]["multi_color_direction"]
-        
+
+        if not tray_data.get("spool_color"):
+          multi_colors = spool["filament"]["multi_color_hexes"]
+          if isinstance(multi_colors, str):
+            multi_colors = [c.strip() for c in multi_colors.split(",") if c.strip()]
+          if isinstance(multi_colors, (list, tuple)) and multi_colors:
+            tray_data["spool_color"] = str(multi_colors[0]).lstrip("#")
+
+      tray_material = (tray_data.get("tray_type") or "").strip().lower()
+      spool_material = (spool["filament"].get("material") or "").strip().lower()
+
+      tray_material_suffix = ""
+      material_mismatch = False
+      if tray_material and spool_material:
+        if tray_material == spool_material:
+          material_mismatch = False
+        elif tray_material.startswith(spool_material):
+          tray_material_suffix = tray_material[len(spool_material):].strip()
+        else:
+          material_mismatch = True
+
+      tray_sub_brand = (tray_data.get("tray_sub_brands") or "").strip().lower()
+      tray_sub_brand_normalized = tray_sub_brand
+
+      if tray_sub_brand_normalized and spool_material and tray_sub_brand_normalized.startswith(spool_material):
+        tray_sub_brand_normalized = tray_sub_brand_normalized[len(spool_material):].strip()
+
+      if not tray_sub_brand_normalized and tray_material_suffix:
+        tray_sub_brand_normalized = tray_material_suffix
+
+      filament_sub_brand = tray_data["spool_sub_brand"]
+
+      if not filament_sub_brand and spool_material == "pla":
+        filament_sub_brand = "basic"
+
+      if not tray_sub_brand_normalized and spool_material == "pla":
+        tray_sub_brand_normalized = "basic"
+
+      tray_data["spool_sub_brand"] = filament_sub_brand
+
+      sub_brand_mismatch = bool(tray_sub_brand_normalized and tray_sub_brand_normalized != filament_sub_brand)
+
+      tray_data["mismatch"] = material_mismatch or sub_brand_mismatch
+      tray_data["issue"] = tray_data["mismatch"]
       tray_data["matched"] = True
       break
 
   if tray_data.get("tray_type") and tray_data["tray_type"] != "" and tray_data["matched"] == False:
     tray_data["issue"] = True
-  else:
-    tray_data["issue"] = False
 
 def spendFilaments(printdata):
   if printdata["ams_mapping"]:

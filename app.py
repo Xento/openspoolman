@@ -32,15 +32,23 @@ def issue():
     return render_template('error.html', exception="Missing AMS ID, or Tray ID.")
 
   fix_ams = None
+  tray_data = None
 
   spool_list = fetchSpools()
   last_ams_config = getLastAMSConfig()
   if ams_id == EXTERNAL_SPOOL_AMS_ID:
     fix_ams = last_ams_config.get("vt_tray", {})
+    tray_data = fix_ams
   else:
     for ams in last_ams_config.get("ams", []):
-      if ams["id"] == ams_id:
+      if str(ams["id"]) == str(ams_id):
         fix_ams = ams
+        break
+
+  if fix_ams:
+    for tray in fix_ams.get("tray", []):
+      if str(tray["id"]) == str(tray_id):
+        tray_data = tray
         break
 
   active_spool = None
@@ -49,13 +57,16 @@ def issue():
       active_spool = spool
       break
 
+  if tray_data:
+    augmentTrayDataWithSpoolMan(spool_list, tray_data, trayUid(ams_id, tray_id))
+
   #TODO: Determine issue
   #New bambulab spool
   #Tray empty, but spoolman has record
   #Extra tag mismatch?
   #COLor/type mismatch
 
-  return render_template('issue.html', fix_ams=fix_ams, active_spool=active_spool)
+  return render_template('issue.html', fix_ams=fix_ams, tray_data=tray_data, ams_id=ams_id, tray_id=tray_id, active_spool=active_spool)
 
 @app.route("/fill")
 def fill():
@@ -90,7 +101,7 @@ def spool_info():
     ams_data = last_ams_config.get("ams", [])
     vt_tray_data = last_ams_config.get("vt_tray", {})
     spool_list = fetchSpools()
-    
+
     issue = False
     #TODO: Fix issue when external spool info is reset via bambulab interface
     augmentTrayDataWithSpoolMan(spool_list, vt_tray_data, trayUid(EXTERNAL_SPOOL_AMS_ID, EXTERNAL_SPOOL_ID))
@@ -122,7 +133,7 @@ def spool_info():
 
     if current_spool:
       # TODO: missing current_spool
-      return render_template('spool_info.html', tag_id=tag_id, current_spool=current_spool, ams_data=ams_data, vt_tray_data=vt_tray_data)
+      return render_template('spool_info.html', tag_id=tag_id, current_spool=current_spool, ams_data=ams_data, vt_tray_data=vt_tray_data, issue=issue)
     else:
       return render_template('error.html', exception="Spool not found")
   except Exception as e:
