@@ -58,8 +58,12 @@ def augmentTrayDataWithSpoolMan(spool_list, tray_data, tray_id):
       tray_data["name"] = spool["filament"]["name"]
       tray_data["vendor"] = spool["filament"]["vendor"]["name"]
       tray_data["spool_material"] = spool["filament"].get("material", "")
-      tray_data["spool_sub_brand"] = (spool["filament"].get("extra", {}).get("type") or "").strip().lower()
+      tray_data["spool_sub_brand"] = (spool["filament"].get("extra", {}).get("type") or "").replace('"', '').strip()
       tray_data["remaining_weight"] = spool["remaining_weight"]
+
+      spool_color = (spool["filament"].get("color_hex") or "").lstrip("#")
+      if spool_color:
+        tray_data["spool_color"] = spool_color
 
       if "last_used" in spool:
         try:
@@ -80,16 +84,16 @@ def augmentTrayDataWithSpoolMan(spool_list, tray_data, tray_id):
       spool_material = (spool["filament"].get("material") or "").strip().lower()
       material_mismatch = bool(tray_material and spool_material and tray_material != spool_material)
 
-      tray_sub_brand = (tray_data.get("tray_sub_brands") or "").strip().lower()
-      filament_sub_brand =  tray_data["spool_sub_brand"].replace('"', '').strip().lower()
+      tray_sub_brand = (tray_data.get("tray_sub_brands") or "").replace("Basic","").strip().lower()
+      filament_sub_brand =  tray_data["spool_sub_brand"].replace("Basic", "").strip().lower()
 
       if tray_sub_brand:
-        filament_sub_brand = spool_material + " " + filament_sub_brand
+        filament_sub_brand = (spool_material + " " + filament_sub_brand).strip()
 
-      tray_data["spool_sub_brand"] = filament_sub_brand
+      sub_brand_mismatch = bool(tray_sub_brand != filament_sub_brand)
 
-      sub_brand_mismatch = bool(tray_sub_brand and tray_sub_brand != tray_data["spool_sub_brand"])
-
+      tray_data["tray_sub_brand"] = tray_data.get("tray_sub_brands", "").replace(tray_data.get("tray_type", ""), '').replace("Basic","").strip()
+      tray_data["spool_sub_brand"] = tray_data["spool_sub_brand"].replace("Basic", '').strip()
       tray_data["mismatch"] = material_mismatch or sub_brand_mismatch
       tray_data["issue"] = tray_data["mismatch"]
       tray_data["matched"] = True

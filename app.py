@@ -51,12 +51,6 @@ def issue():
         tray_data = tray
         break
 
-  if fix_ams:
-    for tray in fix_ams.get("tray", []):
-      if str(tray["id"]) == str(tray_id):
-        tray_data = tray
-        break
-
   active_spool = None
   for spool in spool_list:
     if spool.get("extra") and spool["extra"].get("active_tray") and spool["extra"]["active_tray"] == json.dumps(trayUid(ams_id, tray_id)):
