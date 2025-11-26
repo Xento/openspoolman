@@ -7,28 +7,88 @@
         document.querySelectorAll('.print-grid').forEach(grid => {
             const printInfo = grid.querySelector('.printinfo');
             const printImageContainer = grid.querySelector('.print-image');
-            const image = printImageContainer.querySelector('img');
+            const image = printImageContainer?.querySelector('img');
 
             if (printInfo && printImageContainer) {
                 const height = printInfo.clientHeight;
-
-                printImageContainer.style.height = height + "px";
+                if (window.innerWidth >= 920) {
+                    
+                    printImageContainer.style.height = height + "px";
+                } else {
+                    printImageContainer.style.height = "auto";
+                    printImageContainer.style.height = (height / 2) + "px";
+                }
 
                 if (image) {
                     image.style.height = "100%";
                     image.style.width = "auto";
-                    image.style.objectFit = "contain"; //ensure the image fits within the container
+                    image.style.objectFit = "contain";
                 }
             }
         });
     }
-    adjustPrintImages(); 
-    // Adjust images on load and resize
-    window.addEventListener("load", adjustPrintImages);
+
+    setTimeout(() => {
+        adjustPrintImages();
+    }, 10);
+
     window.addEventListener("resize", adjustPrintImages);
+
+    function initThumbnailHover() {
+        const thumbnails = document.querySelectorAll('.thumbnail');
+        const overlay = document.getElementById('image-overlay');
+        const overlayImage = overlay.querySelector('.overlay-image');
+        const backdrop = overlay.querySelector('.overlay-backdrop');
+
+        thumbnails.forEach(thumbnail => {
+            thumbnail.addEventListener('click', () => {
+                const relativeSrc = thumbnail.getAttribute('src');
+                if (!relativeSrc) return;
+
+                const host = window.location.origin;
+                const fullSrc = host + "/" + relativeSrc.replace(/^\/+/, "");
+
+                overlay.classList.remove('hidden');
+                overlayImage.src = fullSrc;
+                document.body.classList.add('modal-open');
+            });
+        });
+
+        backdrop.addEventListener('click', () => {
+            closeThumbnailOverlay()
+        });
+
+        overlayImage.addEventListener('click', () => {
+            closeThumbnailOverlay()
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closeThumbnailOverlay()
+            }
+        });
+    }
+
+    function closeThumbnailOverlay() {
+        const overlay = document.getElementById('image-overlay');
+        const overlayImage = overlay.querySelector('.overlay-image');
+        overlay.classList.add('hidden');
+        overlayImage.src = '';
+        document.body.classList.remove('modal-open');
+    }
+
+    window.addEventListener("load", initThumbnailHover);
+    
 </script>
 
 <!-- Page Title -->
 <h1 class="mb-4 text-center">Print history</h1>
 {% with action_assign=True %}{% include 'fragments/list_prints.html' %}{% endwith %}
+
+<div id="image-overlay" class="image-overlay hidden">
+    <div class="overlay-backdrop"></div>
+    <div class="overlay-content bg-body p-3 rounded">
+        <img src="" class="overlay-image" style="width: 100%; height: 100%;"/>
+    </div>
+</div>
 {% endblock %}

@@ -51,6 +51,18 @@
     border-bottom-right-radius: 6px
 }
 
+.ams-card .tray-card {
+    height: 100%;
+}
+
+.ams-card .tray-card .tray-empty {
+    height: 100%;
+    align-items: center;
+    display: flex;
+    justify-content: center;
+}
+
+
 .print-history {
     display: flex;
     flex-direction: column;

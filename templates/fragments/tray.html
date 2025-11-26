@@ -1,4 +1,4 @@
-<div class="card">
+<div class="card tray-card">
   <!-- Tray ID -->
   <div class="card-header d-flex justify-content-between align-items-center">
     <div class="d-flex align-items-center flex-wrap gap-2">
@@ -11,26 +11,13 @@
         {% else %}
           External Spool
         {% endif %}
-        {% set header_material = tray_data.spool_material if tray_data.matched else tray_data.tray_type %}
-        {% if not header_material and tray_data.tray_type %}
-          {% set header_material = tray_data.tray_type %}
-        {% endif %}
-        {% if header_material %}
-          {% set header_sub_brand = tray_data.spool_sub_brand if tray_data.matched else tray_data.tray_sub_brands %}
-          - {{ header_material }}{% if header_sub_brand %} {{ header_sub_brand }}{% endif %}
+        {% if tray_data.tray_type %}
+          - {{ tray_data.tray_type }}{% if tray_data.tray_sub_brand %} {{ tray_data.tray_sub_brand }}{% endif %}
         {% endif %}
       </div>
     </div>
-    {% set header_color = tray_data.spool_color %}
-    {% if not header_color %}
-      {% if tray_data.tray_color is iterable and tray_data.tray_color is not string %}
-        {% set header_color = tray_data.tray_color[0] %}
-      {% elif tray_data.tray_color %}
-        {% set header_color = tray_data.tray_color %}
-      {% endif %}
-    {% endif %}
-    {% if header_color %}
-      <span class="ms-2 border rounded" style="width: 16px; height: 16px; background-color: #{{ header_color }}; display: inline-block;"></span>
+    {% if tray_data.tray_color %}
+      <span class="ms-2 border rounded" style="width: 24px; height: 24px; background-color: #{{ tray_data.tray_color }}; display: inline-block;"></span>
     {% endif %}
   </div>
 
@@ -41,22 +28,22 @@
         <div class="text-start">
           <div class="fw-semibold">Filament type mismatch</div>
           <small>
-            AMS reports {{ tray_data.tray_type }}{% if tray_data.tray_sub_brands %} ({{ tray_data.tray_sub_brands }}){% endif %}, but the assigned spool is {{ tray_data.vendor }} {{ tray_data.name }}{% if tray_data.spool_material %} ({{ tray_data.spool_material }}{% if tray_data.spool_sub_brand %}, {{ tray_data.spool_sub_brand }}{% endif %}){% endif %}.
+            AMS reports {{ tray_data.tray_type }}{% if tray_data.tray_sub_brands %} {{ tray_data.tray_sub_brand }}{% endif %}, but the assigned spool is {% if tray_data.spool_material %} {{ tray_data.spool_material }}{% if tray_data.spool_sub_brand %} {{ tray_data.spool_sub_brand }}{% endif %}{% endif %}.
           </small>
         </div>
       </div>
     {% endif %}
     <!-- Typ & Hersteller -->
-    <div class="small text-muted text-center mb-2">
-      {% set display_material = tray_data.spool_material if tray_data.matched else tray_data.tray_type %}
-      {% set display_sub_brand = tray_data.spool_sub_brand if tray_data.matched else tray_data.tray_sub_brands %}
-      {% if display_material %}
-        {{ display_material }}{% if display_sub_brand %} - {{ display_sub_brand }}{% endif %}
-        {% if tray_data.vendor %}- {{ tray_data.vendor }}{% endif %}
-      {% else %}
-        Empty
-      {% endif %}
-    </div>
+    {% if tray_data.tray_type and tray_data.spool_material %}
+      <div class="small text-muted text-center mb-2">
+          {{ tray_data.spool_material }}{% if tray_data.spool_sub_brand %} - {{ tray_data.spool_sub_brand }}{% endif %}
+          {% if tray_data.vendor %}- {{ tray_data.vendor }}{% endif %}
+      </div>
+    {% else %}
+      <div class="small text-muted text-center mb-2 tray-empty">
+          Empty
+      </div>
+    {% endif %}
 
     <div class="row align-items-center text-center text-sm-start">
       {% if tray_data.tray_type %}
@@ -112,10 +99,6 @@
     {% if pick_tray %}
       <a class="btn btn-primary"
          href="{{ url_for('tray_load', spool_id=current_spool['id'], tag_id=tag_id, ams=ams_id, tray=tray_id) }}">Assign</a>
-    {% endif %}
-    {% if tray_data.issue %}
-      <a class="btn btn-primary"
-         href="{{ url_for('issue', ams=ams_id, tray=tray_id) }}">Fix</a>
     {% endif %}
     {% if not pick_tray %}
       <a class="btn btn-primary"
