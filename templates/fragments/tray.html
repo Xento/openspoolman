@@ -16,8 +16,22 @@
         {% endif %}
       </div>
     </div>
-    {% if tray_data.tray_color %}
-      <span class="ms-2 border rounded" style="width: 24px; height: 24px; background-color: #{{ tray_data.tray_color }}; display: inline-block;"></span>
+    {% set header_color = tray_data.ams_tray_color %}
+    {% if not header_color and tray_data.tray_color is string %}
+      {% set header_color = tray_data.tray_color %}
+    {% endif %}
+    {% if header_color %}
+      <div class="d-flex align-items-center gap-2">
+        <span class="ms-2 border rounded" style="width: 24px; height: 24px; background-color: #{{ header_color | replace('#', '') }}; display: inline-block;"></span>
+        {% if tray_data.color_mismatch %}
+          <i class="bi bi-exclamation-circle-fill text-warning" role="button" tabindex="0"
+             data-bs-toggle="popover"
+             data-bs-trigger="hover focus click"
+             data-bs-placement="bottom"
+             data-bs-content="{{ tray_data.color_mismatch_message }}">
+          </i>
+        {% endif %}
+      </div>
     {% endif %}
   </div>
 
