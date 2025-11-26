@@ -21,17 +21,16 @@
       {% set header_color = tray_data.tray_color %}
     {% endif %}
     {% if header_color %}
+      {% if tray_data.color_mismatch %}
+        {% set color_popover_attrs = 'role="button" tabindex="0" data-bs-toggle="popover" data-bs-container="body" data-bs-trigger="manual" data-bs-placement="bottom" data-bs-content="' ~ tray_data.color_mismatch_message ~ '"' %}
+      {% else %}
+        {% set color_popover_attrs = '' %}
+      {% endif %}
       <div class="d-flex align-items-center gap-2">
-        <div class="tray-color-wrapper">
+        <div class="tray-color-wrapper" {{ color_popover_attrs|safe }}>
           <span class="ms-2 border rounded tray-color-swatch" style="background-color: #{{ header_color | replace('#', '') }};"></span>
           {% if tray_data.color_mismatch %}
-            <i class="bi bi-exclamation-triangle-fill text-warning tray-color-warning" role="button" tabindex="0"
-               data-bs-toggle="popover"
-               data-bs-container="body"
-               data-bs-trigger="manual"
-               data-bs-placement="bottom"
-               data-bs-content="{{ tray_data.color_mismatch_message }}">
-            </i>
+            <i class="bi bi-exclamation-triangle-fill text-warning tray-color-warning"></i>
           {% endif %}
         </div>
       </div>

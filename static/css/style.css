@@ -47,11 +47,7 @@
     top: -6px;
     right: -6px;
     font-size: 0.9rem;
-    padding: 2px;
     line-height: 1;
-    background-color: var(--bs-body-bg);
-    border-radius: 999px;
-    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.15);
 }
 
 .spool-icon.vertical *:first-child {
