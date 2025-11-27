@@ -30,7 +30,7 @@
 {% endif %}
 
 <!-- Spool List -->
-<div class="list-group overflow-auto" id="spool-list" style="max-height: 60vh;">
+<div class="list-group overflow-auto" id="spool-list">
   {% for spool in spools %}
   <!-- Individual Spool Item -->
         <div class="spool-container list-group-item list-group-item-action d-flex justify-content-between align-items-center"
@@ -119,21 +119,16 @@
 
 <script>
 (() => {
-  const filterWrapper = document.querySelector('[data-material-filter-wrapper]');
-
-  if (!filterWrapper) {
-    return;
-  }
-
   const spoolList = document.getElementById('spool-list');
-  const filterButtons = filterWrapper.querySelectorAll('[data-material-filter]');
-  const clearButton = document.getElementById('clear-material-filter');
-  const stateInput = document.getElementById('material-filter-state');
 
   if (!spoolList) {
     return;
   }
 
+  const filterWrapper = document.querySelector('[data-material-filter-wrapper]');
+  const filterButtons = filterWrapper ? filterWrapper.querySelectorAll('[data-material-filter]') : [];
+  const clearButton = filterWrapper ? document.getElementById('clear-material-filter') : null;
+  const stateInput = document.getElementById('material-filter-state');
   const selected = new Set();
 
   if (stateInput && stateInput.value) {
@@ -177,6 +172,17 @@
     }
   };
 
+  const updateListHeight = () => {
+    const listRect = spoolList.getBoundingClientRect();
+    const paddingOffset = 24;
+    const availableHeight = window.innerHeight - listRect.top - paddingOffset;
+
+    if (availableHeight > 0) {
+      spoolList.style.maxHeight = `${availableHeight}px`;
+      spoolList.style.height = `${availableHeight}px`;
+    }
+  };
+
   filterButtons.forEach((button) => {
     button.addEventListener('click', () => {
       const material = button.dataset.materialFilter;
@@ -198,6 +204,10 @@
     });
   }
 
+  window.addEventListener('resize', updateListHeight);
+  window.addEventListener('orientationchange', updateListHeight);
+
   applyFilter();
+  updateListHeight();
 })();
 </script>
