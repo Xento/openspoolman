@@ -16,11 +16,7 @@
         {% endif %}
       </div>
     </div>
-    {% set header_color = tray_data.ams_tray_color %}
-    {% if not header_color and tray_data.tray_color is string %}
-      {% set header_color = tray_data.tray_color %}
-    {% endif %}
-    {% if header_color %}
+    {% if tray_data.tray_color %}
       {% if tray_data.color_mismatch %}
         {% set color_popover_attrs = 'role="button" tabindex="0" data-bs-toggle="popover" data-bs-container="body" data-bs-trigger="manual" data-bs-placement="bottom" data-bs-content="' ~ tray_data.color_mismatch_message ~ '"' %}
       {% else %}
@@ -28,7 +24,7 @@
       {% endif %}
       <div class="d-flex align-items-center gap-2">
         <div class="tray-color-wrapper" {{ color_popover_attrs|safe }}>
-          <span class="ms-2 border rounded tray-color-swatch" style="background-color: #{{ header_color | replace('#', '') }};"></span>
+          <span class="ms-2 border rounded tray-color-swatch" style="background-color: #{{ tray_data.tray_color | replace('#', '') }};"></span>
           {% if tray_data.color_mismatch %}
             <i class="bi bi-exclamation-triangle-fill text-warning tray-color-warning"></i>
           {% endif %}
@@ -53,7 +49,7 @@
     {% if tray_data.tray_type and tray_data.spool_material %}
       <div class="small text-muted text-center mb-2">
           {{ tray_data.spool_material }}{% if tray_data.spool_sub_brand %} - {{ tray_data.spool_sub_brand }}{% endif %}
-          {% if tray_data.vendor %}- {{ tray_data.vendor }}{% endif %}
+          {% if tray_data.vendor %} - {{ tray_data.vendor }}{% endif %}
       </div>
     {% else %}
       <div class="small text-muted text-center mb-2 tray-empty">
@@ -62,29 +58,29 @@
     {% endif %}
 
     <div class="row align-items-center text-center text-sm-start">
-      {% if tray_data.tray_type %}
+      {% if tray_data.tray_type and tray_data.spool_material %}
         <!-- Farbname + Badge -->
         <div class="col-12 col-xxl-5 d-flex flex-column align-items-center mb-2 mb-sm-0">
           <!-- Farbname -->
           <div class="fw-semibold mb-1 text-center">
             {{ tray_data.name }}
           </div>
-          {% if tray_data.tray_color is iterable and tray_data.tray_color is not string %}
+          {% if tray_data.spool_color is iterable and tray_data.spool_color_orientation %}
             <!-- Multi-Color Badge -->
-            {% if tray_data.tray_color_orientation == "coaxial" %}
+            {% if tray_data.spool_color_orientation == "coaxial" %}
             <div class="spool-icon horizontal">
             {% else %}
             <div class="spool-icon vertical">
             {% endif %}
-              {% for color in tray_data.tray_color %}
+              {% for color in tray_data.spool_color %}
                 <div style="background-color:#{{ color }}" title="#{{ color }}"></div>
               {% endfor %}
             </div>
           {% else %}
             <!-- Single Color Badge -->
             <span class="badge d-inline-block p-2"
-                  style="background-color: #{{ tray_data.tray_color }};
-                         color: {% if color_is_dark(tray_data.tray_color) %}#FFFFFF{% else %}#000000{% endif %}">
+                  style="background-color: #{{ tray_data.spool_color }};
+                         color: {% if color_is_dark(tray_data.spool_color) %}#FFFFFF{% else %}#000000{% endif %}">
               #{{ tray_data.tray_color | upper }}
             </span>
           {% endif %}
