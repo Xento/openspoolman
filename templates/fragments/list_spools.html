@@ -1,3 +1,6 @@
+{% set materials = materials or [] %}
+{% set selected_materials = selected_materials or [] %}
+
 <!-- Empty State -->
 {% if spools|length == 0 or not spools %}
 <div class="alert alert-info text-center" role="alert">
@@ -5,11 +8,33 @@
 </div>
 {% else %}
 
+{% if materials %}
+<div class="mb-3" data-material-filter-wrapper>
+  <div class="d-flex flex-wrap align-items-center gap-2">
+    <span class="fw-semibold">Filter by material:</span>
+    {% for material in materials %}
+    <button type="button"
+            class="btn btn-sm {% if material in selected_materials %}btn-primary active{% else %}btn-outline-primary{% endif %}"
+            data-material-filter="{{ material }}">
+      {{ material }}
+    </button>
+    {% endfor %}
+    <button type="button"
+            id="clear-material-filter"
+            class="btn btn-sm {% if not selected_materials %}btn-primary active{% else %}btn-outline-secondary{% endif %}">
+      Show all
+    </button>
+  </div>
+  <input type="hidden" id="material-filter-state" value='{{ selected_materials|tojson }}'>
+</div>
+{% endif %}
+
 <!-- Spool List -->
-<div class="list-group">
+<div class="list-group" id="spool-list">
   {% for spool in spools %}
   <!-- Individual Spool Item -->
-	<div class="spool-container list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+        <div class="spool-container list-group-item list-group-item-action d-flex justify-content-between align-items-center"
+             data-material="{{ spool.filament.material }}">
     <!-- Left: Filament Color Badge -->
     <div class="me-3">
 		{% if "multi_color_hexes" in spool.filament and spool.filament.multi_color_hexes is iterable and spool.filament.multi_color_hexes is not string%}
@@ -85,3 +110,81 @@
   {% endfor %}
 </div>
 {% endif %}
+
+<script>
+(() => {
+  const filterWrapper = document.querySelector('[data-material-filter-wrapper]');
+
+  if (!filterWrapper) {
+    return;
+  }
+
+  const spoolList = document.getElementById('spool-list');
+  const filterButtons = filterWrapper.querySelectorAll('[data-material-filter]');
+  const clearButton = document.getElementById('clear-material-filter');
+  const stateInput = document.getElementById('material-filter-state');
+
+  if (!spoolList) {
+    return;
+  }
+
+  const selected = new Set();
+
+  if (stateInput && stateInput.value) {
+    try {
+      JSON.parse(stateInput.value).forEach((material) => selected.add(material));
+    } catch (error) {
+      console.warn('Failed to parse selected materials', error);
+    }
+  }
+
+  const applyFilter = () => {
+    const items = spoolList.querySelectorAll('.spool-container');
+
+    items.forEach((item) => {
+      const material = item.dataset.material;
+      const isVisible = selected.size === 0 || selected.has(material);
+      item.classList.toggle('d-none', !isVisible);
+    });
+
+    filterButtons.forEach((button) => {
+      const material = button.dataset.materialFilter;
+      const isActive = selected.has(material);
+
+      button.classList.toggle('btn-primary', isActive);
+      button.classList.toggle('btn-outline-primary', !isActive);
+      button.classList.toggle('active', isActive);
+    });
+
+    if (clearButton) {
+      const clearActive = selected.size === 0;
+      clearButton.classList.toggle('btn-primary', clearActive);
+      clearButton.classList.toggle('btn-outline-secondary', !clearActive);
+      clearButton.classList.toggle('active', clearActive);
+    }
+  };
+
+  filterButtons.forEach((button) => {
+    button.addEventListener('click', () => {
+      const material = button.dataset.materialFilter;
+
+      if (selected.has(material)) {
+        selected.delete(material);
+      } else {
+        selected.add(material);
+      }
+
+      applyFilter();
+    });
+  });
+
+  if (clearButton) {
+    clearButton.addEventListener('click', () => {
+      selected.clear();
+      applyFilter();
+    });
+  }
+
+  applyFilter();
+})();
+</script>
