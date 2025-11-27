@@ -86,8 +86,32 @@ def fill():
     return redirect(url_for('home', success_message=f"Updated Spool ID {spool_id} to AMS {ams_id}, Tray {tray_id}."))
   else:
     spools = fetchSpools()
-        
-    return render_template('fill.html', spools=spools, ams_id=ams_id, tray_id=tray_id)
+
+    materials = extract_materials(spools)
+    selected_materials = []
+
+    try:
+      last_ams_config = getLastAMSConfig()
+      default_material = None
+
+      if ams_id == EXTERNAL_SPOOL_AMS_ID:
+        default_material = last_ams_config.get("vt_tray", {}).get("tray_type")
+      else:
+        for ams in last_ams_config.get("ams", []):
+          if str(ams.get("id")) != str(ams_id):
+            continue
+
+          for tray in ams.get("tray", []):
+            if str(tray.get("id")) == str(tray_id):
+              default_material = tray.get("tray_type")
+              break
+
+      if default_material and default_material in materials:
+        selected_materials.append(default_material)
+    except Exception:
+      pass
+
+    return render_template('fill.html', spools=spools, ams_id=ams_id, tray_id=tray_id, materials=materials, selected_materials=selected_materials)
 
 @app.route("/spool_info")
 def spool_info():
@@ -248,15 +272,44 @@ def sort_spools(spools):
   # Sort with the custom condition: False values come first
   return sorted(spools, key=lambda spool: bool(condition(spool)))
 
+
+def extract_materials(spools):
+  materials = set()
+
+  for spool in spools:
+    filament = None
+
+    if isinstance(spool, dict):
+      filament = spool.get("filament")
+    else:
+      filament = getattr(spool, "filament", None)
+
+    if isinstance(filament, dict):
+      material = filament.get("material")
+    else:
+      material = getattr(filament, "material", None)
+
+    if material:
+      materials.add(material)
+
+  return sorted(materials)
+
 @app.route("/assign_tag")
 def assign_tag():
   if not isMqttClientConnected():
     return render_template('error.html', exception="MQTT is disconnected. Is the printer online?")
-    
+
   try:
     spools = sort_spools(fetchSpools())
 
-    return render_template('assign_tag.html', spools=spools)
+    materials = extract_materials(spools)
+    selected_materials = []
+    requested_material = request.args.get("material")
+
+    if requested_material and requested_material in materials:
+      selected_materials.append(requested_material)
+
+    return render_template('assign_tag.html', spools=spools, materials=materials, selected_materials=selected_materials)
   except Exception as e:
     traceback.print_exc()
     return render_template('error.html', exception=str(e))
