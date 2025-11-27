@@ -1,4 +1,5 @@
 import json
+import math
 import traceback
 import uuid
 
@@ -340,6 +341,13 @@ def health():
 def print_history():
   spoolman_settings = getSettings()
 
+  try:
+    page = max(int(request.args.get("page", 1)), 1)
+  except ValueError:
+    page = 1
+  per_page = 50
+  offset = max((page - 1) * per_page, 0)
+
   ams_slot = request.args.get("ams_slot")
   print_id = request.args.get("print_id")
   spool_id = request.args.get("spool_id")
@@ -355,7 +363,7 @@ def print_history():
         
       consumeSpool(spool_id, filament["grams_used"])
 
-  prints = get_prints_with_filament()
+  prints, total_prints = get_prints_with_filament(limit=per_page, offset=offset)
 
   spool_list = fetchSpools()
 
@@ -372,7 +380,16 @@ def print_history():
             print["total_cost"] += filament["cost"]
             break
   
-  return render_template('print_history.html', prints=prints, currencysymbol=spoolman_settings["currency_symbol"])
+  total_pages = max(1, math.ceil(total_prints / per_page))
+
+  return render_template(
+    'print_history.html',
+    prints=prints,
+    currencysymbol=spoolman_settings["currency_symbol"],
+    page=page,
+    total_pages=total_pages,
+    per_page=per_page,
+  )
 
 @app.route("/print_select_spool")
 def print_select_spool():

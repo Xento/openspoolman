@@ -83,7 +83,38 @@
 
 <!-- Page Title -->
 <h1 class="mb-4 text-center">Print history</h1>
+{% if total_pages > 1 %}
+<nav aria-label="Print history pagination" class="mb-3">
+    <ul class="pagination justify-content-center">
+        <li class="page-item {% if page <= 1 %}disabled{% endif %}">
+            <a class="page-link" href="{{ url_for('print_history', page=page-1) }}" aria-label="Previous">Previous</a>
+        </li>
+        <li class="page-item disabled">
+            <span class="page-link">Page {{ page }} of {{ total_pages }}</span>
+        </li>
+        <li class="page-item {% if page >= total_pages %}disabled{% endif %}">
+            <a class="page-link" href="{{ url_for('print_history', page=page+1) }}" aria-label="Next">Next</a>
+        </li>
+    </ul>
+</nav>
+{% endif %}
 {% with action_assign=True %}{% include 'fragments/list_prints.html' %}{% endwith %}
+
+{% if total_pages > 1 %}
+<nav aria-label="Print history pagination" class="mt-3">
+    <ul class="pagination justify-content-center">
+        <li class="page-item {% if page <= 1 %}disabled{% endif %}">
+            <a class="page-link" href="{{ url_for('print_history', page=page-1) }}" aria-label="Previous">Previous</a>
+        </li>
+        <li class="page-item disabled">
+            <span class="page-link">Page {{ page }} of {{ total_pages }}</span>
+        </li>
+        <li class="page-item {% if page >= total_pages %}disabled{% endif %}">
+            <a class="page-link" href="{{ url_for('print_history', page=page+1) }}" aria-label="Next">Next</a>
+        </li>
+    </ul>
+</nav>
+{% endif %}
 
 <div id="image-overlay" class="image-overlay hidden">
     <div class="overlay-backdrop"></div>
