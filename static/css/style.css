@@ -31,6 +31,25 @@
     border: #44444430 solid 2px
 }
 
+.tray-color-wrapper {
+    position: relative;
+    display: inline-block;
+}
+
+.tray-color-swatch {
+    width: 24px;
+    height: 24px;
+    display: inline-block;
+}
+
+.tray-color-warning {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    font-size: 0.9rem;
+    line-height: 1;
+}
+
 .spool-icon.vertical *:first-child {
     border-top-left-radius: 6px;
     border-top-right-radius: 6px
