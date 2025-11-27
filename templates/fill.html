@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<h1>Fill slot</h1>
-<h2>AMS: {{ ams_id }}, Tray: {{ tray_id }}</h2>
+<h1>Fill tray</h1>
+<h2>AMS: {{ ams_id|int +1 }}, Tray: {{ tray_id|int +1 }}</h2>
 {% with action_fill=True, materials=materials, selected_materials=selected_materials %}{% include 'fragments/list_spools.html' %}{% endwith %}
 {% endblock %}
