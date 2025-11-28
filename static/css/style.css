@@ -2,6 +2,19 @@
     gap: 10px;
 }
 
+#spool-list .spool-container {
+    padding: 0.75rem;
+}
+
+#spool-list h6 {
+    font-size: 1rem;
+    margin-bottom: 0.1rem;
+}
+
+#spool-list small {
+    font-size: 0.9rem;
+}
+
 .spool-icon {
     display: flex;
     width: 2.5em;
@@ -18,7 +31,7 @@
     width: 20px;
     margin: 0;
     height: 50px;
-} 
+}
 
 .spool-icon.large {
     width: 4em;
@@ -170,7 +183,7 @@
 @media (max-width: 768px) {
     .print-grid {
         grid-template-columns: 1fr;
-        grid-template-areas: 
+        grid-template-areas:
             "info"
             "filament"
             "image";
@@ -197,7 +210,7 @@
   @media (min-width: 576px) {
     .label-print-value {
       display: ruby;
-    }
+      }
     .label-print-inline {
       display: inline;
     }
@@ -205,3 +218,31 @@
       display: none;
     }
   }
+
+@media (max-width: 576px) {
+    #spool-list .spool-container {
+        padding: 0.5rem;
+    }
+
+    #spool-list h6 {
+        font-size: 0.95rem;
+    }
+
+    #spool-list small {
+        font-size: 0.8rem;
+    }
+
+    #spool-list .badge {
+        font-size: 0.8rem;
+    }
+
+    #spool-list .badge.d-inline-block {
+        width: 16px !important;
+        height: 40px !important;
+    }
+
+    .spool-icon.small {
+        width: 16px;
+        height: 40px;
+    }
+}
