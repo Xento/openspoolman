@@ -15,6 +15,14 @@
     font-size: 0.9rem;
 }
 
+#spool-list .spool-actions {
+    flex-shrink: 0;
+}
+
+#spool-list .spool-action-link {
+    text-decoration: none;
+}
+
 .spool-icon {
     display: flex;
     width: 2.5em;
@@ -244,5 +252,14 @@
     .spool-icon.small {
         width: 16px;
         height: 40px;
+    }
+
+    #spool-list .spool-actions {
+        width: 100%;
+        align-items: stretch;
+    }
+
+    #spool-list .spool-action-link {
+        width: 100%;
     }
 }
