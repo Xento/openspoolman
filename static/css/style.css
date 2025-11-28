@@ -17,6 +17,11 @@ main.container {
     padding: 0.75rem;
 }
 
+#spool-list {
+    max-height: none;
+    overflow: visible;
+}
+
 #spool-list h6 {
     font-size: 1rem;
     margin-bottom: 0.1rem;
