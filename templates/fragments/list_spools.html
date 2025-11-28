@@ -179,6 +179,7 @@
   };
 
   let viewportHeight = measureViewportHeight();
+  let viewportWidth = window.innerWidth;
 
   const updateListHeight = () => {
     const listRect = spoolList.getBoundingClientRect();
@@ -193,15 +194,20 @@
 
   const handleResize = () => {
     const nextHeight = measureViewportHeight();
+    const nextWidth = window.innerWidth;
+    const widthChanged = nextWidth !== viewportWidth;
+    const isPointerFine = window.matchMedia('(pointer: fine)').matches;
 
-    if (nextHeight < viewportHeight) {
+    if (nextHeight < viewportHeight || widthChanged || isPointerFine) {
       viewportHeight = nextHeight;
+      viewportWidth = nextWidth;
       updateListHeight();
     }
   };
 
   const handleOrientationChange = () => {
     viewportHeight = measureViewportHeight();
+    viewportWidth = window.innerWidth;
     updateListHeight();
   };
 
