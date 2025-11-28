@@ -353,12 +353,15 @@ def print_history():
   spool_id = request.args.get("spool_id")
   old_spool_id = request.args.get("old_spool_id")
 
+  if not old_spool_id:
+    old_spool_id = -1
+
   if all([ams_slot, print_id, spool_id]):
     filament = get_filament_for_slot(print_id, ams_slot)
     update_filament_spool(print_id, ams_slot, spool_id)
 
     if(filament["spool_id"] != int(spool_id) and (not old_spool_id or (old_spool_id and filament["spool_id"] == int(old_spool_id)))):
-      if old_spool_id:
+      if old_spool_id and int(old_spool_id) != -1:
         consumeSpool(old_spool_id, filament["grams_used"] * -1)
         
       consumeSpool(spool_id, filament["grams_used"])
@@ -397,7 +400,12 @@ def print_select_spool():
   try:
     ams_slot = request.args.get("ams_slot")
     print_id = request.args.get("print_id")
+    old_spool_id = request.args.get("old_spool_id")
+    
     change_spool = request.args.get("change_spool", "false").lower() == "true"
+    
+    if not old_spool_id:
+      old_spool_id = -1
 
     if not all([ams_slot, print_id]):
       return render_template('error.html', exception="Missing spool ID or print ID.")
@@ -422,6 +430,7 @@ def print_select_spool():
       spools=spools,
       ams_slot=ams_slot,
       print_id=print_id,
+      old_spool_id=old_spool_id,
       change_spool=change_spool,
       materials=materials,
       selected_materials=selected_materials,

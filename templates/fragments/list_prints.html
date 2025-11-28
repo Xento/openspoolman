@@ -86,7 +86,7 @@
                                         </div>
 
                                         <!-- Edit Button rechts -->
-                                        <a href="{{ url_for('print_select_spool', ams_slot=filament['ams_slot'], print_id=print['id'], change_spool=true )}}" class="btn btn-sm btn-outline-primary ms-3">
+                                        <a href="{{ url_for('print_select_spool', ams_slot=filament['ams_slot'], print_id=print['id'], old_spool_id=filament['spool'].id, change_spool=true )}}" class="btn btn-sm btn-outline-primary ms-3">
                                             <i class="bi bi-pencil"></i>
                                         </a>
                                         </div>
