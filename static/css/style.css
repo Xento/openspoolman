@@ -271,7 +271,6 @@ main.container {
     }
 
     #spool-list .spool-actions {
-        width: 100%;
         align-items: stretch;
     }
 
