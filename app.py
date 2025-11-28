@@ -397,13 +397,14 @@ def print_select_spool():
   try:
     ams_slot = request.args.get("ams_slot")
     print_id = request.args.get("print_id")
+    change_spool = request.args.get("change_spool", "false").lower() == "true"
 
     if not all([ams_slot, print_id]):
       return render_template('error.html', exception="Missing spool ID or print ID.")
 
     spools = fetchSpools()
         
-    return render_template('print_select_spool.html', spools=spools, ams_slot=ams_slot, print_id=print_id)
+    return render_template('print_select_spool.html', spools=spools, ams_slot=ams_slot, print_id=print_id, change_spool=change_spool)
   except Exception as e:
     traceback.print_exc()
     return render_template('error.html', exception=str(e))
