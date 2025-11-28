@@ -403,7 +403,7 @@ def print_select_spool():
     old_spool_id = request.args.get("old_spool_id")
     
     change_spool = request.args.get("change_spool", "false").lower() == "true"
-
+    
     if not old_spool_id:
       old_spool_id = -1
 
@@ -411,8 +411,30 @@ def print_select_spool():
       return render_template('error.html', exception="Missing spool ID or print ID.")
 
     spools = fetchSpools()
-        
-    return render_template('print_select_spool.html', spools=spools, ams_slot=ams_slot, print_id=print_id, old_spool_id=old_spool_id, change_spool=change_spool)
+
+    materials = extract_materials(spools)
+    selected_materials = []
+
+    filament = get_filament_for_slot(print_id, ams_slot)
+
+    try:
+      filament_material = filament["filament_type"] if filament else None
+
+      if filament_material and filament_material in materials:
+        selected_materials.append(filament_material)
+    except Exception:
+      pass
+
+    return render_template(
+      'print_select_spool.html',
+      spools=spools,
+      ams_slot=ams_slot,
+      print_id=print_id,
+      old_spool_id=old_spool_id,
+      change_spool=change_spool,
+      materials=materials,
+      selected_materials=selected_materials,
+    )
   except Exception as e:
     traceback.print_exc()
     return render_template('error.html', exception=str(e))

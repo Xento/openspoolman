@@ -13,5 +13,5 @@
 {% else %}
 <h1 class="mb-4 text-center">Assign spool to print</h1>
 {% endif %}
-{% with action_assign_print=True %}{% include 'fragments/list_spools.html' %}{% endwith %}
+{% with action_assign_print=True, materials=materials, selected_materials=selected_materials %}{% include 'fragments/list_spools.html' %}{% endwith %}
 {% endblock %}
