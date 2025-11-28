@@ -173,15 +173,36 @@
     }
   };
 
+  const measureViewportHeight = () => {
+    const viewport = window.visualViewport;
+    return viewport?.height || window.innerHeight;
+  };
+
+  let viewportHeight = measureViewportHeight();
+
   const updateListHeight = () => {
     const listRect = spoolList.getBoundingClientRect();
     const paddingOffset = 24;
-    const availableHeight = window.innerHeight - listRect.top - paddingOffset;
+    const availableHeight = viewportHeight - listRect.top - paddingOffset;
 
     if (availableHeight > 0) {
       spoolList.style.maxHeight = `${availableHeight}px`;
       spoolList.style.height = `${availableHeight}px`;
     }
+  };
+
+  const handleResize = () => {
+    const nextHeight = measureViewportHeight();
+
+    if (nextHeight < viewportHeight) {
+      viewportHeight = nextHeight;
+      updateListHeight();
+    }
+  };
+
+  const handleOrientationChange = () => {
+    viewportHeight = measureViewportHeight();
+    updateListHeight();
   };
 
   filterButtons.forEach((button) => {
@@ -205,8 +226,8 @@
     });
   }
 
-  window.addEventListener('resize', updateListHeight);
-  window.addEventListener('orientationchange', updateListHeight);
+  window.addEventListener('resize', handleResize);
+  window.addEventListener('orientationchange', handleOrientationChange);
 
   applyFilter();
   updateListHeight();

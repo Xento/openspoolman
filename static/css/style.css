@@ -1,3 +1,14 @@
+.page-shell {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+main.container {
+    flex: 1 0 auto;
+    min-height: 60vh;
+}
+
 .spool-container {
     gap: 10px;
 }
