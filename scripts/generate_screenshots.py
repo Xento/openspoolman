@@ -11,6 +11,8 @@ from typing import Any
 
 import requests
 
+from config import BASE_URL as CONFIG_BASE_URL
+
 
 @dataclass(frozen=True)
 class ScreenshotJob:
@@ -267,10 +269,15 @@ def main() -> int:
     )
 
     server_process = None
-    base_url = args.base_url or f"http://127.0.0.1:{args.port}"
+
+    base_url = args.base_url
+    if base_url is None and args.mode == "live" and CONFIG_BASE_URL:
+        base_url = CONFIG_BASE_URL
+
+    base_url = base_url or f"http://127.0.0.1:{args.port}"
 
     try:
-        if not args.base_url:
+        if base_url == f"http://127.0.0.1:{args.port}":
             use_test_data = args.test_data or args.mode == "seed"
             live_read_only = args.live_readonly or (not args.allow_live_actions)
             server_process = start_server(
