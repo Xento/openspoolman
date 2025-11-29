@@ -17,8 +17,6 @@ os.chdir(REPO_ROOT)
 
 import requests
 
-from config import BASE_URL as CONFIG_BASE_URL
-
 
 @dataclass(frozen=True)
 class ScreenshotJob:
@@ -276,11 +274,7 @@ def main() -> int:
 
     server_process = None
 
-    base_url = args.base_url
-    if base_url is None and args.mode == "live" and CONFIG_BASE_URL:
-        base_url = CONFIG_BASE_URL
-
-    base_url = base_url or f"http://127.0.0.1:{args.port}"
+    base_url = args.base_url or f"http://127.0.0.1:{args.port}"
 
     try:
         if base_url == f"http://127.0.0.1:{args.port}":
