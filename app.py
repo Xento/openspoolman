@@ -196,18 +196,6 @@ def spool_info():
     return render_template('error.html', exception=str(e))
 
 
-@app.route("/spool/<int:spool_id>")
-def spool_detail(spool_id):
-  try:
-    context, error = _spool_info_context(spool_id=spool_id)
-    if error:
-      return render_template('error.html', exception=error)
-    return render_template('spool_info.html', **context)
-  except Exception as e:
-    traceback.print_exc()
-    return render_template('error.html', exception=str(e))
-
-
 @app.route("/tray_load")
 def tray_load():
   if not mqtt_bambulab.isMqttClientConnected():

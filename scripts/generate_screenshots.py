@@ -13,7 +13,7 @@ SCREENSHOT_TARGETS = {
     "docs/img/info.PNG": "/",
     "docs/img/fill_tray.PNG": "/fill?ams=0&tray=0",
     "docs/img/print_history.PNG": "/print_history",
-    "docs/img/spool_info.jpeg": "/spool/1",
+    "docs/img/spool_info.jpeg": "/spool_info?spool_id=1",
     "docs/img/assign_nfc.jpeg": "/write_tag?spool_id=1",
 }
 
