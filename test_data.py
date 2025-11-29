@@ -219,6 +219,24 @@ DEFAULT_DATASET = {
 }
 
 
+def _compute_cost_per_gram(spool: dict) -> dict:
+    if "cost_per_gram" in spool:
+        return spool
+
+    initial_weight = spool.get("initial_weight") or spool.get("filament", {}).get("weight")
+    price = spool.get("price") or spool.get("filament", {}).get("price")
+
+    if initial_weight and price:
+        try:
+            spool["cost_per_gram"] = float(price) / float(initial_weight)
+        except (TypeError, ValueError, ZeroDivisionError):
+            spool["cost_per_gram"] = 0
+    else:
+        spool["cost_per_gram"] = 0
+
+    return spool
+
+
 def _load_snapshot(path: str | Path):
     snapshot_path = Path(path)
     if not snapshot_path.exists():
@@ -230,8 +248,10 @@ def _load_snapshot(path: str | Path):
     except (OSError, json.JSONDecodeError):
         return None
 
+    spools = [_compute_cost_per_gram(spool) for spool in data.get("spools", [])]
+
     return {
-        "spools": data.get("spools", []),
+        "spools": spools,
         "last_ams_config": data.get("last_ams_config") or {},
         "settings": data.get("settings") or {},
         "prints": data.get("prints", []),

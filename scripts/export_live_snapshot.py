@@ -38,6 +38,18 @@ def export_snapshot(path: Path, include_prints: bool = True) -> None:
         print("⚠️ MQTT connection not ready; continuing without AMS tray data")
 
     spools = fetchSpoolList()
+    for spool in spools:
+        if "cost_per_gram" not in spool:
+            initial_weight = spool.get("initial_weight") or spool.get("filament", {}).get("weight")
+            price = spool.get("price") or spool.get("filament", {}).get("price")
+
+            if initial_weight and price:
+                try:
+                    spool["cost_per_gram"] = float(price) / float(initial_weight)
+                except (TypeError, ValueError, ZeroDivisionError):
+                    spool["cost_per_gram"] = 0
+            else:
+                spool["cost_per_gram"] = 0
     settings = getSettings()
     last_ams_config = getLastAMSConfig() or {}
     printer = getPrinterModel()
