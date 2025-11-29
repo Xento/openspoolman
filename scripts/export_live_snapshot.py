@@ -32,7 +32,7 @@ def wait_for_mqtt_ready(timeout: int = 30) -> bool:
 
 
 def export_snapshot(path: Path, include_prints: bool = True) -> None:
-    init_mqtt()
+    init_mqtt(daemon=True)
 
     if not wait_for_mqtt_ready():
         print("⚠️ MQTT connection not ready; continuing without AMS tray data")
