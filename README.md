@@ -61,11 +61,10 @@ Docker: https://ghcr.io/drndos/openspoolman
 
 ### Seeded demo & screenshots
 - Set `OPENSPOOLMAN_TEST_DATA=1` to load a reproducible dummy dataset for the overview, tray fill, print history, and NFC flows.
-- Install the app dependencies with `pip install -r requirements.txt`.
-- If you want to refresh the documentation screenshots, install the optional tooling with `pip install -r requirements-screenshots.txt` **on Python 3.12 or lower** (Playwright's `greenlet` wheels are not available for Python 3.13 on Windows yet) and then install the Chromium browser once via `make playwright-install` (or `python -m playwright install chromium`).
+- Install the app dependencies (including Playwright with `greenlet==1.1.2`) via `pip install -r requirements.txt`.
+- Install the Chromium browser once via `make playwright-install` (or `python -m playwright install chromium`).
 - Run `make screenshots` (or `python scripts/generate_screenshots.py`) to start the app in test mode, open the key routes (`/`, `/fill`, `/print_history`, `/spool/<id>`, `/write_tag`) in headless Chromium, and refresh the images under `docs/img/`.
 - The script can be called in CI after UI changes to automatically regenerate and version the example screenshots.
-- All listed dependencies are pure Python or ship wheels; on Windows no C toolchain is needed because FTPS downloads now rely on the standard library instead of `pycurl`.
 
 ### What you need:
  - Android Phone with Chrome web browser or iPhone (manual process much more complicated if using NFC Tags)

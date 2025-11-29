@@ -19,13 +19,7 @@ SCREENSHOT_TARGETS = {
 
 
 async def capture_pages(base_url: str, output_paths: dict[str, str], viewport: tuple[int, int]) -> None:
-    try:
-        from playwright.async_api import async_playwright
-    except ModuleNotFoundError as exc:  # pragma: no cover - import guard
-        raise SystemExit(
-            "Playwright is required for screenshots. Install it via 'pip install -r requirements-screenshots.txt' "
-            "(Python < 3.13) before running this script."
-        ) from exc
+    from playwright.async_api import async_playwright
 
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
