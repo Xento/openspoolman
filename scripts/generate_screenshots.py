@@ -49,11 +49,14 @@ def wait_for_server(url: str, timeout: int = 30) -> None:
     raise RuntimeError(f"Server at {url} did not become ready in time")
 
 
-def start_server(port: int) -> subprocess.Popen:
+def start_server(port: int, use_test_data: bool = True, snapshot_path: str | None = None) -> subprocess.Popen:
     env = os.environ.copy()
     env.setdefault("FLASK_APP", "app")
     env["FLASK_RUN_PORT"] = str(port)
-    env["OPENSPOOLMAN_TEST_DATA"] = "1"
+    if use_test_data:
+        env["OPENSPOOLMAN_TEST_DATA"] = "1"
+    if snapshot_path:
+        env["OPENSPOOLMAN_TEST_SNAPSHOT"] = snapshot_path
     env.setdefault("OPENSPOOLMAN_BASE_URL", f"http://127.0.0.1:{port}")
 
     process = subprocess.Popen(
@@ -75,10 +78,12 @@ def stop_server(process: subprocess.Popen) -> None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Generate UI screenshots using a seeded dataset")
+    parser = argparse.ArgumentParser(description="Generate UI screenshots using a seeded dataset or live server")
     parser.add_argument("--port", type=int, default=5001, help="Port to run the Flask app on")
     parser.add_argument("--viewport", type=int, nargs=2, default=(1280, 720), metavar=("WIDTH", "HEIGHT"))
-    parser.add_argument("--base-url", dest="base_url", help="Override base URL instead of starting a local server")
+    parser.add_argument("--base-url", dest="base_url", help="Use an already-running server instead of starting one")
+    parser.add_argument("--mode", choices=["seed", "live"], default="seed", help="Start Flask in seeded test mode or against live data")
+    parser.add_argument("--snapshot", dest="snapshot", help="Path to a snapshot JSON to load when using test data")
     args = parser.parse_args()
 
     server_process = None
@@ -86,7 +91,7 @@ def main() -> int:
 
     try:
         if not args.base_url:
-            server_process = start_server(args.port)
+            server_process = start_server(args.port, use_test_data=args.mode == "seed", snapshot_path=args.snapshot)
             wait_for_server(f"{base_url}/health")
 
         asyncio.run(capture_pages(base_url, SCREENSHOT_TARGETS, tuple(args.viewport)))

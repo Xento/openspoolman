@@ -64,6 +64,7 @@ Docker: https://ghcr.io/drndos/openspoolman
 - Install the app dependencies (including Playwright with `greenlet==1.1.2`) via `pip install -r requirements.txt`.
 - Install the Chromium browser once via `make playwright-install` (or `python -m playwright install chromium`).
 - Run `make screenshots` (or `python scripts/generate_screenshots.py`) to start the app in test mode, open the key routes (`/`, `/fill`, `/print_history`, `/spool/<id>`, `/write_tag`) in headless Chromium, and refresh the images under `docs/img/`.
+- To generate pictures from real printer/Spoolman data, either point the generator at your running instance (`python scripts/generate_screenshots.py --mode live --base-url http://<host>:<port>`) or snapshot a live session once with `python scripts/export_live_snapshot.py --output data/live_snapshot.json` and then reuse it via `OPENSPOOLMAN_TEST_DATA=1 OPENSPOOLMAN_TEST_SNAPSHOT=data/live_snapshot.json make screenshots`.
 - The script can be called in CI after UI changes to automatically regenerate and version the example screenshots.
 
 ### What you need:

@@ -3,6 +3,7 @@ import os
 import time
 from copy import deepcopy
 from datetime import datetime, timedelta
+from pathlib import Path
 
 from config import (
     EXTERNAL_SPOOL_AMS_ID,
@@ -11,6 +12,7 @@ from config import (
 from spoolman_service import augmentTrayDataWithSpoolMan, trayUid
 
 TEST_MODE_FLAG = os.getenv("OPENSPOOLMAN_TEST_DATA") == "1"
+SNAPSHOT_PATH = os.getenv("OPENSPOOLMAN_TEST_SNAPSHOT") or os.path.join("data", "live_snapshot.json")
 
 _TEST_PRINTER_ID = os.getenv("PRINTER_ID", "TEST-PRINTER")
 
@@ -19,7 +21,8 @@ def _now_iso(hours_ago: int = 0) -> str:
     return (datetime.utcnow() - timedelta(hours=hours_ago)).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-TEST_SPOOLS = [
+DEFAULT_DATASET = {
+    "spools": [
     {
         "id": 1,
         "remaining_weight": 735.5,
@@ -89,9 +92,8 @@ TEST_SPOOLS = [
             "active_tray": json.dumps(trayUid(0, 1)),
         },
     },
-]
-
-TEST_LAST_AMS_CONFIG = {
+    ],
+    "last_ams_config": {
     "ams": [
         {
             "id": 0,
@@ -136,23 +138,21 @@ TEST_LAST_AMS_CONFIG = {
             ],
         }
     ],
-    "vt_tray": {
-        "id": EXTERNAL_SPOOL_ID,
-        "tray_type": "PETG",
-        "tray_sub_brands": "Matte",
-        "tray_color": "0F0F0F",
-        "tray_info_idx": "PETG-PP-BLACK",
-        "remain": 64,
-        "active": True,
+        "vt_tray": {
+            "id": EXTERNAL_SPOOL_ID,
+            "tray_type": "PETG",
+            "tray_sub_brands": "Matte",
+            "tray_color": "0F0F0F",
+            "tray_info_idx": "PETG-PP-BLACK",
+            "remain": 64,
+            "active": True,
+        },
     },
-}
-
-TEST_SETTINGS = {
-    "currency": "USD",
-    "currency_symbol": "$",
-}
-
-TEST_PRINTS = [
+    "settings": {
+        "currency": "USD",
+        "currency_symbol": "$",
+    },
+    "prints": [
     {
         "id": 1001,
         "print_date": (datetime.utcnow() - timedelta(days=2)).strftime("%Y-%m-%d %H:%M:%S"),
@@ -207,7 +207,47 @@ TEST_PRINTS = [
             ]
         ),
     },
-]
+    ],
+    "printer": {
+        "model": "X1 Carbon (test mode)",
+        "devicename": _TEST_PRINTER_ID,
+    },
+}
+
+
+def _load_snapshot(path: str | Path):
+    snapshot_path = Path(path)
+    if not snapshot_path.exists():
+        return None
+
+    try:
+        with snapshot_path.open("r", encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return None
+
+    return {
+        "spools": data.get("spools", []),
+        "last_ams_config": data.get("last_ams_config") or {},
+        "settings": data.get("settings") or {},
+        "prints": data.get("prints", []),
+        "printer": data.get("printer") or {},
+    }
+
+
+_DATASET = deepcopy(DEFAULT_DATASET)
+_SNAPSHOT_DATA = _load_snapshot(SNAPSHOT_PATH)
+if _SNAPSHOT_DATA:
+    _DATASET.update({k: deepcopy(v) for k, v in _SNAPSHOT_DATA.items()})
+
+TEST_SPOOLS = _DATASET["spools"]
+TEST_LAST_AMS_CONFIG = _DATASET["last_ams_config"]
+TEST_SETTINGS = _DATASET["settings"]
+TEST_PRINTS = _DATASET["prints"]
+TEST_PRINTER = _DATASET["printer"] or {
+    "model": "X1 Carbon (test mode)",
+    "devicename": _TEST_PRINTER_ID,
+}
 
 
 def isMqttClientConnected():
@@ -215,10 +255,7 @@ def isMqttClientConnected():
 
 
 def getPrinterModel():
-    return {
-        "model": "X1 Carbon (test mode)",
-        "devicename": _TEST_PRINTER_ID,
-    }
+    return deepcopy(TEST_PRINTER)
 
 
 def fetchSpools():
