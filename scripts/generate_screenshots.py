@@ -1,40 +1,29 @@
 import argparse
 import asyncio
+import json
 import os
 import subprocess
 import sys
 import time
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import requests
 
 
-SCREENSHOT_TARGETS = {
-    "docs/img/info.PNG": "/",
-    "docs/img/fill_tray.PNG": "/fill?ams=0&tray=0",
-    "docs/img/print_history.PNG": "/print_history",
-    "docs/img/spool_info.jpeg": "/spool_info?spool_id=1",
-    "docs/img/assign_nfc.jpeg": "/write_tag?spool_id=1",
-}
-
-
-def build_output_targets(output_dir: str | os.PathLike | None = None) -> dict[str, str]:
-    """Return the screenshot targets, optionally rewriting the output directory.
-
-    When ``output_dir`` is provided, filenames are kept the same but written into
-    the specified directory. By default, the original ``docs/img`` targets are
-    used so CLI and pytest callers can share the same mapping.
-    """
-
-    if output_dir is None:
-        return dict(SCREENSHOT_TARGETS)
-
-    base = Path(output_dir)
-    return {str(base / Path(path).name): route for path, route in SCREENSHOT_TARGETS.items()}
+@dataclass(frozen=True)
+class ScreenshotJob:
+    output: str
+    route: str
+    viewport: tuple[int, int]
+    max_height: int | None
+    device: str
+    name: str
 
 
 def parse_viewport(raw_viewport: str | tuple[int, int] | list[int]) -> tuple[int, int]:
-    """Parse a viewport specification from CLI or pytest options."""
+    """Parse a viewport specification from CLI, pytest, or config options."""
 
     if isinstance(raw_viewport, (tuple, list)) and len(raw_viewport) == 2:
         return int(raw_viewport[0]), int(raw_viewport[1])
@@ -46,39 +35,118 @@ def parse_viewport(raw_viewport: str | tuple[int, int] | list[int]) -> tuple[int
     raise ValueError("Viewport must be WIDTHxHEIGHT or two integers")
 
 
-async def capture_pages(
-    base_url: str,
-    output_paths: dict[str, str],
-    viewport: tuple[int, int],
-    max_height: int | None = None,
-) -> None:
+def load_config(config_path: str | os.PathLike | None = None) -> dict[str, Any]:
+    """Load the screenshot configuration JSON (defaults to scripts/screenshot_config.json)."""
+
+    if config_path is None:
+        config_path = Path(__file__).with_name("screenshot_config.json")
+
+    with open(config_path, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def _device_viewport(device: dict[str, Any]) -> tuple[int, int]:
+    viewport = device.get("viewport")
+    if viewport is None:
+        raise ValueError("Each device in the screenshot config must define a viewport")
+    return parse_viewport(viewport)
+
+
+def _rewrite_output_path(output: str, device: str, target_devices: list[str], output_dir: str | None) -> str:
+    """Rewrite the output path to include the device suffix and optional directory."""
+
+    path = Path(output)
+
+    # Avoid collisions when multiple devices are captured from the same target
+    if len(target_devices) > 1 and device not in path.stem:
+        path = path.with_name(f"{path.stem}_{device}{path.suffix}")
+
+    if output_dir:
+        path = Path(output_dir) / path.name
+
+    return str(path)
+
+
+def build_jobs(
+    config: dict[str, Any],
+    devices: list[str] | None = None,
+    output_dir: str | None = None,
+    default_max_height: int | None = None,
+) -> list[ScreenshotJob]:
+    """Build the set of screenshots to capture from the JSON configuration."""
+
+    device_defs = config.get("devices") or {}
+    if not device_defs:
+        raise ValueError("Screenshot config must define at least one device")
+
+    selected_devices = devices or config.get("default_devices") or list(device_defs.keys())
+    jobs: list[ScreenshotJob] = []
+
+    for target in config.get("targets", []):
+        target_devices = target.get("devices") or selected_devices
+        route = target["route"]
+        name = target.get("name") or route
+        max_height = target.get("max_height") or default_max_height
+
+        for device in target_devices:
+            if device not in selected_devices:
+                continue
+            if device not in device_defs:
+                raise ValueError(f"Device '{device}' referenced by target '{name}' is not defined in the config")
+
+            viewport = _device_viewport(device_defs[device])
+            output = target.get("output") or f"docs/img/{name}.png"
+
+            if template := target.get("output_template"):
+                output = template.format(device=device, name=name)
+
+            output = _rewrite_output_path(output, device, target_devices, output_dir)
+            jobs.append(
+                ScreenshotJob(
+                    output=output,
+                    route=route,
+                    viewport=viewport,
+                    max_height=max_height,
+                    device=device,
+                    name=name,
+                )
+            )
+
+    return jobs
+
+
+async def capture_pages(base_url: str, jobs: list[ScreenshotJob]) -> None:
     from playwright.async_api import async_playwright
 
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
-        viewport_width, viewport_height = viewport
-        page_height = max(viewport_height, max_height) if max_height else viewport_height
-        page = await browser.new_page(viewport={"width": viewport_width, "height": page_height})
 
-        for output, route in output_paths.items():
-            url = f"{base_url}{route}"
-            print(f"Capturing {url} -> {output}")
+        for job in jobs:
+            viewport_width, viewport_height = job.viewport
+            page_height = max(viewport_height, job.max_height) if job.max_height else viewport_height
+
+            context = await browser.new_context(viewport={"width": viewport_width, "height": page_height})
+            page = await context.new_page()
+
+            url = f"{base_url}{job.route}"
+            print(f"Capturing {url} -> {job.output} ({job.device})")
             await page.goto(url, wait_until="networkidle")
             await page.wait_for_timeout(1000)
-            Path(output).parent.mkdir(parents=True, exist_ok=True)
+            Path(job.output).parent.mkdir(parents=True, exist_ok=True)
 
-            screenshot_kwargs: dict = {"path": output}
-            if max_height:
+            screenshot_kwargs: dict = {"path": job.output}
+            if job.max_height:
                 screenshot_kwargs.update(
                     {
                         "full_page": False,
-                        "clip": {"x": 0, "y": 0, "width": viewport_width, "height": max_height},
+                        "clip": {"x": 0, "y": 0, "width": viewport_width, "height": job.max_height},
                     }
                 )
             else:
                 screenshot_kwargs["full_page"] = True
 
             await page.screenshot(**screenshot_kwargs)
+            await context.close()
 
         await browser.close()
 
@@ -134,14 +202,23 @@ def stop_server(process: subprocess.Popen) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Generate UI screenshots using a seeded dataset or live server")
     parser.add_argument("--port", type=int, default=5001, help="Port to run the Flask app on")
-    parser.add_argument("--viewport", default="1280x720", help="Viewport WIDTHxHEIGHT for screenshots")
+    parser.add_argument(
+        "--config",
+        dest="config_path",
+        default=None,
+        help="Path to screenshot configuration JSON (defaults to scripts/screenshot_config.json)",
+    )
+    parser.add_argument(
+        "--devices",
+        help="Comma-separated list of device names from the config to capture (defaults to config default_devices)",
+    )
     parser.add_argument(
         "--max-height",
         type=int,
         default=None,
-        help="Optional maximum screenshot height; crops long pages to the top section",
+        help="Default maximum screenshot height; per-target overrides in the config win",
     )
-    parser.add_argument("--output-dir", dest="output_dir", help="Directory to write screenshots (defaults to docs/img)")
+    parser.add_argument("--output-dir", dest="output_dir", help="Directory to write screenshots (defaults to config outputs)")
     parser.add_argument("--base-url", dest="base_url", help="Use an already-running server instead of starting one")
     parser.add_argument("--mode", choices=["seed", "live"], default="seed", help="Start Flask in seeded test mode or against live data")
     parser.add_argument("--snapshot", dest="snapshot", help="Path to a snapshot JSON to load when using test data")
@@ -158,10 +235,17 @@ def main() -> int:
     parser.add_argument("--allow-live-actions", action="store_true", help="Permit live mode to make state changes instead of running read-only")
     args = parser.parse_args()
 
+    config = load_config(args.config_path)
+    selected_devices = args.devices.split(",") if args.devices else None
+    jobs = build_jobs(
+        config,
+        devices=[device.strip() for device in selected_devices] if selected_devices else None,
+        output_dir=args.output_dir,
+        default_max_height=args.max_height,
+    )
+
     server_process = None
     base_url = args.base_url or f"http://127.0.0.1:{args.port}"
-    viewport = parse_viewport(args.viewport)
-    targets = build_output_targets(args.output_dir)
 
     try:
         if not args.base_url:
@@ -177,7 +261,7 @@ def main() -> int:
         elif args.mode == "live" and not args.allow_live_actions:
             print("Live mode reminder: set OPENSPOOLMAN_LIVE_READONLY=1 on the target server to avoid state changes.")
 
-        asyncio.run(capture_pages(base_url, targets, viewport, max_height=args.max_height))
+        asyncio.run(capture_pages(base_url, jobs))
         return 0
     finally:
         if server_process is not None:

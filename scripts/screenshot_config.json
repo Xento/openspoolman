@@ -1,0 +1,21 @@
+{
+  "default_devices": ["desktop"],
+  "devices": {
+    "desktop": {"viewport": "1280x720"},
+    "mobile": {"viewport": "414x896"}
+  },
+  "targets": [
+    {"name": "info", "route": "/", "output": "docs/img/info.PNG", "devices": ["desktop"]},
+    {"name": "fill_tray", "route": "/fill?ams=0&tray=0", "output": "docs/img/fill_tray.PNG", "devices": ["desktop"]},
+    {"name": "print_history", "route": "/print_history", "output": "docs/img/print_history.PNG", "devices": ["desktop"], "max_height": 1400},
+    {"name": "spool_info", "route": "/spool_info?spool_id=1", "output": "docs/img/spool_info.jpeg", "devices": ["desktop"]},
+    {"name": "assign_nfc", "route": "/write_tag?spool_id=1", "output": "docs/img/assign_nfc.jpeg", "devices": ["desktop"]},
+    {
+      "name": "info_mobile",
+      "route": "/",
+      "output": "docs/img/info_mobile.PNG",
+      "devices": ["mobile"],
+      "max_height": 1100
+    }
+  ]
+}

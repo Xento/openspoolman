@@ -32,11 +32,6 @@ def pytest_addoption(parser):
         help="Use an already running server for screenshots instead of starting Flask",
     )
     group.addoption(
-        "--screenshot-viewport",
-        default="1280x720",
-        help="Viewport WIDTHxHEIGHT for screenshot tests",
-    )
-    group.addoption(
         "--screenshot-max-height",
         type=int,
         default=None,
@@ -46,6 +41,16 @@ def pytest_addoption(parser):
         "--screenshot-snapshot",
         default=None,
         help="Snapshot JSON to load when generating seeded screenshots",
+    )
+    group.addoption(
+        "--screenshot-config",
+        default=None,
+        help="Path to screenshot configuration JSON (defaults to scripts/screenshot_config.json)",
+    )
+    group.addoption(
+        "--screenshot-devices",
+        default=None,
+        help="Comma-separated list of devices from the screenshot config to render (defaults to config default_devices)",
     )
 
 

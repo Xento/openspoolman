@@ -25,9 +25,18 @@ def test_seeded_screenshots(request, unused_tcp_port_factory):
     base_url = request.config.getoption("--screenshot-base-url")
     output_dir = request.config.getoption("--screenshot-output")
     snapshot = request.config.getoption("--screenshot-snapshot")
-    viewport = gs.parse_viewport(request.config.getoption("--screenshot-viewport"))
     max_height = request.config.getoption("--screenshot-max-height")
-    targets = gs.build_output_targets(output_dir)
+
+    config_path = request.config.getoption("--screenshot-config")
+    devices = request.config.getoption("--screenshot-devices")
+
+    config = gs.load_config(config_path)
+    jobs = gs.build_jobs(
+        config,
+        devices=[device.strip() for device in devices.split(",") if device.strip()] if devices else None,
+        output_dir=output_dir,
+        default_max_height=max_height,
+    )
 
     port = unused_tcp_port_factory()
     server_process = None
@@ -45,10 +54,10 @@ def test_seeded_screenshots(request, unused_tcp_port_factory):
         elif mode == "live" and not os.environ.get("OPENSPOOLMAN_LIVE_READONLY"):
             pytest.skip("Set OPENSPOOLMAN_LIVE_READONLY=1 for safe live captures")
 
-        asyncio.run(gs.capture_pages(base_url, targets, viewport, max_height=max_height))
+        asyncio.run(gs.capture_pages(base_url, jobs))
     finally:
         if server_process is not None:
             gs.stop_server(server_process)
 
-    for output in targets:
-        assert Path(output).exists(), f"Screenshot missing: {output}"
+    for job in jobs:
+        assert Path(job.output).exists(), f"Screenshot missing: {job.output}"
