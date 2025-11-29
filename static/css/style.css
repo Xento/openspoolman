@@ -278,3 +278,48 @@ main.container {
         width: 100%;
     }
 }
+
+/* AMS humidity visualization */
+.ams-humidity-display {
+    gap: 0.35rem !important;
+}
+
+.humidity-droplet-wrapper {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+}
+
+.humidity-droplet {
+    width: 28px;
+    height: 28px;
+}
+
+.droplet-base {
+    fill: transparent;
+}
+
+.droplet-fill {
+    fill: var(--bs-info, #0dcaf0);
+    opacity: 0.8;
+}
+
+.droplet-outline {
+    fill: none;
+    stroke: #000;
+    stroke-width: 0.8;
+}
+
+.humidity-level-number {
+    position: absolute;
+    font-weight: 700;
+    font-size: 0.85rem;
+    color: var(--bs-body-color);
+    line-height: 1;
+    left: 50%;
+    top: 60%;
+    transform: translate(-50%, -50%);
+}
