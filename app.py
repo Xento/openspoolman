@@ -1,5 +1,6 @@
 import json
 import math
+import os
 import traceback
 import uuid
 
@@ -9,12 +10,32 @@ from config import BASE_URL, AUTO_SPEND, SPOOLMAN_BASE_URL, EXTERNAL_SPOOL_AMS_I
 from filament import generate_filament_brand_code, generate_filament_temperatures
 from frontend_utils import color_is_dark
 from messages import AMS_FILAMENT_SETTING
-from mqtt_bambulab import fetchSpools, getLastAMSConfig, publish, getMqttClient, setActiveTray, isMqttClientConnected, init_mqtt, getPrinterModel
-from spoolman_client import patchExtraTags, getSpoolById, consumeSpool
-from spoolman_service import augmentTrayDataWithSpoolMan, trayUid, getSettings
-from print_history import get_prints_with_filament, update_filament_spool, get_filament_for_slot
+from spoolman_service import augmentTrayDataWithSpoolMan, trayUid
 
-init_mqtt()
+USE_TEST_DATA = os.getenv("OPENSPOOLMAN_TEST_DATA") == "1"
+
+if USE_TEST_DATA:
+  from test_data import (
+    consumeSpool,
+    fetchSpools,
+    getLastAMSConfig,
+    getPrinterModel,
+    getSettings,
+    get_filament_for_slot,
+    get_prints_with_filament,
+    getSpoolById,
+    isMqttClientConnected,
+    patchExtraTags,
+    setActiveTray,
+    update_filament_spool,
+  )
+else:
+  from mqtt_bambulab import fetchSpools, getLastAMSConfig, publish, getMqttClient, setActiveTray, isMqttClientConnected, init_mqtt, getPrinterModel
+  from spoolman_client import patchExtraTags, getSpoolById, consumeSpool
+  from spoolman_service import getSettings
+  from print_history import get_prints_with_filament, update_filament_spool, get_filament_for_slot
+
+  init_mqtt()
 
 app = Flask(__name__)
 
@@ -114,53 +135,81 @@ def fill():
 
     return render_template('fill.html', spools=spools, ams_id=ams_id, tray_id=tray_id, materials=materials, selected_materials=selected_materials)
 
+def _spool_info_context(spool_id=None, tag_id=None):
+  if not isMqttClientConnected():
+    return None, "MQTT is disconnected. Is the printer online?"
+
+  tag_id = tag_id or request.args.get("tag_id")
+  spool_id = spool_id or request.args.get("spool_id")
+
+  if not spool_id and not tag_id:
+    return None, "Spool or tag ID is required."
+
+  last_ams_config = getLastAMSConfig()
+  ams_data = last_ams_config.get("ams", [])
+  vt_tray_data = last_ams_config.get("vt_tray", {})
+  spool_list = fetchSpools()
+
+  issue = False
+  augmentTrayDataWithSpoolMan(spool_list, vt_tray_data, trayUid(EXTERNAL_SPOOL_AMS_ID, EXTERNAL_SPOOL_ID))
+  issue |= vt_tray_data["issue"]
+
+  for ams in ams_data:
+    for tray in ams.get("tray", []):
+      augmentTrayDataWithSpoolMan(spool_list, tray, trayUid(ams.get("id"), tray.get("id")))
+      issue |= tray["issue"]
+
+  spools = fetchSpools()
+  current_spool = None
+  for spool in spools:
+    if spool_id and spool['id'] == int(spool_id):
+      current_spool = spool
+      break
+
+    if not tag_id or not spool.get("extra", {}).get("tag"):
+      continue
+
+    tag = json.loads(spool["extra"]["tag"])
+    if tag != tag_id:
+      continue
+
+    current_spool = spool
+    break
+
+  if current_spool and not tag_id:
+    tag_id = json.loads(current_spool.get("extra", {}).get("tag", json.dumps("")))
+
+  if not current_spool:
+    return None, "Spool not found"
+
+  return {
+    "tag_id": tag_id,
+    "current_spool": current_spool,
+    "ams_data": ams_data,
+    "vt_tray_data": vt_tray_data,
+    "issue": issue,
+  }, None
+
+
 @app.route("/spool_info")
 def spool_info():
-  if not isMqttClientConnected():
-    return render_template('error.html', exception="MQTT is disconnected. Is the printer online?")
-    
   try:
-    tag_id = request.args.get("tag_id", "-1")
-    spool_id = request.args.get("spool_id", -1)
-    last_ams_config = getLastAMSConfig()
-    ams_data = last_ams_config.get("ams", [])
-    vt_tray_data = last_ams_config.get("vt_tray", {})
-    spool_list = fetchSpools()
+    context, error = _spool_info_context()
+    if error:
+      return render_template('error.html', exception=error)
+    return render_template('spool_info.html', **context)
+  except Exception as e:
+    traceback.print_exc()
+    return render_template('error.html', exception=str(e))
 
-    issue = False
-    #TODO: Fix issue when external spool info is reset via bambulab interface
-    augmentTrayDataWithSpoolMan(spool_list, vt_tray_data, trayUid(EXTERNAL_SPOOL_AMS_ID, EXTERNAL_SPOOL_ID))
-    issue |= vt_tray_data["issue"]
 
-    for ams in ams_data:
-      for tray in ams["tray"]:
-        augmentTrayDataWithSpoolMan(spool_list, tray, trayUid(ams["id"], tray["id"]))
-        issue |= tray["issue"]
-
-    if not tag_id:
-      return render_template('error.html', exception="TAG ID is required as a query parameter (e.g., ?tag_id=RFID123)")
-
-    spools = fetchSpools()
-    current_spool = None
-    for spool in spools:
-      if spool['id'] == int(spool_id):
-        current_spool = spool
-        break
-
-      if not spool.get("extra", {}).get("tag"):
-        continue
-
-      tag = json.loads(spool["extra"]["tag"])
-      if tag != tag_id:
-        continue
-
-      current_spool = spool
-
-    if current_spool:
-      # TODO: missing current_spool
-      return render_template('spool_info.html', tag_id=tag_id, current_spool=current_spool, ams_data=ams_data, vt_tray_data=vt_tray_data, issue=issue)
-    else:
-      return render_template('error.html', exception="Spool not found")
+@app.route("/spool/<int:spool_id>")
+def spool_detail(spool_id):
+  try:
+    context, error = _spool_info_context(spool_id=spool_id)
+    if error:
+      return render_template('error.html', exception=error)
+    return render_template('spool_info.html', **context)
   except Exception as e:
     traceback.print_exc()
     return render_template('error.html', exception=str(e))
@@ -191,6 +240,9 @@ def tray_load():
     return render_template('error.html', exception=str(e))
 
 def setActiveSpool(ams_id, tray_id, spool_data):
+  if USE_TEST_DATA:
+    return None
+
   if not isMqttClientConnected():
     return render_template('error.html', exception="MQTT is disconnected. Is the printer online?")
   
@@ -333,7 +385,7 @@ def write_tag():
     traceback.print_exc()
     return render_template('error.html', exception=str(e))
 
-@app.route('/', methods=['GET'])
+@app.route('/health', methods=['GET'])
 def health():
   return "OK", 200
 

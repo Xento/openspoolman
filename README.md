@@ -59,6 +59,12 @@ Docker: https://ghcr.io/drndos/openspoolman
     </tbody>
 </table>
 
+### Seeded demo & screenshots
+- Set `OPENSPOOLMAN_TEST_DATA=1` to load a reproducible dummy dataset for the overview, tray fill, print history, and NFC flows.
+- Install the Playwright browsers once via `python -m playwright install chromium`.
+- Run `make screenshots` (or `python scripts/generate_screenshots.py`) to start the app in test mode, open the key routes (`/`, `/fill`, `/print_history`, `/spool/<id>`, `/write_tag`) in headless Chromium, and refresh the images under `docs/img/`.
+- The script can be called in CI after UI changes to automatically regenerate and version the example screenshots.
+
 ### What you need:
  - Android Phone with Chrome web browser or iPhone (manual process much more complicated if using NFC Tags)
  - Server to run OpenSpoolMan with https (optional when not using NFC Tags) that is reachable from your Phone and can reach both SpoolMan and Bambu Lab printer on the network
