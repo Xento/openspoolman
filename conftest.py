@@ -37,6 +37,12 @@ def pytest_addoption(parser):
         help="Viewport WIDTHxHEIGHT for screenshot tests",
     )
     group.addoption(
+        "--screenshot-max-height",
+        type=int,
+        default=None,
+        help="Cap screenshot height to the top N pixels for long pages",
+    )
+    group.addoption(
         "--screenshot-snapshot",
         default=None,
         help="Snapshot JSON to load when generating seeded screenshots",

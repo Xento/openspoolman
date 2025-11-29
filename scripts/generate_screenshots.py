@@ -46,12 +46,19 @@ def parse_viewport(raw_viewport: str | tuple[int, int] | list[int]) -> tuple[int
     raise ValueError("Viewport must be WIDTHxHEIGHT or two integers")
 
 
-async def capture_pages(base_url: str, output_paths: dict[str, str], viewport: tuple[int, int]) -> None:
+async def capture_pages(
+    base_url: str,
+    output_paths: dict[str, str],
+    viewport: tuple[int, int],
+    max_height: int | None = None,
+) -> None:
     from playwright.async_api import async_playwright
 
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
-        page = await browser.new_page(viewport={"width": viewport[0], "height": viewport[1]})
+        viewport_width, viewport_height = viewport
+        page_height = max(viewport_height, max_height) if max_height else viewport_height
+        page = await browser.new_page(viewport={"width": viewport_width, "height": page_height})
 
         for output, route in output_paths.items():
             url = f"{base_url}{route}"
@@ -59,7 +66,19 @@ async def capture_pages(base_url: str, output_paths: dict[str, str], viewport: t
             await page.goto(url, wait_until="networkidle")
             await page.wait_for_timeout(1000)
             Path(output).parent.mkdir(parents=True, exist_ok=True)
-            await page.screenshot(path=output, full_page=True)
+
+            screenshot_kwargs: dict = {"path": output}
+            if max_height:
+                screenshot_kwargs.update(
+                    {
+                        "full_page": False,
+                        "clip": {"x": 0, "y": 0, "width": viewport_width, "height": max_height},
+                    }
+                )
+            else:
+                screenshot_kwargs["full_page"] = True
+
+            await page.screenshot(**screenshot_kwargs)
 
         await browser.close()
 
@@ -116,6 +135,12 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Generate UI screenshots using a seeded dataset or live server")
     parser.add_argument("--port", type=int, default=5001, help="Port to run the Flask app on")
     parser.add_argument("--viewport", default="1280x720", help="Viewport WIDTHxHEIGHT for screenshots")
+    parser.add_argument(
+        "--max-height",
+        type=int,
+        default=None,
+        help="Optional maximum screenshot height; crops long pages to the top section",
+    )
     parser.add_argument("--output-dir", dest="output_dir", help="Directory to write screenshots (defaults to docs/img)")
     parser.add_argument("--base-url", dest="base_url", help="Use an already-running server instead of starting one")
     parser.add_argument("--mode", choices=["seed", "live"], default="seed", help="Start Flask in seeded test mode or against live data")
@@ -140,7 +165,7 @@ def main() -> int:
         elif args.mode == "live" and not args.allow_live_actions:
             print("Live mode reminder: set OPENSPOOLMAN_LIVE_READONLY=1 on the target server to avoid state changes.")
 
-        asyncio.run(capture_pages(base_url, targets, viewport))
+        asyncio.run(capture_pages(base_url, targets, viewport, max_height=args.max_height))
         return 0
     finally:
         if server_process is not None:
