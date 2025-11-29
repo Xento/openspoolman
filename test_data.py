@@ -253,6 +253,12 @@ TEST_PRINTER = _DATASET["printer"] or {
 }
 
 
+def current_dataset() -> dict:
+    """Return a deep copy of the active dataset (seeded or snapshot-backed)."""
+
+    return deepcopy(_DATASET)
+
+
 def isMqttClientConnected():
     return True
 

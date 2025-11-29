@@ -18,6 +18,34 @@ SCREENSHOT_TARGETS = {
 }
 
 
+def build_output_targets(output_dir: str | os.PathLike | None = None) -> dict[str, str]:
+    """Return the screenshot targets, optionally rewriting the output directory.
+
+    When ``output_dir`` is provided, filenames are kept the same but written into
+    the specified directory. By default, the original ``docs/img`` targets are
+    used so CLI and pytest callers can share the same mapping.
+    """
+
+    if output_dir is None:
+        return dict(SCREENSHOT_TARGETS)
+
+    base = Path(output_dir)
+    return {str(base / Path(path).name): route for path, route in SCREENSHOT_TARGETS.items()}
+
+
+def parse_viewport(raw_viewport: str | tuple[int, int] | list[int]) -> tuple[int, int]:
+    """Parse a viewport specification from CLI or pytest options."""
+
+    if isinstance(raw_viewport, (tuple, list)) and len(raw_viewport) == 2:
+        return int(raw_viewport[0]), int(raw_viewport[1])
+
+    if isinstance(raw_viewport, str) and "x" in raw_viewport:
+        width, height = raw_viewport.lower().split("x", 1)
+        return int(width), int(height)
+
+    raise ValueError("Viewport must be WIDTHxHEIGHT or two integers")
+
+
 async def capture_pages(base_url: str, output_paths: dict[str, str], viewport: tuple[int, int]) -> None:
     from playwright.async_api import async_playwright
 
@@ -87,7 +115,8 @@ def stop_server(process: subprocess.Popen) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Generate UI screenshots using a seeded dataset or live server")
     parser.add_argument("--port", type=int, default=5001, help="Port to run the Flask app on")
-    parser.add_argument("--viewport", type=int, nargs=2, default=(1280, 720), metavar=("WIDTH", "HEIGHT"))
+    parser.add_argument("--viewport", default="1280x720", help="Viewport WIDTHxHEIGHT for screenshots")
+    parser.add_argument("--output-dir", dest="output_dir", help="Directory to write screenshots (defaults to docs/img)")
     parser.add_argument("--base-url", dest="base_url", help="Use an already-running server instead of starting one")
     parser.add_argument("--mode", choices=["seed", "live"], default="seed", help="Start Flask in seeded test mode or against live data")
     parser.add_argument("--snapshot", dest="snapshot", help="Path to a snapshot JSON to load when using test data")
@@ -96,6 +125,8 @@ def main() -> int:
 
     server_process = None
     base_url = args.base_url or f"http://127.0.0.1:{args.port}"
+    viewport = parse_viewport(args.viewport)
+    targets = build_output_targets(args.output_dir)
 
     try:
         if not args.base_url:
@@ -109,7 +140,7 @@ def main() -> int:
         elif args.mode == "live" and not args.allow_live_actions:
             print("Live mode reminder: set OPENSPOOLMAN_LIVE_READONLY=1 on the target server to avoid state changes.")
 
-        asyncio.run(capture_pages(base_url, SCREENSHOT_TARGETS, tuple(args.viewport)))
+        asyncio.run(capture_pages(base_url, targets, viewport))
         return 0
     finally:
         if server_process is not None:
