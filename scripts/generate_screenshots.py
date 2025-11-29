@@ -20,6 +20,7 @@ class ScreenshotJob:
     max_height: int | None
     device: str
     name: str
+    full_page: bool
 
 
 def parse_viewport(raw_viewport: str | tuple[int, int] | list[int]) -> tuple[int, int]:
@@ -86,7 +87,8 @@ def build_jobs(
         target_devices = target.get("devices") or selected_devices
         route = target["route"]
         name = target.get("name") or route
-        max_height = target.get("max_height") or default_max_height
+        target_max_height = target.get("max_height")
+        full_page = bool(target.get("full_page"))
 
         for device in target_devices:
             if device not in selected_devices:
@@ -95,6 +97,19 @@ def build_jobs(
                 raise ValueError(f"Device '{device}' referenced by target '{name}' is not defined in the config")
 
             viewport = _device_viewport(device_defs[device])
+            resolved_max_height = None
+
+            if not full_page:
+                if isinstance(target_max_height, dict):
+                    resolved_max_height = target_max_height.get(device)
+                else:
+                    resolved_max_height = target_max_height
+
+                if resolved_max_height is None:
+                    resolved_max_height = default_max_height
+
+                if resolved_max_height is None:
+                    resolved_max_height = viewport[1]
             output = target.get("output") or f"docs/img/{name}.png"
 
             if template := target.get("output_template"):
@@ -106,9 +121,10 @@ def build_jobs(
                     output=output,
                     route=route,
                     viewport=viewport,
-                    max_height=max_height,
+                    max_height=resolved_max_height,
                     device=device,
                     name=name,
+                    full_page=full_page,
                 )
             )
 
@@ -123,7 +139,7 @@ async def capture_pages(base_url: str, jobs: list[ScreenshotJob]) -> None:
 
         for job in jobs:
             viewport_width, viewport_height = job.viewport
-            page_height = max(viewport_height, job.max_height) if job.max_height else viewport_height
+            page_height = max(viewport_height, job.max_height or viewport_height)
 
             context = await browser.new_context(viewport={"width": viewport_width, "height": page_height})
             page = await context.new_page()
@@ -135,15 +151,15 @@ async def capture_pages(base_url: str, jobs: list[ScreenshotJob]) -> None:
             Path(job.output).parent.mkdir(parents=True, exist_ok=True)
 
             screenshot_kwargs: dict = {"path": job.output}
-            if job.max_height:
+            if job.full_page:
+                screenshot_kwargs["full_page"] = True
+            else:
                 screenshot_kwargs.update(
                     {
                         "full_page": False,
                         "clip": {"x": 0, "y": 0, "width": viewport_width, "height": job.max_height},
                     }
                 )
-            else:
-                screenshot_kwargs["full_page"] = True
 
             await page.screenshot(**screenshot_kwargs)
             await context.close()
@@ -216,7 +232,10 @@ def main() -> int:
         "--max-height",
         type=int,
         default=None,
-        help="Default maximum screenshot height; per-target overrides in the config win",
+        help=(
+            "Default maximum screenshot height; per-target/device overrides in the config win."
+            " If omitted, captures are clipped to the viewport height unless a target sets full_page=true."
+        ),
     )
     parser.add_argument("--output-dir", dest="output_dir", help="Directory to write screenshots (defaults to config outputs)")
     parser.add_argument("--base-url", dest="base_url", help="Use an already-running server instead of starting one")
