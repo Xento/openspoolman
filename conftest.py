@@ -39,8 +39,8 @@ def pytest_addoption(parser):
     )
     group.addoption(
         "--screenshot-snapshot",
-        default=None,
-        help="Snapshot JSON to load when generating seeded screenshots",
+        default="data/live_snapshot.json",
+        help="Snapshot JSON to load when generating seeded screenshots (defaults to data/live_snapshot.json)",
     )
     group.addoption(
         "--screenshot-config",
@@ -55,7 +55,7 @@ def pytest_addoption(parser):
     group.addoption(
         "--screenshot-print-history-db",
         default=None,
-        help="Override the SQLite DB path for print history (e.g., data/demo.db)",
+        help="Override the SQLite DB path for print history",
     )
 
 

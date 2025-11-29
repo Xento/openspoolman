@@ -348,9 +348,6 @@ def assign_tag():
 @app.route("/write_tag")
 def write_tag():
   try:
-    if READ_ONLY_MODE:
-      return render_template('error.html', exception="Live read-only mode: writing NFC tags is disabled.")
-
     spool_id = request.args.get("spool_id")
 
     if not spool_id:

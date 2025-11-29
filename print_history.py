@@ -1,10 +1,7 @@
-import copy
 import os
 import sqlite3
-import json
 from datetime import datetime
 from pathlib import Path
-from collections.abc import Mapping
 
 DEFAULT_DB_NAME = "demo.db"
 DB_ENV_VAR = "OPENSPOOLMAN_PRINT_HISTORY_DB"
@@ -23,43 +20,9 @@ def _default_db_path() -> Path:
 db_config = {"db_path": str(_default_db_path())}  # Configuration for database location
 
 
-_DEMO_PRINTS = [
-    {
-        "id": 1,
-        "print_date": "2024-01-01 12:00:00",
-        "file_name": "benchy.3mf",
-        "print_type": "PLA",
-        "image_file": None,
-        "filament_info": [
-            {"spool_id": 1, "filament_type": "PLA", "color": "Red", "grams_used": 22.5, "ams_slot": 1},
-            {"spool_id": 2, "filament_type": "PLA", "color": "Black", "grams_used": 3.0, "ams_slot": 4},
-        ],
-    },
-    {
-        "id": 2,
-        "print_date": "2024-01-03 17:45:00",
-        "file_name": "phone_stand.3mf",
-        "print_type": "PLA",
-        "image_file": None,
-        "filament_info": [
-            {"spool_id": 3, "filament_type": "PLA", "color": "Sky Blue", "grams_used": 12.0, "ams_slot": 2},
-        ],
-    },
-    {
-        "id": 3,
-        "print_date": "2024-01-10 09:30:00",
-        "file_name": "gears.3mf",
-        "print_type": "PETG",
-        "image_file": None,
-        "filament_info": [
-            {"spool_id": 4, "filament_type": "PETG", "color": "Green", "grams_used": 30.5, "ams_slot": 1},
-        ],
-    },
-]
-
 def create_database() -> None:
     """
-    Creates an SQLite database to store 3D printer print jobs and filament usage if it does not exist.
+    Create the SQLite database schema if it does not exist.
     """
     db_path = Path(db_config["db_path"])
     if not db_path.exists():
@@ -67,8 +30,7 @@ def create_database() -> None:
 
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
-        
-        # Create table for prints
+
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS prints (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -78,8 +40,7 @@ def create_database() -> None:
                 image_file TEXT
             )
         ''')
-        
-        # Create table for filament usage
+
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS filament_usage (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -94,47 +55,8 @@ def create_database() -> None:
         ''')
 
         conn.commit()
-        _seed_demo_data(conn)
         conn.close()
 
-
-def _seed_demo_data(conn: sqlite3.Connection) -> None:
-    """Populate a new database with a small demo history so the UI renders."""
-
-    cursor = conn.cursor()
-    cursor.execute("SELECT COUNT(*) FROM prints")
-    if cursor.fetchone()[0]:
-        return
-
-    for print_job in _DEMO_PRINTS:
-        cursor.execute(
-            "INSERT INTO prints (id, print_date, file_name, print_type, image_file) VALUES (?, ?, ?, ?, ?)",
-            (
-                print_job["id"],
-                print_job["print_date"],
-                print_job["file_name"],
-                print_job["print_type"],
-                print_job["image_file"],
-            ),
-        )
-
-        for filament in print_job["filament_info"]:
-            cursor.execute(
-                """
-                INSERT INTO filament_usage (print_id, spool_id, filament_type, color, grams_used, ams_slot)
-                VALUES (?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    print_job["id"],
-                    filament.get("spool_id"),
-                    filament["filament_type"],
-                    filament["color"],
-                    filament["grams_used"],
-                    filament["ams_slot"],
-                ),
-            )
-
-    conn.commit()
 
 def insert_print(file_name: str, print_type: str, image_file: str = None, print_date: str = None) -> int:
     """
@@ -143,7 +65,7 @@ def insert_print(file_name: str, print_type: str, image_file: str = None, print_
     """
     if print_date is None:
         print_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    
+
     conn = sqlite3.connect(db_config["db_path"])
     cursor = conn.cursor()
     cursor.execute('''
@@ -244,27 +166,15 @@ def get_filament_for_slot(print_id: int, ams_slot: int):
     conn = sqlite3.connect(db_config["db_path"])
     conn.row_factory = sqlite3.Row  # Enable column name access
     cursor = conn.cursor()
-    
+
     cursor.execute('''
         SELECT * FROM filament_usage
         WHERE print_id = ? AND ams_slot = ?
     ''', (print_id, ams_slot))
-    
+
     results = cursor.fetchone()
     conn.close()
     return results
 
 # Example for creating the database if it does not exist
 create_database()
-
-# Example usage
-#print_id = insert_print("test_print.gcode", "PLA", "test_print.png")
-#insert_filament_usage(print_id, 15.2, 1)  # Spool_id is unknown initially
-#insert_filament_usage(print_id, 10.5, 2, 123)  # Spool_id is known
-
-# Updating spool_id for the first filament entry
-#update_filament_spool(1, 456)  # Assigns spool_id to the first filament usage entry
-
-#print("All Prints:", get_prints())
-#print(f"Filament usage for print {print_id}:", get_filament_usage(print_id))
-#print(f"Prints using spool 123:", get_prints_by_spool(123))

@@ -2,7 +2,6 @@ import json
 import os
 import time
 from copy import deepcopy
-from datetime import datetime, timedelta
 from contextlib import ExitStack, contextmanager
 import importlib
 from pathlib import Path
@@ -15,208 +14,11 @@ from config import (
 from spoolman_service import augmentTrayDataWithSpoolMan, trayUid
 
 TEST_MODE_FLAG = os.getenv("OPENSPOOLMAN_TEST_DATA") == "1"
-SNAPSHOT_PATH = os.getenv("OPENSPOOLMAN_TEST_SNAPSHOT") or os.path.join("data", "live_snapshot.json")
+SNAPSHOT_PATH = Path(os.getenv("OPENSPOOLMAN_TEST_SNAPSHOT") or Path("data") / "live_snapshot.json")
 
 _TEST_PRINTER_ID = os.getenv("PRINTER_ID", "TEST-PRINTER")
 _PATCH_ACTIVE = False
-
-
-def _now_iso(hours_ago: int = 0) -> str:
-    return (datetime.utcnow() - timedelta(hours=hours_ago)).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-
-DEFAULT_DATASET = {
-    "spools": [
-    {
-        "id": 1,
-        "remaining_weight": 735.5,
-        "remaining_length": 24300,
-        "cost_per_gram": 0.05,
-        "registered": "2024-01-10T12:00:00Z",
-        "last_used": _now_iso(5),
-        "filament": {
-            "name": "Sunset Orange",
-            "material": "PLA",
-            "vendor": {"name": "OpenMaker"},
-            "color_hex": "FF6B35",
-            "extra": {
-                "type": "Basic",
-                "nozzle_temperature": "[200,215]",
-                "filament_id": "PLA-OM-ORANGE",
-            },
-        },
-        "extra": {
-            "tag": json.dumps("NFC-TAG-PLA-01"),
-            "active_tray": json.dumps(trayUid(0, 0)),
-        },
-    },
-    {
-        "id": 2,
-        "remaining_weight": 910.2,
-        "remaining_length": 27600,
-        "cost_per_gram": 0.07,
-        "registered": "2024-02-15T08:30:00Z",
-        "last_used": _now_iso(30),
-        "filament": {
-            "name": "Midnight Black",
-            "material": "PETG",
-            "vendor": {"name": "ProtoPrint"},
-            "color_hex": "0F0F0F",
-            "extra": {
-                "type": "Matte",
-                "nozzle_temperature": "[230,245]",
-                "filament_id": "PETG-PP-BLACK",
-            },
-        },
-        "extra": {
-            "tag": json.dumps("NFC-TAG-PETG-02"),
-            "active_tray": json.dumps(trayUid(EXTERNAL_SPOOL_AMS_ID, EXTERNAL_SPOOL_ID)),
-        },
-    },
-    {
-        "id": 3,
-        "remaining_weight": 520.0,
-        "remaining_length": 18000,
-        "cost_per_gram": 0.06,
-        "registered": "2024-03-21T15:45:00Z",
-        "last_used": _now_iso(48),
-        "filament": {
-            "name": "Sky Blue",
-            "material": "PLA",
-            "vendor": {"name": "ColorWorks"},
-            "color_hex": "7EC8E3",
-            "extra": {
-                "type": "Silk",
-                "nozzle_temperature": "[205,220]",
-                "filament_id": "PLA-CW-BLUE",
-            },
-        },
-        "extra": {
-            "tag": json.dumps("NFC-TAG-PLA-03"),
-            "active_tray": json.dumps(trayUid(0, 1)),
-        },
-    },
-    ],
-    "last_ams_config": {
-    "ams": [
-        {
-            "id": 0,
-            "humidity": 25,
-            "tray": [
-                {
-                    "id": 0,
-                    "tray_type": "PLA",
-                    "tray_sub_brands": "Basic",
-                    "tray_color": "FF6B35",
-                    "tray_info_idx": "PLA-OM-ORANGE",
-                    "remain": 82,
-                    "active": True,
-                },
-                {
-                    "id": 1,
-                    "tray_type": "PLA",
-                    "tray_sub_brands": "Silk",
-                    "tray_color": "7EC8E3",
-                    "tray_info_idx": "PLA-CW-BLUE",
-                    "remain": 55,
-                    "active": True,
-                },
-                {
-                    "id": 2,
-                    "tray_type": "PETG",
-                    "tray_sub_brands": "Matte",
-                    "tray_color": "0F0F0F",
-                    "tray_info_idx": "PETG-PP-BLACK",
-                    "remain": 0,
-                    "active": False,
-                },
-                {
-                    "id": 3,
-                    "tray_type": "PETG",
-                    "tray_sub_brands": "Basic",
-                    "tray_color": "8CC84B",
-                    "tray_info_idx": "PETG-PP-GREEN",
-                    "remain": 0,
-                    "active": False,
-                },
-            ],
-        }
-    ],
-        "vt_tray": {
-            "id": EXTERNAL_SPOOL_ID,
-            "tray_type": "PETG",
-            "tray_sub_brands": "Matte",
-            "tray_color": "0F0F0F",
-            "tray_info_idx": "PETG-PP-BLACK",
-            "remain": 64,
-            "active": True,
-        },
-    },
-    "settings": {
-        "currency": "USD",
-        "currency_symbol": "$",
-    },
-    "prints": [
-    {
-        "id": 1001,
-        "print_date": (datetime.utcnow() - timedelta(days=2)).strftime("%Y-%m-%d %H:%M:%S"),
-        "file_name": "AMS_cover.gcode",
-        "print_type": "cloud",
-        "image_file": None,
-        "filament_info": json.dumps(
-            [
-                {
-                    "spool_id": 1,
-                    "filament_type": "PLA",
-                    "color": "Sunset Orange",
-                    "grams_used": 48.5,
-                    "ams_slot": 1,
-                }
-            ]
-        ),
-    },
-    {
-        "id": 1002,
-        "print_date": (datetime.utcnow() - timedelta(days=1, hours=3)).strftime("%Y-%m-%d %H:%M:%S"),
-        "file_name": "Spool_hook.gcode",
-        "print_type": "cloud",
-        "image_file": None,
-        "filament_info": json.dumps(
-            [
-                {
-                    "spool_id": 2,
-                    "filament_type": "PETG",
-                    "color": "Midnight Black",
-                    "grams_used": 36.2,
-                    "ams_slot": 255,
-                }
-            ]
-        ),
-    },
-    {
-        "id": 1003,
-        "print_date": (datetime.utcnow() - timedelta(hours=6)).strftime("%Y-%m-%d %H:%M:%S"),
-        "file_name": "Calibration_cube.gcode",
-        "print_type": "local",
-        "image_file": None,
-        "filament_info": json.dumps(
-            [
-                {
-                    "spool_id": 3,
-                    "filament_type": "PLA",
-                    "color": "Sky Blue",
-                    "grams_used": 12.0,
-                    "ams_slot": 2,
-                }
-            ]
-        ),
-    },
-    ],
-    "printer": {
-        "model": "X1 Carbon (test mode)",
-        "devicename": _TEST_PRINTER_ID,
-    },
-}
+_DATASET: dict | None = None
 
 
 def _compute_cost_per_gram(spool: dict) -> dict:
@@ -239,18 +41,18 @@ def _compute_cost_per_gram(spool: dict) -> dict:
 
 def _load_snapshot(path: str | Path):
     snapshot_path = Path(path)
-    if not snapshot_path.exists():
-        return None
 
     try:
         with snapshot_path.open("r", encoding="utf-8") as f:
             data = json.load(f)
+    except FileNotFoundError:
+        return None
     except (OSError, json.JSONDecodeError):
         return None
 
     spools = [_compute_cost_per_gram(spool) for spool in data.get("spools", [])]
 
-    return {
+    snapshot = {
         "spools": spools,
         "last_ams_config": data.get("last_ams_config") or {},
         "settings": data.get("settings") or {},
@@ -258,26 +60,44 @@ def _load_snapshot(path: str | Path):
         "printer": data.get("printer") or {},
     }
 
+    snapshot.setdefault("last_ams_config", {})
+    snapshot.setdefault("settings", {})
+    snapshot.setdefault("prints", [])
+    snapshot.setdefault("printer", {})
 
-_DATASET = deepcopy(DEFAULT_DATASET)
-_SNAPSHOT_DATA = _load_snapshot(SNAPSHOT_PATH)
-if _SNAPSHOT_DATA:
-    _DATASET.update({k: deepcopy(v) for k, v in _SNAPSHOT_DATA.items()})
+    return snapshot
 
-TEST_SPOOLS = _DATASET["spools"]
-TEST_LAST_AMS_CONFIG = _DATASET["last_ams_config"]
-TEST_SETTINGS = _DATASET["settings"]
-TEST_PRINTS = _DATASET["prints"]
-TEST_PRINTER = _DATASET["printer"] or {
-    "model": "X1 Carbon (test mode)",
-    "devicename": _TEST_PRINTER_ID,
-}
+
+def _ensure_dataset_loaded() -> dict:
+    global _DATASET
+
+    if _DATASET is not None:
+        return _DATASET
+
+    snapshot_path = SNAPSHOT_PATH
+    if not snapshot_path.exists():
+        raise FileNotFoundError(
+            f"Snapshot not found at {snapshot_path}. Create one with 'python scripts/export_live_snapshot.py --output {snapshot_path}'."
+        )
+
+    snapshot = _load_snapshot(snapshot_path)
+    if snapshot is None:
+        raise RuntimeError(
+            f"Snapshot at {snapshot_path} could not be loaded. Recreate it with 'python scripts/export_live_snapshot.py --output {snapshot_path}'."
+        )
+
+    _DATASET = deepcopy(snapshot)
+    return _DATASET
+
+
+if TEST_MODE_FLAG:
+    _ensure_dataset_loaded()
 
 
 def current_dataset() -> dict:
-    """Return a deep copy of the active dataset (seeded or snapshot-backed)."""
+    """Return a deep copy of the active snapshot-backed dataset."""
 
-    return deepcopy(_DATASET)
+    return deepcopy(_ensure_dataset_loaded())
 
 
 def isMqttClientConnected():
@@ -285,29 +105,37 @@ def isMqttClientConnected():
 
 
 def getPrinterModel():
-    return deepcopy(TEST_PRINTER)
+    printer = deepcopy(_ensure_dataset_loaded().get("printer") or {})
+    printer.setdefault("devicename", _TEST_PRINTER_ID)
+    printer.setdefault("model", "Snapshot printer")
+    return printer
 
 
 def fetchSpools():
-    return deepcopy(TEST_SPOOLS)
+    return deepcopy(_ensure_dataset_loaded().get("spools", []))
 
 
 def getLastAMSConfig():
-    config = deepcopy(TEST_LAST_AMS_CONFIG)
+    config = deepcopy(_ensure_dataset_loaded().get("last_ams_config") or {})
     spool_list = fetchSpools()
-    augmentTrayDataWithSpoolMan(spool_list, config["vt_tray"], trayUid(EXTERNAL_SPOOL_AMS_ID, EXTERNAL_SPOOL_ID))
+
+    vt_tray = config.get("vt_tray")
+    if vt_tray:
+        augmentTrayDataWithSpoolMan(spool_list, vt_tray, trayUid(EXTERNAL_SPOOL_AMS_ID, EXTERNAL_SPOOL_ID))
+
     for ams in config.get("ams", []):
         for tray in ams.get("tray", []):
-            augmentTrayDataWithSpoolMan(spool_list, tray, trayUid(ams["id"], tray["id"]))
+            augmentTrayDataWithSpoolMan(spool_list, tray, trayUid(ams.get("id"), tray.get("id")))
     return config
 
 
 def getSettings():
-    return deepcopy(TEST_SETTINGS)
+    return deepcopy(_ensure_dataset_loaded().get("settings", {}))
 
 
 def patchExtraTags(spool_id, _, new_tags):
-    for spool in TEST_SPOOLS:
+    dataset = _ensure_dataset_loaded()
+    for spool in dataset.get("spools", []):
         if spool["id"] == int(spool_id):
             spool.setdefault("extra", {}).update(new_tags)
             return spool
@@ -315,15 +143,16 @@ def patchExtraTags(spool_id, _, new_tags):
 
 
 def getSpoolById(spool_id):
-    for spool in TEST_SPOOLS:
+    for spool in _ensure_dataset_loaded().get("spools", []):
         if spool["id"] == int(spool_id):
             return deepcopy(spool)
     return None
 
 
 def setActiveTray(spool_id, spool_extra, ams_id, tray_id):
+    dataset = _ensure_dataset_loaded()
     active_tray = json.dumps(trayUid(int(ams_id), int(tray_id)))
-    for spool in TEST_SPOOLS:
+    for spool in dataset.get("spools", []):
         if spool["id"] == int(spool_id):
             spool.setdefault("extra", {}).update(spool_extra or {})
             spool["extra"]["active_tray"] = active_tray
@@ -332,38 +161,42 @@ def setActiveTray(spool_id, spool_extra, ams_id, tray_id):
 
 
 def consumeSpool(spool_id, grams):
-    for spool in TEST_SPOOLS:
+    dataset = _ensure_dataset_loaded()
+    for spool in dataset.get("spools", []):
         if spool["id"] == int(spool_id):
-            spool["remaining_weight"] = max(spool["remaining_weight"] - grams, 0)
+            spool["remaining_weight"] = max(spool.get("remaining_weight", 0) - grams, 0)
             break
 
 
 def get_prints_with_filament(limit=50, offset=0):
-    prints = deepcopy(TEST_PRINTS)
+    dataset = _ensure_dataset_loaded()
+    prints = deepcopy(dataset.get("prints", []))
     if offset:
         prints = prints[offset:]
     if limit is not None:
         prints = prints[:limit]
-    return prints, len(TEST_PRINTS)
+    return prints, len(dataset.get("prints", []))
 
 
 def get_filament_for_slot(print_id, ams_slot):
-    for print_job in TEST_PRINTS:
-        if int(print_job["id"]) != int(print_id):
+    dataset = _ensure_dataset_loaded()
+    for print_job in dataset.get("prints", []):
+        if int(print_job.get("id")) != int(print_id):
             continue
-        for filament in json.loads(print_job["filament_info"]):
-            if int(filament["ams_slot"]) == int(ams_slot):
+        for filament in json.loads(print_job.get("filament_info", "[]")):
+            if int(filament.get("ams_slot")) == int(ams_slot):
                 return filament
     return None
 
 
 def update_filament_spool(print_id, ams_slot, spool_id):
-    for print_job in TEST_PRINTS:
-        if int(print_job["id"]) != int(print_id):
+    dataset = _ensure_dataset_loaded()
+    for print_job in dataset.get("prints", []):
+        if int(print_job.get("id")) != int(print_id):
             continue
-        filaments = json.loads(print_job["filament_info"])
+        filaments = json.loads(print_job.get("filament_info", "[]"))
         for filament in filaments:
-            if int(filament["ams_slot"]) == int(ams_slot):
+            if int(filament.get("ams_slot")) == int(ams_slot):
                 filament["spool_id"] = int(spool_id)
         print_job["filament_info"] = json.dumps(filaments)
     return True

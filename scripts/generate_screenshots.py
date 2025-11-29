@@ -17,6 +17,8 @@ os.chdir(REPO_ROOT)
 
 import requests
 
+DEFAULT_SNAPSHOT_PATH = Path("data") / "live_snapshot.json"
+
 
 @dataclass(frozen=True)
 class ScreenshotJob:
@@ -195,10 +197,16 @@ def start_server(
     env = os.environ.copy()
     env.setdefault("FLASK_APP", "app")
     env["FLASK_RUN_PORT"] = str(port)
+    snapshot_for_env = snapshot_path or str(DEFAULT_SNAPSHOT_PATH)
     if use_test_data:
+        resolved_snapshot = Path(snapshot_for_env)
+        if not resolved_snapshot.exists():
+            raise FileNotFoundError(
+                f"Snapshot not found at {resolved_snapshot}. Create one with 'python scripts/export_live_snapshot.py --output {resolved_snapshot}'."
+            )
+
         env["OPENSPOOLMAN_TEST_DATA"] = "1"
-    if snapshot_path:
-        env["OPENSPOOLMAN_TEST_SNAPSHOT"] = snapshot_path
+        env["OPENSPOOLMAN_TEST_SNAPSHOT"] = str(resolved_snapshot)
     if live_read_only:
         env["OPENSPOOLMAN_LIVE_READONLY"] = "1"
     if print_history_db:
@@ -248,8 +256,13 @@ def main() -> int:
     parser.add_argument("--output-dir", dest="output_dir", help="Directory to write screenshots (defaults to config outputs)")
     parser.add_argument("--base-url", dest="base_url", help="Use an already-running server instead of starting one")
     parser.add_argument("--mode", choices=["seed", "live"], default="seed", help="Start Flask in seeded test mode or against live data")
-    parser.add_argument("--snapshot", dest="snapshot", help="Path to a snapshot JSON to load when using test data")
-    parser.add_argument("--print-history-db", dest="print_history_db", help="Path to a SQLite DB (e.g., data/demo.db) for print history")
+    parser.add_argument(
+        "--snapshot",
+        dest="snapshot",
+        default=str(DEFAULT_SNAPSHOT_PATH),
+        help="Path to a snapshot JSON to load when using test data (defaults to data/live_snapshot.json)",
+    )
+    parser.add_argument("--print-history-db", dest="print_history_db", help="Path to a SQLite DB for print history")
     parser.add_argument(
         "--test-data",
         action="store_true",
@@ -293,6 +306,9 @@ def main() -> int:
 
         asyncio.run(capture_pages(base_url, jobs))
         return 0
+    except FileNotFoundError as exc:
+        print(exc)
+        return 1
     finally:
         if server_process is not None:
             stop_server(server_process)
