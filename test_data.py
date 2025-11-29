@@ -18,6 +18,7 @@ TEST_MODE_FLAG = os.getenv("OPENSPOOLMAN_TEST_DATA") == "1"
 SNAPSHOT_PATH = os.getenv("OPENSPOOLMAN_TEST_SNAPSHOT") or os.path.join("data", "live_snapshot.json")
 
 _TEST_PRINTER_ID = os.getenv("PRINTER_ID", "TEST-PRINTER")
+_PATCH_ACTIVE = False
 
 
 def _now_iso(hours_ago: int = 0) -> str:
@@ -379,6 +380,12 @@ _PATCH_TARGETS = {
 }
 
 
+def test_data_active():
+    """Return True when the test-data patches or flag are enabled."""
+
+    return TEST_MODE_FLAG or _PATCH_ACTIVE
+
+
 @contextmanager
 def patched_test_data():
     """
@@ -390,10 +397,17 @@ def patched_test_data():
             ...
     """
 
+    global _PATCH_ACTIVE
+    previous_state = _PATCH_ACTIVE
+    _PATCH_ACTIVE = True
+
     with ExitStack() as stack:
         for target, replacement in _PATCH_TARGETS.items():
             stack.enter_context(patch(target, replacement))
-        yield
+        try:
+            yield
+        finally:
+            _PATCH_ACTIVE = previous_state
 
 
 def apply_test_overrides(monkeypatch=None):
@@ -409,6 +423,8 @@ def apply_test_overrides(monkeypatch=None):
     """
 
     if monkeypatch is not None:
+        global _PATCH_ACTIVE
+        _PATCH_ACTIVE = True
         for target, replacement in _PATCH_TARGETS.items():
             module_name, attr = target.rsplit(".", 1)
             module = importlib.import_module(module_name)
@@ -416,3 +432,11 @@ def apply_test_overrides(monkeypatch=None):
         return None
 
     return patched_test_data()
+
+
+def activate_test_data_patches():
+    """Apply the test-data patches for the lifetime of the process."""
+
+    ctx = patched_test_data()
+    ctx.__enter__()
+    return ctx

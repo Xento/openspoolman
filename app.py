@@ -10,43 +10,32 @@ from config import BASE_URL, AUTO_SPEND, SPOOLMAN_BASE_URL, EXTERNAL_SPOOL_AMS_I
 from filament import generate_filament_brand_code, generate_filament_temperatures
 from frontend_utils import color_is_dark
 from messages import AMS_FILAMENT_SETTING
+import mqtt_bambulab
+import print_history as print_history_service
+import spoolman_client
+import spoolman_service
+import test_data
 from spoolman_service import augmentTrayDataWithSpoolMan, trayUid
 
-USE_TEST_DATA = os.getenv("OPENSPOOLMAN_TEST_DATA") == "1"
+_TEST_PATCH_CONTEXT = None
+if test_data.TEST_MODE_FLAG:
+  _TEST_PATCH_CONTEXT = test_data.activate_test_data_patches()
+
+USE_TEST_DATA = test_data.test_data_active()
 READ_ONLY_MODE = (not USE_TEST_DATA) and os.getenv("OPENSPOOLMAN_LIVE_READONLY") == "1"
 
-if USE_TEST_DATA:
-  from test_data import (
-    consumeSpool,
-    fetchSpools,
-    getLastAMSConfig,
-    getPrinterModel,
-    getSettings,
-    get_filament_for_slot,
-    get_prints_with_filament,
-    getSpoolById,
-    isMqttClientConnected,
-    patchExtraTags,
-    setActiveTray,
-    update_filament_spool,
-  )
-else:
-  from mqtt_bambulab import fetchSpools, getLastAMSConfig, publish, getMqttClient, setActiveTray, isMqttClientConnected, init_mqtt, getPrinterModel
-  from spoolman_client import patchExtraTags, getSpoolById, consumeSpool
-  from spoolman_service import getSettings
-  from print_history import get_prints_with_filament, update_filament_spool, get_filament_for_slot
-
-  init_mqtt()
+if not USE_TEST_DATA:
+  mqtt_bambulab.init_mqtt()
 
 app = Flask(__name__)
 
 @app.context_processor
 def fronted_utilities():
-  return dict(SPOOLMAN_BASE_URL=SPOOLMAN_BASE_URL, AUTO_SPEND=AUTO_SPEND, color_is_dark=color_is_dark, BASE_URL=BASE_URL, EXTERNAL_SPOOL_AMS_ID=EXTERNAL_SPOOL_AMS_ID, EXTERNAL_SPOOL_ID=EXTERNAL_SPOOL_ID, PRINTER_MODEL=getPrinterModel(), PRINTER_NAME=PRINTER_NAME)
+  return dict(SPOOLMAN_BASE_URL=SPOOLMAN_BASE_URL, AUTO_SPEND=AUTO_SPEND, color_is_dark=color_is_dark, BASE_URL=BASE_URL, EXTERNAL_SPOOL_AMS_ID=EXTERNAL_SPOOL_AMS_ID, EXTERNAL_SPOOL_ID=EXTERNAL_SPOOL_ID, PRINTER_MODEL=mqtt_bambulab.getPrinterModel(), PRINTER_NAME=PRINTER_NAME)
 
 @app.route("/issue")
 def issue():
-  if not isMqttClientConnected():
+  if not mqtt_bambulab.isMqttClientConnected():
     return render_template('error.html', exception="MQTT is disconnected. Is the printer online?")
     
   ams_id = request.args.get("ams")
@@ -57,8 +46,8 @@ def issue():
   fix_ams = None
   tray_data = None
 
-  spool_list = fetchSpools()
-  last_ams_config = getLastAMSConfig()
+  spool_list = mqtt_bambulab.fetchSpools()
+  last_ams_config = mqtt_bambulab.getLastAMSConfig()
   if ams_id == EXTERNAL_SPOOL_AMS_ID:
     fix_ams = last_ams_config.get("vt_tray", {})
     tray_data = fix_ams
@@ -93,7 +82,7 @@ def issue():
 
 @app.route("/fill")
 def fill():
-  if not isMqttClientConnected():
+  if not mqtt_bambulab.isMqttClientConnected():
     return render_template('error.html', exception="MQTT is disconnected. Is the printer online?")
     
   ams_id = request.args.get("ams")
@@ -106,18 +95,18 @@ def fill():
     if READ_ONLY_MODE:
       return render_template('error.html', exception="Live read-only mode: assigning spools to trays is disabled.")
 
-    spool_data = getSpoolById(spool_id)
-    setActiveTray(spool_id, spool_data["extra"], ams_id, tray_id)
+    spool_data = spoolman_client.getSpoolById(spool_id)
+    mqtt_bambulab.setActiveTray(spool_id, spool_data["extra"], ams_id, tray_id)
     setActiveSpool(ams_id, tray_id, spool_data)
     return redirect(url_for('home', success_message=f"Updated Spool ID {spool_id} to AMS {ams_id}, Tray {tray_id}."))
   else:
-    spools = fetchSpools()
+    spools = mqtt_bambulab.fetchSpools()
 
     materials = extract_materials(spools)
     selected_materials = []
 
     try:
-      last_ams_config = getLastAMSConfig()
+      last_ams_config = mqtt_bambulab.getLastAMSConfig()
       default_material = None
 
       if ams_id == EXTERNAL_SPOOL_AMS_ID:
@@ -140,7 +129,7 @@ def fill():
     return render_template('fill.html', spools=spools, ams_id=ams_id, tray_id=tray_id, materials=materials, selected_materials=selected_materials)
 
 def _spool_info_context(spool_id=None, tag_id=None):
-  if not isMqttClientConnected():
+  if not mqtt_bambulab.isMqttClientConnected():
     return None, "MQTT is disconnected. Is the printer online?"
 
   tag_id = tag_id or request.args.get("tag_id")
@@ -149,10 +138,10 @@ def _spool_info_context(spool_id=None, tag_id=None):
   if not spool_id and not tag_id:
     return None, "Spool or tag ID is required."
 
-  last_ams_config = getLastAMSConfig()
+  last_ams_config = mqtt_bambulab.getLastAMSConfig()
   ams_data = last_ams_config.get("ams", [])
   vt_tray_data = last_ams_config.get("vt_tray", {})
-  spool_list = fetchSpools()
+  spool_list = mqtt_bambulab.fetchSpools()
 
   issue = False
   augmentTrayDataWithSpoolMan(spool_list, vt_tray_data, trayUid(EXTERNAL_SPOOL_AMS_ID, EXTERNAL_SPOOL_ID))
@@ -163,7 +152,7 @@ def _spool_info_context(spool_id=None, tag_id=None):
       augmentTrayDataWithSpoolMan(spool_list, tray, trayUid(ams.get("id"), tray.get("id")))
       issue |= tray["issue"]
 
-  spools = fetchSpools()
+  spools = mqtt_bambulab.fetchSpools()
   current_spool = None
   for spool in spools:
     if spool_id and spool['id'] == int(spool_id):
@@ -221,7 +210,7 @@ def spool_detail(spool_id):
 
 @app.route("/tray_load")
 def tray_load():
-  if not isMqttClientConnected():
+  if not mqtt_bambulab.isMqttClientConnected():
     return render_template('error.html', exception="MQTT is disconnected. Is the printer online?")
   
   tag_id = request.args.get("tag_id")
@@ -237,8 +226,8 @@ def tray_load():
 
   try:
     # Update Spoolman with the selected tray
-    spool_data = getSpoolById(spool_id)
-    setActiveTray(spool_id, spool_data["extra"], ams_id, tray_id)
+    spool_data = spoolman_client.getSpoolById(spool_id)
+    mqtt_bambulab.setActiveTray(spool_id, spool_data["extra"], ams_id, tray_id)
     setActiveSpool(ams_id, tray_id, spool_data)
 
     return redirect(url_for('home', success_message=f"Updated Spool ID {spool_id} with TAG id {tag_id} to AMS {ams_id}, Tray {tray_id}."))
@@ -250,7 +239,7 @@ def setActiveSpool(ams_id, tray_id, spool_data):
   if USE_TEST_DATA or READ_ONLY_MODE:
     return None
 
-  if not isMqttClientConnected():
+  if not mqtt_bambulab.isMqttClientConnected():
     return render_template('error.html', exception="MQTT is disconnected. Is the printer online?")
   
   ams_message = AMS_FILAMENT_SETTING
@@ -291,18 +280,18 @@ def setActiveSpool(ams_id, tray_id, spool_data):
   ams_message["print"]["tray_sub_brands"] = ""
 
   print(ams_message)
-  publish(getMqttClient(), ams_message)
+  mqtt_bambulab.publish(mqtt_bambulab.getMqttClient(), ams_message)
 
 @app.route("/")
 def home():
-  if not isMqttClientConnected():
+  if not mqtt_bambulab.isMqttClientConnected():
     return render_template('error.html', exception="MQTT is disconnected. Is the printer online?")
-    
+
   try:
-    last_ams_config = getLastAMSConfig()
+    last_ams_config = mqtt_bambulab.getLastAMSConfig()
     ams_data = last_ams_config.get("ams", [])
     vt_tray_data = last_ams_config.get("vt_tray", {})
-    spool_list = fetchSpools()
+    spool_list = mqtt_bambulab.fetchSpools()
     success_message = request.args.get("success_message")
     
     issue = False
@@ -356,11 +345,11 @@ def extract_materials(spools):
 
 @app.route("/assign_tag")
 def assign_tag():
-  if not isMqttClientConnected():
+  if not mqtt_bambulab.isMqttClientConnected():
     return render_template('error.html', exception="MQTT is disconnected. Is the printer online?")
 
   try:
-    spools = sort_spools(fetchSpools())
+    spools = sort_spools(mqtt_bambulab.fetchSpools())
 
     materials = extract_materials(spools)
     selected_materials = []
@@ -387,7 +376,7 @@ def write_tag():
 
     myuuid = str(uuid.uuid4())
 
-    patchExtraTags(spool_id, {}, {
+    spoolman_client.patchExtraTags(spool_id, {}, {
       "tag": json.dumps(myuuid),
     })
     return render_template('write_tag.html', myuuid=myuuid)
@@ -401,7 +390,7 @@ def health():
 
 @app.route("/print_history")
 def print_history():
-  spoolman_settings = getSettings()
+  spoolman_settings = spoolman_service.getSettings()
 
   try:
     page = max(int(request.args.get("page", 1)), 1)
@@ -422,18 +411,18 @@ def print_history():
     return render_template('error.html', exception="Live read-only mode: updating print-to-spool assignments is disabled.")
 
   if all([ams_slot, print_id, spool_id]):
-    filament = get_filament_for_slot(print_id, ams_slot)
-    update_filament_spool(print_id, ams_slot, spool_id)
+    filament = print_history_service.get_filament_for_slot(print_id, ams_slot)
+    print_history_service.update_filament_spool(print_id, ams_slot, spool_id)
 
     if(filament["spool_id"] != int(spool_id) and (not old_spool_id or (old_spool_id and filament["spool_id"] == int(old_spool_id)))):
       if old_spool_id and int(old_spool_id) != -1:
-        consumeSpool(old_spool_id, filament["grams_used"] * -1)
-        
-      consumeSpool(spool_id, filament["grams_used"])
+        spoolman_client.consumeSpool(old_spool_id, filament["grams_used"] * -1)
 
-  prints, total_prints = get_prints_with_filament(limit=per_page, offset=offset)
+      spoolman_client.consumeSpool(spool_id, filament["grams_used"])
 
-  spool_list = fetchSpools()
+  prints, total_prints = print_history_service.get_prints_with_filament(limit=per_page, offset=offset)
+
+  spool_list = mqtt_bambulab.fetchSpools()
 
   for print in prints:
     print["filament_usage"] = json.loads(print["filament_info"])
@@ -475,12 +464,12 @@ def print_select_spool():
     if not all([ams_slot, print_id]):
       return render_template('error.html', exception="Missing spool ID or print ID.")
 
-    spools = fetchSpools()
+    spools = mqtt_bambulab.fetchSpools()
 
     materials = extract_materials(spools)
     selected_materials = []
 
-    filament = get_filament_for_slot(print_id, ams_slot)
+    filament = print_history_service.get_filament_for_slot(print_id, ams_slot)
 
     try:
       filament_material = filament["filament_type"] if filament else None

@@ -60,7 +60,7 @@ Docker: https://ghcr.io/drndos/openspoolman
 </table>
 
 ### Seeded demo & screenshots
-- Set `OPENSPOOLMAN_TEST_DATA=1` to load a reproducible dummy dataset for the overview, tray fill, print history, and NFC flows.
+- Set `OPENSPOOLMAN_TEST_DATA=1` to load a reproducible dummy dataset for the overview, tray fill, print history, and NFC flows via runtime monkeypatching (no alternate imports needed).
 - Install the app dependencies (including Playwright with `greenlet==1.1.2`) via `pip install -r requirements.txt`.
 - Install the Chromium browser once via `make playwright-install` (or `python -m playwright install chromium`).
 - Run `make screenshots` (or `python scripts/generate_screenshots.py`) to start the app in test mode, open the key routes (`/`, `/fill`, `/print_history`, `/spool/<id>`, `/write_tag`) in headless Chromium, and refresh the images under `docs/img/`.
