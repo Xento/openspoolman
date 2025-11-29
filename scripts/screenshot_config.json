@@ -1,11 +1,17 @@
 {
-  "default_devices": ["desktop"],
+  "default_devices": ["desktop", "mobile"],
   "devices": {
     "desktop": {"viewport": "1280x720"},
     "mobile": {"viewport": "414x896"}
   },
   "targets": [
-    {"name": "info", "route": "/", "output": "docs/img/info.PNG", "devices": ["desktop"]},
+    {
+      "name": "info",
+      "route": "/",
+      "output": "docs/img/info.PNG",
+      "devices": ["desktop", "mobile"],
+      "max_height": {"mobile": 1100}
+    },
     {"name": "fill_tray", "route": "/fill?ams=0&tray=0", "output": "docs/img/fill_tray.PNG", "devices": ["desktop"]},
     {
       "name": "print_history",
@@ -15,13 +21,6 @@
       "max_height": {"desktop": 1400}
     },
     {"name": "spool_info", "route": "/spool_info?spool_id=1", "output": "docs/img/spool_info.jpeg", "devices": ["desktop"]},
-    {"name": "assign_nfc", "route": "/write_tag?spool_id=1", "output": "docs/img/assign_nfc.jpeg", "devices": ["desktop"]},
-    {
-      "name": "info_mobile",
-      "route": "/",
-      "output": "docs/img/info_mobile.PNG",
-      "devices": ["mobile"],
-      "max_height": 1100
-    }
+    {"name": "assign_nfc", "route": "/write_tag?spool_id=1", "output": "docs/img/assign_nfc.jpeg", "devices": ["desktop"]}
   ]
 }

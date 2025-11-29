@@ -54,13 +54,12 @@ def _device_viewport(device: dict[str, Any]) -> tuple[int, int]:
 
 
 def _rewrite_output_path(output: str, device: str, target_devices: list[str], output_dir: str | None) -> str:
-    """Rewrite the output path to include the device suffix and optional directory."""
+    """Rewrite the output path to include the device prefix and optional directory."""
 
     path = Path(output)
 
-    # Avoid collisions when multiple devices are captured from the same target
-    if len(target_devices) > 1 and device not in path.stem:
-        path = path.with_name(f"{path.stem}_{device}{path.suffix}")
+    if not path.name.startswith(f"{device}_"):
+        path = path.with_name(f"{device}_{path.name}")
 
     if output_dir:
         path = Path(output_dir) / path.name
