@@ -198,8 +198,8 @@ def start_server(
 
     process = subprocess.Popen(
         [sys.executable, "-m", "flask", "run", "--port", str(port), "--host", "0.0.0.0"],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
+        stdout=None,
+        stderr=None,
         env=env,
     )
     return process
