@@ -128,69 +128,63 @@ def fill():
 
     return render_template('fill.html', spools=spools, ams_id=ams_id, tray_id=tray_id, materials=materials, selected_materials=selected_materials)
 
-def _spool_info_context(spool_id=None, tag_id=None):
-  if not mqtt_bambulab.isMqttClientConnected():
-    return None, "MQTT is disconnected. Is the printer online?"
-
-  tag_id = tag_id or request.args.get("tag_id")
-  spool_id = spool_id or request.args.get("spool_id")
-
-  if not spool_id and not tag_id:
-    return None, "Spool or tag ID is required."
-
-  last_ams_config = mqtt_bambulab.getLastAMSConfig()
-  ams_data = last_ams_config.get("ams", [])
-  vt_tray_data = last_ams_config.get("vt_tray", {})
-  spool_list = mqtt_bambulab.fetchSpools()
-
-  issue = False
-  augmentTrayDataWithSpoolMan(spool_list, vt_tray_data, trayUid(EXTERNAL_SPOOL_AMS_ID, EXTERNAL_SPOOL_ID))
-  issue |= vt_tray_data["issue"]
-
-  for ams in ams_data:
-    for tray in ams.get("tray", []):
-      augmentTrayDataWithSpoolMan(spool_list, tray, trayUid(ams.get("id"), tray.get("id")))
-      issue |= tray["issue"]
-
-  spools = mqtt_bambulab.fetchSpools()
-  current_spool = None
-  for spool in spools:
-    if spool_id and spool['id'] == int(spool_id):
-      current_spool = spool
-      break
-
-    if not tag_id or not spool.get("extra", {}).get("tag"):
-      continue
-
-    tag = json.loads(spool["extra"]["tag"])
-    if tag != tag_id:
-      continue
-
-    current_spool = spool
-    break
-
-  if current_spool and not tag_id:
-    tag_id = json.loads(current_spool.get("extra", {}).get("tag", json.dumps("")))
-
-  if not current_spool:
-    return None, "Spool not found"
-
-  return {
-    "tag_id": tag_id,
-    "current_spool": current_spool,
-    "ams_data": ams_data,
-    "vt_tray_data": vt_tray_data,
-    "issue": issue,
-  }, None
-
-
 @app.route("/spool_info")
 def spool_info():
   try:
-    context, error = _spool_info_context()
-    if error:
-      return render_template('error.html', exception=error)
-    return render_template('spool_info.html', **context)
+    if not mqtt_bambulab.isMqttClientConnected():
+      return render_template('error.html', exception="MQTT is disconnected. Is the printer online?")
+
+    tag_id = request.args.get("tag_id")
+    spool_id = request.args.get("spool_id")
+
+    if not spool_id and not tag_id:
+      return render_template('error.html', exception="Spool or tag ID is required.")
+
+    last_ams_config = mqtt_bambulab.getLastAMSConfig()
+    ams_data = last_ams_config.get("ams", [])
+    vt_tray_data = last_ams_config.get("vt_tray", {})
+    spool_list = mqtt_bambulab.fetchSpools()
+
+    issue = False
+    augmentTrayDataWithSpoolMan(spool_list, vt_tray_data, trayUid(EXTERNAL_SPOOL_AMS_ID, EXTERNAL_SPOOL_ID))
+    issue |= vt_tray_data["issue"]
+
+    for ams in ams_data:
+      for tray in ams.get("tray", []):
+        augmentTrayDataWithSpoolMan(spool_list, tray, trayUid(ams.get("id"), tray.get("id")))
+        issue |= tray["issue"]
+
+    spools = mqtt_bambulab.fetchSpools()
+    current_spool = None
+    for spool in spools:
+      if spool_id and spool['id'] == int(spool_id):
+        current_spool = spool
+        break
+
+      if not tag_id or not spool.get("extra", {}).get("tag"):
+        continue
+
+      tag = json.loads(spool["extra"]["tag"])
+      if tag != tag_id:
+        continue
+
+      current_spool = spool
+      break
+
+    if current_spool and not tag_id:
+      tag_id = json.loads(current_spool.get("extra", {}).get("tag", json.dumps("")))
+
+    if not current_spool:
+      return render_template('error.html', exception="Spool not found")
+
+    return render_template(
+        'spool_info.html',
+        tag_id=tag_id,
+        current_spool=current_spool,
+        ams_data=ams_data,
+        vt_tray_data=vt_tray_data,
+        issue=issue,
+    )
   except Exception as e:
     traceback.print_exc()
     return render_template('error.html', exception=str(e))
