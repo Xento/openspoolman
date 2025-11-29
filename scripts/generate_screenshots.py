@@ -109,7 +109,7 @@ def start_server(
         env["OPENSPOOLMAN_TEST_DATA"] = "1"
     if snapshot_path:
         env["OPENSPOOLMAN_TEST_SNAPSHOT"] = snapshot_path
-    if live_read_only and not use_test_data:
+    if live_read_only:
         env["OPENSPOOLMAN_LIVE_READONLY"] = "1"
     env.setdefault("OPENSPOOLMAN_BASE_URL", f"http://127.0.0.1:{port}")
 
@@ -145,6 +145,16 @@ def main() -> int:
     parser.add_argument("--base-url", dest="base_url", help="Use an already-running server instead of starting one")
     parser.add_argument("--mode", choices=["seed", "live"], default="seed", help="Start Flask in seeded test mode or against live data")
     parser.add_argument("--snapshot", dest="snapshot", help="Path to a snapshot JSON to load when using test data")
+    parser.add_argument(
+        "--test-data",
+        action="store_true",
+        help="Explicitly set OPENSPOOLMAN_TEST_DATA=1 when starting the Flask server",
+    )
+    parser.add_argument(
+        "--live-readonly",
+        action="store_true",
+        help="Explicitly set OPENSPOOLMAN_LIVE_READONLY=1 when starting the Flask server",
+    )
     parser.add_argument("--allow-live-actions", action="store_true", help="Permit live mode to make state changes instead of running read-only")
     args = parser.parse_args()
 
@@ -155,11 +165,13 @@ def main() -> int:
 
     try:
         if not args.base_url:
+            use_test_data = args.test_data or args.mode == "seed"
+            live_read_only = args.live_readonly or (not args.allow_live_actions)
             server_process = start_server(
                 args.port,
-                use_test_data=args.mode == "seed",
+                use_test_data=use_test_data,
                 snapshot_path=args.snapshot,
-                live_read_only=not args.allow_live_actions,
+                live_read_only=live_read_only,
             )
             wait_for_server(f"{base_url}/health")
         elif args.mode == "live" and not args.allow_live_actions:
