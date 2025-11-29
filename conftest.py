@@ -52,6 +52,11 @@ def pytest_addoption(parser):
         default=None,
         help="Comma-separated list of devices from the screenshot config to render (defaults to config default_devices)",
     )
+    group.addoption(
+        "--screenshot-print-history-db",
+        default=None,
+        help="Override the SQLite DB path for print history (e.g., data/demo.db)",
+    )
 
 
 @pytest.fixture(autouse=True)

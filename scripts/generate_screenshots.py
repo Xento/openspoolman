@@ -184,6 +184,7 @@ def start_server(
     use_test_data: bool = True,
     snapshot_path: str | None = None,
     live_read_only: bool = True,
+    print_history_db: str | None = None,
 ) -> subprocess.Popen:
     env = os.environ.copy()
     env.setdefault("FLASK_APP", "app")
@@ -194,6 +195,8 @@ def start_server(
         env["OPENSPOOLMAN_TEST_SNAPSHOT"] = snapshot_path
     if live_read_only:
         env["OPENSPOOLMAN_LIVE_READONLY"] = "1"
+    if print_history_db:
+        env["OPENSPOOLMAN_PRINT_HISTORY_DB"] = print_history_db
     env.setdefault("OPENSPOOLMAN_BASE_URL", f"http://127.0.0.1:{port}")
 
     process = subprocess.Popen(
@@ -240,6 +243,7 @@ def main() -> int:
     parser.add_argument("--base-url", dest="base_url", help="Use an already-running server instead of starting one")
     parser.add_argument("--mode", choices=["seed", "live"], default="seed", help="Start Flask in seeded test mode or against live data")
     parser.add_argument("--snapshot", dest="snapshot", help="Path to a snapshot JSON to load when using test data")
+    parser.add_argument("--print-history-db", dest="print_history_db", help="Path to a SQLite DB (e.g., data/demo.db) for print history")
     parser.add_argument(
         "--test-data",
         action="store_true",
@@ -274,6 +278,7 @@ def main() -> int:
                 use_test_data=use_test_data,
                 snapshot_path=args.snapshot,
                 live_read_only=live_read_only,
+                print_history_db=args.print_history_db,
             )
             wait_for_server(f"{base_url}/health")
         elif args.mode == "live" and not args.allow_live_actions:

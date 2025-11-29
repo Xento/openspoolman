@@ -3,16 +3,69 @@ import os
 import sqlite3
 import json
 from datetime import datetime
+from pathlib import Path
 from collections.abc import Mapping
 
-db_config = {"db_path": os.path.join(os.getcwd(), 'data', "3d_printer_logs.db")}  # Configuration for database location
+DEFAULT_DB_NAME = "demo.db"
+DB_ENV_VAR = "OPENSPOOLMAN_PRINT_HISTORY_DB"
+
+
+def _default_db_path() -> Path:
+    """Resolve the print history database path, allowing an env override."""
+
+    env_path = os.getenv(DB_ENV_VAR)
+    if env_path:
+        return Path(env_path).expanduser().resolve()
+
+    return Path(__file__).resolve().parent / "data" / DEFAULT_DB_NAME
+
+
+db_config = {"db_path": str(_default_db_path())}  # Configuration for database location
+
+
+_DEMO_PRINTS = [
+    {
+        "id": 1,
+        "print_date": "2024-01-01 12:00:00",
+        "file_name": "benchy.3mf",
+        "print_type": "PLA",
+        "image_file": None,
+        "filament_info": [
+            {"spool_id": 1, "filament_type": "PLA", "color": "Red", "grams_used": 22.5, "ams_slot": 1},
+            {"spool_id": 2, "filament_type": "PLA", "color": "Black", "grams_used": 3.0, "ams_slot": 4},
+        ],
+    },
+    {
+        "id": 2,
+        "print_date": "2024-01-03 17:45:00",
+        "file_name": "phone_stand.3mf",
+        "print_type": "PLA",
+        "image_file": None,
+        "filament_info": [
+            {"spool_id": 3, "filament_type": "PLA", "color": "Sky Blue", "grams_used": 12.0, "ams_slot": 2},
+        ],
+    },
+    {
+        "id": 3,
+        "print_date": "2024-01-10 09:30:00",
+        "file_name": "gears.3mf",
+        "print_type": "PETG",
+        "image_file": None,
+        "filament_info": [
+            {"spool_id": 4, "filament_type": "PETG", "color": "Green", "grams_used": 30.5, "ams_slot": 1},
+        ],
+    },
+]
 
 def create_database() -> None:
     """
     Creates an SQLite database to store 3D printer print jobs and filament usage if it does not exist.
     """
-    if not os.path.exists(db_config["db_path"]):
-        conn = sqlite3.connect(db_config["db_path"])
+    db_path = Path(db_config["db_path"])
+    if not db_path.exists():
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+
+        conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         
         # Create table for prints
@@ -39,9 +92,49 @@ def create_database() -> None:
                 FOREIGN KEY (print_id) REFERENCES prints (id) ON DELETE CASCADE
             )
         ''')
-        
+
         conn.commit()
+        _seed_demo_data(conn)
         conn.close()
+
+
+def _seed_demo_data(conn: sqlite3.Connection) -> None:
+    """Populate a new database with a small demo history so the UI renders."""
+
+    cursor = conn.cursor()
+    cursor.execute("SELECT COUNT(*) FROM prints")
+    if cursor.fetchone()[0]:
+        return
+
+    for print_job in _DEMO_PRINTS:
+        cursor.execute(
+            "INSERT INTO prints (id, print_date, file_name, print_type, image_file) VALUES (?, ?, ?, ?, ?)",
+            (
+                print_job["id"],
+                print_job["print_date"],
+                print_job["file_name"],
+                print_job["print_type"],
+                print_job["image_file"],
+            ),
+        )
+
+        for filament in print_job["filament_info"]:
+            cursor.execute(
+                """
+                INSERT INTO filament_usage (print_id, spool_id, filament_type, color, grams_used, ams_slot)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    print_job["id"],
+                    filament.get("spool_id"),
+                    filament["filament_type"],
+                    filament["color"],
+                    filament["grams_used"],
+                    filament["ams_slot"],
+                ),
+            )
+
+    conn.commit()
 
 def insert_print(file_name: str, print_type: str, image_file: str = None, print_date: str = None) -> int:
     """

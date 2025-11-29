@@ -26,6 +26,7 @@ def test_seeded_screenshots(request, unused_tcp_port_factory):
     output_dir = request.config.getoption("--screenshot-output")
     snapshot = request.config.getoption("--screenshot-snapshot")
     max_height = request.config.getoption("--screenshot-max-height")
+    print_history_db = request.config.getoption("--screenshot-print-history-db")
 
     config_path = request.config.getoption("--screenshot-config")
     devices = request.config.getoption("--screenshot-devices")
@@ -48,6 +49,7 @@ def test_seeded_screenshots(request, unused_tcp_port_factory):
                 use_test_data=mode == "seed",
                 snapshot_path=snapshot,
                 live_read_only=mode != "seed",
+                print_history_db=print_history_db,
             )
             gs.wait_for_server(f"http://127.0.0.1:{port}/health")
             base_url = f"http://127.0.0.1:{port}"
