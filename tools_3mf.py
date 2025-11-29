@@ -2,11 +2,10 @@ import requests
 import zipfile
 import tempfile
 import xml.etree.ElementTree as ET
-import pycurl
-import urllib.parse
 import os
 import re
 import time
+from ftplib import FTP_TLS
 from datetime import datetime
 from config import PRINTER_ID, PRINTER_CODE, PRINTER_IP
 from urllib.parse import urlparse, unquote
@@ -70,35 +69,18 @@ def download3mfFromFTP(filename, destFile):
   ftp_pass = PRINTER_CODE
   remote_path = "/cache/" + filename
   local_path = destFile.name  # 🔹 Download into the current directory
-  encoded_remote_path = urllib.parse.quote(remote_path)
-  with open(local_path, "wb") as f:
-    c = pycurl.Curl()
-    url = f"ftps://{ftp_host}{encoded_remote_path}"
-
-    # 🔹 Setup explicit FTPS connection (like FileZilla)
-    c.setopt(c.URL, url)
-    c.setopt(c.USERPWD, f"{ftp_user}:{ftp_pass}")
-    c.setopt(c.WRITEDATA, f)
-    
-    # 🔹 Enable SSL/TLS
-    c.setopt(c.SSL_VERIFYPEER, 0)  # Disable SSL verification
-    c.setopt(c.SSL_VERIFYHOST, 0)
-    
-    # 🔹 Enable passive mode (like FileZilla)
-    c.setopt(c.FTP_SSL, c.FTPSSL_ALL)
-    
-    # 🔹 Enable proper TLS authentication
-    c.setopt(c.FTPSSLAUTH, c.FTPAUTH_TLS)
-
-    print("[DEBUG] Starting file download into ./test.3mf...")
-
-    try:
-        c.perform()
-        print("[DEBUG] File successfully downloaded into ./test.3mf!")
-    except pycurl.error as e:
-        print(f"[ERROR] cURL error: {e}")
-
-    c.close()
+  try:
+    with FTP_TLS() as ftps, open(local_path, "wb") as f:
+      ftps.connect(host=ftp_host, port=21, timeout=30)
+      ftps.auth()  # Explicit FTPS handshake
+      ftps.prot_p()  # Secure data connection
+      ftps.login(user=ftp_user, passwd=ftp_pass)
+      ftps.set_pasv(True)
+      print(f"[DEBUG] Starting file download from {remote_path} into ./test.3mf...")
+      ftps.retrbinary(f"RETR {remote_path}", f.write)
+      print("[DEBUG] File successfully downloaded into ./test.3mf!")
+  except Exception as e:
+    print(f"[ERROR] FTPS error: {e}")
 
 def download3mfFromLocalFilesystem(path, destFile):
   with open(path, "rb") as src_file:
