@@ -27,6 +27,7 @@ def test_seeded_screenshots(request, unused_tcp_port_factory):
     snapshot = request.config.getoption("--screenshot-snapshot")
     max_height = request.config.getoption("--screenshot-max-height")
     print_history_db = request.config.getoption("--screenshot-print-history-db")
+    color_scheme = request.config.getoption("--screenshot-color-scheme")
 
     config_path = request.config.getoption("--screenshot-config")
     devices = request.config.getoption("--screenshot-devices")
@@ -56,7 +57,7 @@ def test_seeded_screenshots(request, unused_tcp_port_factory):
         elif mode == "live" and not os.environ.get("OPENSPOOLMAN_LIVE_READONLY"):
             pytest.skip("Set OPENSPOOLMAN_LIVE_READONLY=1 for safe live captures")
 
-        asyncio.run(gs.capture_pages(base_url, jobs))
+        asyncio.run(gs.capture_pages(base_url, jobs, color_scheme=color_scheme))
     finally:
         if server_process is not None:
             gs.stop_server(server_process)

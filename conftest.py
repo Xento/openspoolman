@@ -57,6 +57,12 @@ def pytest_addoption(parser):
         default=None,
         help="Override the SQLite DB path for print history",
     )
+    group.addoption(
+        "--screenshot-color-scheme",
+        choices=["auto", "light", "dark"],
+        default=None,
+        help="Force light or dark mode when generating screenshots (defaults to config or auto)",
+    )
 
 
 @pytest.fixture(autouse=True)

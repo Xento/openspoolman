@@ -1,4 +1,5 @@
 {
+  "color_scheme": "auto",
   "default_devices": ["desktop", "mobile"],
   "devices": {
     "desktop": {"viewport": "1280x720"},

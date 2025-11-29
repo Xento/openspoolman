@@ -138,7 +138,7 @@ def build_jobs(
     return jobs
 
 
-async def capture_pages(base_url: str, jobs: list[ScreenshotJob]) -> None:
+async def capture_pages(base_url: str, jobs: list[ScreenshotJob], color_scheme: str | None = None) -> None:
     from playwright.async_api import async_playwright
 
     async with async_playwright() as p:
@@ -148,7 +148,10 @@ async def capture_pages(base_url: str, jobs: list[ScreenshotJob]) -> None:
             viewport_width, viewport_height = job.viewport
             page_height = max(viewport_height, job.max_height or viewport_height)
 
-            context = await browser.new_context(viewport={"width": viewport_width, "height": page_height})
+            context = await browser.new_context(
+                viewport={"width": viewport_width, "height": page_height},
+                color_scheme=None if color_scheme == "auto" else color_scheme,
+            )
             page = await context.new_page()
 
             url = f"{base_url}{job.route}"
@@ -274,9 +277,16 @@ def main() -> int:
         help="Explicitly set OPENSPOOLMAN_LIVE_READONLY=1 when starting the Flask server",
     )
     parser.add_argument("--allow-live-actions", action="store_true", help="Permit live mode to make state changes instead of running read-only")
+    parser.add_argument(
+        "--color-scheme",
+        choices=["auto", "light", "dark"],
+        default=None,
+        help="Force Playwright to render pages in light or dark mode (defaults to config color_scheme or auto)",
+    )
     args = parser.parse_args()
 
     config = load_config(args.config_path)
+    color_scheme = args.color_scheme or config.get("color_scheme") or "auto"
     selected_devices = args.devices.split(",") if args.devices else None
     jobs = build_jobs(
         config,
@@ -304,7 +314,7 @@ def main() -> int:
         elif args.mode == "live" and not args.allow_live_actions:
             print("Live mode reminder: set OPENSPOOLMAN_LIVE_READONLY=1 on the target server to avoid state changes.")
 
-        asyncio.run(capture_pages(base_url, jobs))
+        asyncio.run(capture_pages(base_url, jobs, color_scheme=color_scheme))
         return 0
     except FileNotFoundError as exc:
         print(exc)
