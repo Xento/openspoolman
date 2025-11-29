@@ -66,6 +66,7 @@ Docker: https://ghcr.io/drndos/openspoolman
 - Run `make screenshots` (or `python scripts/generate_screenshots.py`) to start the app in test mode, open the key routes (`/`, `/fill`, `/print_history`, `/spool/<id>`, `/write_tag`) in headless Chromium, and refresh the images under `docs/img/`.
 - To generate pictures from real printer/Spoolman data, either point the generator at your running instance (`python scripts/generate_screenshots.py --mode live --base-url http://<host>:<port>`) or snapshot a live session once with `python scripts/export_live_snapshot.py --output data/live_snapshot.json` and then reuse it via `OPENSPOOLMAN_TEST_DATA=1 OPENSPOOLMAN_TEST_SNAPSHOT=data/live_snapshot.json make screenshots`. When talking to live services, set `OPENSPOOLMAN_LIVE_READONLY=1` to block actions that would change your printer or Spoolman data (the screenshot generator enforces this by default unless you pass `--allow-live-actions`).
 - The script can be called in CI after UI changes to automatically regenerate and version the example screenshots.
+- For unit tests, you can reuse the same seeded dataset without environment variables: wrap your test body in `with test_data.apply_test_overrides(): ...` or call `test_data.apply_test_overrides(monkeypatch)` in pytest to monkeypatch the production modules to the in-memory fixtures.
 
 ### What you need:
  - Android Phone with Chrome web browser or iPhone (manual process much more complicated if using NFC Tags)

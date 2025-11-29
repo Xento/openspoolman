@@ -3,7 +3,10 @@ import os
 import time
 from copy import deepcopy
 from datetime import datetime, timedelta
+from contextlib import ExitStack, contextmanager
+import importlib
 from pathlib import Path
+from unittest.mock import patch
 
 from config import (
     EXTERNAL_SPOOL_AMS_ID,
@@ -349,3 +352,61 @@ def wait_for_seed_ready(timeout=10):
     while time.time() - start < timeout:
         time.sleep(0.1)
     return True
+
+
+_PATCH_TARGETS = {
+    "spoolman_client.fetchSpoolList": fetchSpools,
+    "spoolman_client.getSpoolById": getSpoolById,
+    "spoolman_client.consumeSpool": consumeSpool,
+    "spoolman_client.patchExtraTags": patchExtraTags,
+    "print_history.get_prints_with_filament": get_prints_with_filament,
+    "print_history.get_filament_for_slot": get_filament_for_slot,
+    "print_history.update_filament_spool": update_filament_spool,
+    "spoolman_service.fetchSpools": fetchSpools,
+    "spoolman_service.setActiveTray": setActiveTray,
+    "spoolman_service.consumeSpool": consumeSpool,
+    "mqtt_bambulab.fetchSpools": fetchSpools,
+    "mqtt_bambulab.getLastAMSConfig": getLastAMSConfig,
+    "mqtt_bambulab.isMqttClientConnected": isMqttClientConnected,
+    "mqtt_bambulab.getPrinterModel": getPrinterModel,
+    "mqtt_bambulab.setActiveTray": setActiveTray,
+}
+
+
+@contextmanager
+def patched_test_data():
+    """
+    Patch production modules with the in-memory test dataset for unit tests.
+
+    Usage:
+        with patched_test_data():
+            # imports inside the block will use the seeded functions
+            ...
+    """
+
+    with ExitStack() as stack:
+        for target, replacement in _PATCH_TARGETS.items():
+            stack.enter_context(patch(target, replacement))
+        yield
+
+
+def apply_test_overrides(monkeypatch=None):
+    """
+    Apply the test-data mocks either via pytest's monkeypatch or as a context manager.
+
+    If ``monkeypatch`` is provided, overrides are applied immediately for the
+    duration of the test. Without it, a context manager is returned so tests can
+    control the lifetime explicitly:
+
+        with apply_test_overrides():
+            ...
+    """
+
+    if monkeypatch is not None:
+        for target, replacement in _PATCH_TARGETS.items():
+            module_name, attr = target.rsplit(".", 1)
+            module = importlib.import_module(module_name)
+            monkeypatch.setattr(module, attr, replacement)
+        return None
+
+    return patched_test_data()
