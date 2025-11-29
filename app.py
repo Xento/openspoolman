@@ -2,14 +2,27 @@ import json
 import math
 import traceback
 import uuid
+from queue import Empty
 
-from flask import Flask, request, render_template, redirect, url_for
+from flask import Flask, Response, jsonify, redirect, render_template, request, stream_with_context, url_for
 
 from config import BASE_URL, AUTO_SPEND, SPOOLMAN_BASE_URL, EXTERNAL_SPOOL_AMS_ID, EXTERNAL_SPOOL_ID, PRINTER_NAME
 from filament import generate_filament_brand_code, generate_filament_temperatures
 from frontend_utils import color_is_dark
 from messages import AMS_FILAMENT_SETTING
-from mqtt_bambulab import fetchSpools, getLastAMSConfig, publish, getMqttClient, setActiveTray, isMqttClientConnected, init_mqtt, getPrinterModel
+from mqtt_bambulab import (
+  fetchSpools,
+  getLastAMSConfig,
+  getMqttClient,
+  get_dashboard_version,
+  getPrinterModel,
+  init_mqtt,
+  isMqttClientConnected,
+  publish,
+  register_dashboard_listener,
+  setActiveTray,
+  unregister_dashboard_listener,
+)
 from spoolman_client import patchExtraTags, getSpoolById, consumeSpool
 from spoolman_service import augmentTrayDataWithSpoolMan, trayUid, getSettings
 from print_history import get_prints_with_filament, update_filament_spool, get_filament_for_slot
@@ -234,29 +247,81 @@ def setActiveSpool(ams_id, tray_id, spool_data):
   print(ams_message)
   publish(getMqttClient(), ams_message)
 
+
+def build_dashboard_payload():
+  last_ams_config = getLastAMSConfig() or {}
+  ams_data = last_ams_config.get("ams", [])
+  vt_tray_data = last_ams_config.get("vt_tray", {})
+  spool_list = fetchSpools()
+
+  issue = False
+  augmentTrayDataWithSpoolMan(spool_list, vt_tray_data, trayUid(EXTERNAL_SPOOL_AMS_ID, EXTERNAL_SPOOL_ID))
+  issue |= bool(vt_tray_data.get("issue"))
+
+  for ams in ams_data:
+    for tray in ams.get("tray", []):
+      augmentTrayDataWithSpoolMan(spool_list, tray, trayUid(ams.get("id"), tray.get("id")))
+      issue |= bool(tray.get("issue"))
+
+  return {
+    "ams_data": ams_data,
+    "vt_tray_data": vt_tray_data,
+    "issue": bool(issue),
+    "version": get_dashboard_version(),
+    "mqtt_connected": isMqttClientConnected(),
+  }
+
+
+def format_sse(data):
+  return f"data: {json.dumps(data)}\n\n"
+
+@app.route("/stream/dashboard")
+def dashboard_stream():
+  def event_stream():
+    subscriber = register_dashboard_listener()
+    last_version = None
+
+    try:
+      payload = build_dashboard_payload()
+      last_version = payload.get("version")
+      yield format_sse(payload)
+
+      while True:
+        try:
+          subscriber.get(timeout=15)
+        except Empty:
+          yield ": keep-alive\n\n"
+          continue
+
+        payload = build_dashboard_payload()
+        if payload.get("version") == last_version:
+          continue
+
+        last_version = payload.get("version")
+        yield format_sse(payload)
+    except GeneratorExit:
+      pass
+    finally:
+      unregister_dashboard_listener(subscriber)
+
+  return Response(stream_with_context(event_stream()), mimetype="text/event-stream")
+
+
+@app.route("/api/dashboard")
+def dashboard_json():
+  try:
+    return jsonify(build_dashboard_payload())
+  except Exception as e:
+    traceback.print_exc()
+    return jsonify({"error": str(e)}), 500
+
+
 @app.route("/")
 def home():
-  if not isMqttClientConnected():
-    return render_template('error.html', exception="MQTT is disconnected. Is the printer online?")
-    
   try:
-    last_ams_config = getLastAMSConfig()
-    ams_data = last_ams_config.get("ams", [])
-    vt_tray_data = last_ams_config.get("vt_tray", {})
-    spool_list = fetchSpools()
+    dashboard_data = build_dashboard_payload()
     success_message = request.args.get("success_message")
-    
-    issue = False
-    #TODO: Fix issue when external spool info is reset via bambulab interface
-    augmentTrayDataWithSpoolMan(spool_list, vt_tray_data, trayUid(EXTERNAL_SPOOL_AMS_ID, EXTERNAL_SPOOL_ID))
-    issue |= vt_tray_data["issue"]
-
-    for ams in ams_data:
-      for tray in ams["tray"]:
-        augmentTrayDataWithSpoolMan(spool_list, tray, trayUid(ams["id"], tray["id"]))
-        issue |= tray["issue"]
-
-    return render_template('index.html', success_message=success_message, ams_data=ams_data, vt_tray_data=vt_tray_data, issue=issue)
+    return render_template('index.html', success_message=success_message, **dashboard_data)
   except Exception as e:
     traceback.print_exc()
     return render_template('error.html', exception=str(e))

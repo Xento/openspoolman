@@ -166,6 +166,10 @@
     object-fit: contain; /* Sorgt dafür, dass das Bild innerhalb des Containers bleibt */
 }
 
+#live-status {
+    min-width: 96px;
+}
+
 /* Responsive Anpassungen */
 @media (max-width: 768px) {
     .print-grid {

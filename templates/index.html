@@ -1,38 +1,244 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<!-- AMS and External Spool Row -->
-<div class="row">
-  <!-- External Spool -->
-  <div class="{% if ams_data|length > 1 %}col-12{% else %}col-lg-6{% endif %} mb-4 text-center">
-    {% with tray_data=vt_tray_data, ams_id=EXTERNAL_SPOOL_AMS_ID, pick_tray=False, tray_id=EXTERNAL_SPOOL_ID %}
-      {% include 'fragments/tray.html' %}
-    {% endwith %}
-  </div>
+<div id="dashboard-root"></div>
 
-  <!-- AMS Cards -->
-  {% for ams in ams_data %}
-  <div class="col-lg-6 mb-4 text-center ams-card">
-    <div class="card shadow-sm">
+<script>
+  const DASHBOARD_CONSTANTS = {
+    externalSpoolAmsId: "{{ EXTERNAL_SPOOL_AMS_ID }}",
+    externalSpoolId: "{{ EXTERNAL_SPOOL_ID }}",
+    autoSpend: {{ 'true' if AUTO_SPEND else 'false' }},
+    fillUrl: "{{ url_for('fill') }}",
+  };
+
+  const INITIAL_DASHBOARD_DATA = {{ {
+    "ams_data": ams_data,
+    "vt_tray_data": vt_tray_data,
+    "issue": issue,
+    "version": version,
+    "mqtt_connected": mqtt_connected,
+  } | tojson }};
+
+  function normalizeHex(color) {
+    if (!color) return "";
+    return color.replace('#', '').trim();
+  }
+
+  function colorIsDarkJS(color) {
+    const hex = normalizeHex(color);
+    if (hex.length !== 6) return false;
+    const r = parseInt(hex.substring(0, 2), 16);
+    const g = parseInt(hex.substring(2, 4), 16);
+    const b = parseInt(hex.substring(4, 6), 16);
+    // Perceived luminance
+    return (0.299 * r + 0.587 * g + 0.114 * b) < 186;
+  }
+
+  function renderTrayCard(trayData = {}, amsId) {
+    const trayId = typeof trayData.id === 'number' || typeof trayData.id === 'string' ? trayData.id : DASHBOARD_CONSTANTS.externalSpoolId;
+    const trayName = amsId !== DASHBOARD_CONSTANTS.externalSpoolAmsId ? `Tray ${Number(trayId) + 1}` : 'External Spool';
+    const trayTitle = trayData.tray_type ? `${trayName} - ${trayData.tray_type}${trayData.tray_sub_brand ? ` ${trayData.tray_sub_brand}` : ''}` : trayName;
+    const colorMismatchAttrs = trayData.color_mismatch ? `role="button" tabindex="0" data-bs-toggle="popover" data-bs-container="body" data-bs-trigger="manual" data-bs-placement="bottom" data-bs-content="${trayData.color_mismatch_message || ''}"` : '';
+
+    const multiColors = Array.isArray(trayData.spool_color) ? trayData.spool_color : null;
+    const colorSwatch = multiColors ?
+      `<div class="spool-icon ${trayData.spool_color_orientation === 'coaxial' ? 'horizontal' : 'vertical'}">${multiColors.map(c => `<div style=\"background-color:#${normalizeHex(c)}\"></div>`).join('')}</div>` :
+      `<span class="badge d-inline-block p-2" style="background-color: #${normalizeHex(trayData.spool_color || trayData.tray_color)}; color: ${colorIsDarkJS(trayData.spool_color || trayData.tray_color) ? '#FFFFFF' : '#000000'}">#${normalizeHex(trayData.tray_color || trayData.spool_color || '')?.toUpperCase()}</span>`;
+
+    const remaining = DASHBOARD_CONSTANTS.autoSpend && trayData.matched ? `${Math.round(trayData.remaining_weight || 0)}g` : `${trayData.remain ?? '-'}%`;
+
+    return `
+    <div class="card tray-card">
       <div class="card-header d-flex justify-content-between align-items-center">
-        <h5 class="mb-0">AMS{% if ams_data|length > 1 %} {{ ams.id|int +1 }} {% endif %}</h5>
-        {% if ams.temp != "0.0" %}
-        <span class="text-muted small">Humidity: {{ ams.humidity }}%, Temp: {{ ams.temp }}°C</span>
-        {% endif %}
+        <div class="d-flex align-items-center flex-wrap gap-2">
+          ${trayData.issue ? '<i class="bi bi-exclamation-triangle-fill text-warning me-1"></i>' : ''}
+          <div class="fw-semibold">${trayTitle}</div>
+        </div>
+        ${trayData.tray_color ? `<div class="d-flex align-items-center gap-2"><div class="tray-color-wrapper" ${colorMismatchAttrs}><span class="ms-2 border rounded tray-color-swatch" style="background-color: #${normalizeHex(trayData.tray_color)};"></span>${trayData.color_mismatch ? '<i class="bi bi-exclamation-triangle-fill text-warning tray-color-warning"></i>' : ''}</div></div>` : ''}
       </div>
       <div class="card-body">
-        <div class="row">
-          {% for tray in ams.tray %}
-          <div class="col-sm-6 mb-3">
-            {% with tray_data=tray, ams_id=ams.id, pick_tray=False, tray_id=tray.id %}
-              {% include 'fragments/tray.html' %}
-            {% endwith %}
-          </div>
-          {% endfor %}
-        </div>
+        ${trayData.mismatch ? `<div class=\"alert alert-warning d-flex align-items-start py-2 mb-3\"><i class=\"bi bi-exclamation-triangle-fill text-danger me-2 fs-5\"></i><div class=\"text-start\"><div class=\"fw-semibold\">Filament type mismatch</div><small>AMS reports ${trayData.tray_type || ''}${trayData.tray_sub_brand ? ' ' + trayData.tray_sub_brand : ''}, but the assigned spool is ${trayData.spool_material || ''}${trayData.spool_sub_brand ? ' ' + trayData.spool_sub_brand : ''}.</small></div></div>` : ''}
+        ${(trayData.tray_type && trayData.spool_material) ? `<div class="small text-muted text-center mb-2">${trayData.spool_material}${trayData.spool_sub_brand ? ' - ' + trayData.spool_sub_brand : ''}${trayData.vendor ? ' - ' + trayData.vendor : ''}</div>` : `<div class="small text-muted text-center mb-2 tray-empty">Empty</div>`}
+        ${(trayData.tray_type && trayData.spool_material) ? `<div class="row align-items-center text-center text-sm-start">
+            <div class="col-12 col-xxl-5 d-flex flex-column align-items-center mb-2 mb-sm-0">
+              <div class="fw-semibold mb-1 text-center">${trayData.name || ''}</div>
+              ${colorSwatch}
+            </div>
+            <div class="col-12 col-xxl-7">
+              <div class="mt-2 d-flex flex-column flex-sm-row"><div class="me-sm-1">Last used:</div><div class="fw-bold">${trayData.last_used || '-'}</div></div>
+              <div class="mt-2 d-flex flex-column flex-sm-row"><div class="me-sm-1">Remaining:</div><div class="fw-bold">${remaining}</div></div>
+            </div>
+          </div>` : ''}
       </div>
-    </div>
-  </div>
-  {% endfor %}
-</div>
+      <div class="card-footer">
+        <a class="btn btn-primary" href="${DASHBOARD_CONSTANTS.fillUrl}?ams=${amsId}&tray=${trayId}">Fill</a>
+      </div>
+    </div>`;
+  }
+
+  function renderAmsCard(ams, amsCount) {
+    const header = `
+      <div class="card shadow-sm">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <h5 class="mb-0">AMS${amsCount > 1 ? ` ${Number(ams.id) + 1}` : ''}</h5>
+          ${ams.temp && ams.temp !== '0.0' ? `<span class="text-muted small">Humidity: ${ams.humidity}%, Temp: ${ams.temp}°C</span>` : ''}
+        </div>
+        <div class="card-body">
+          <div class="row">
+            ${(ams.tray || []).map(tray => `<div class="col-sm-6 mb-3">${renderTrayCard(tray, ams.id)}</div>`).join('')}
+          </div>
+        </div>
+      </div>`;
+    return `<div class="col-lg-6 mb-4 text-center ams-card">${header}</div>`;
+  }
+
+  function updateStatusBadge(label, variant) {
+    const badge = document.getElementById('live-status');
+    if (!badge) return;
+    badge.textContent = label;
+    badge.className = `badge text-bg-${variant} ${badge.classList.contains('ms-lg-3') ? 'ms-lg-3' : ''}`.trim();
+  }
+
+  function setupPopovers() {
+    if (!window.bootstrap) return;
+    const popoverTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="popover"]'));
+    popoverTriggerList.forEach(function (popoverTriggerEl) {
+      if (popoverTriggerEl.dataset.popoverBound) {
+        return;
+      }
+      popoverTriggerEl.dataset.popoverBound = 'true';
+      const popover = new bootstrap.Popover(popoverTriggerEl, {container: 'body', trigger: 'manual'});
+      const showPopover = () => popover.show();
+      const hidePopover = () => {
+        popover.hide();
+        popoverTriggerEl.classList.remove('popover-visible');
+      };
+      let touchActivated = false;
+
+      popoverTriggerEl.addEventListener('mouseenter', showPopover);
+      popoverTriggerEl.addEventListener('mouseleave', hidePopover);
+      popoverTriggerEl.addEventListener('focus', showPopover);
+      popoverTriggerEl.addEventListener('blur', hidePopover);
+      popoverTriggerEl.addEventListener('click', function (event) {
+        if (touchActivated) {
+          touchActivated = false;
+          return;
+        }
+        event.preventDefault();
+        popoverTriggerEl.classList.toggle('popover-visible');
+        popoverTriggerEl.classList.contains('popover-visible') ? showPopover() : hidePopover();
+      });
+      popoverTriggerEl.addEventListener('touchstart', function (event) {
+        touchActivated = true;
+        event.preventDefault();
+        popoverTriggerEl.classList.toggle('popover-visible');
+        popoverTriggerEl.classList.contains('popover-visible') ? showPopover() : hidePopover();
+      }, { passive: false });
+
+      document.addEventListener('click', function (event) {
+        if (!popoverTriggerEl.contains(event.target)) {
+          hidePopover();
+        }
+      });
+    });
+  }
+
+  function renderDashboard(data) {
+    if (!data) return;
+    const root = document.getElementById('dashboard-root');
+    if (!root) return;
+
+    const amsData = data.ams_data || [];
+    const externalClass = amsData.length > 1 ? 'col-12' : 'col-lg-6';
+    const externalTray = renderTrayCard(data.vt_tray_data, DASHBOARD_CONSTANTS.externalSpoolAmsId);
+
+    let html = '<div class="row">';
+    html += `<div class="${externalClass} mb-4 text-center">${externalTray}</div>`;
+    html += amsData.map((ams) => renderAmsCard(ams, amsData.length)).join('');
+    html += '</div>';
+
+    root.innerHTML = html;
+    setupPopovers();
+    currentVersion = data.version ?? currentVersion;
+    if (typeof data.mqtt_connected !== 'undefined') {
+      updateStatusBadge(data.mqtt_connected ? 'Live' : 'Printer offline', data.mqtt_connected ? 'success' : 'warning');
+    }
+  }
+
+  let eventSource = null;
+  let fallbackTimer = null;
+  let reconnectTimer = null;
+  let currentVersion = INITIAL_DASHBOARD_DATA?.version || 0;
+
+  function startFallbackPolling() {
+    if (fallbackTimer) return;
+    fallbackTimer = setInterval(fetchDashboardData, 15000);
+    fetchDashboardData();
+  }
+
+  function stopFallbackPolling() {
+    if (fallbackTimer) {
+      clearInterval(fallbackTimer);
+      fallbackTimer = null;
+    }
+  }
+
+  function fetchDashboardData() {
+    fetch('/api/dashboard')
+      .then((resp) => resp.json())
+      .then((payload) => {
+        if (!payload) return;
+        if (typeof payload.version !== 'undefined' && payload.version === currentVersion) return;
+        renderDashboard(payload);
+      })
+      .catch(() => {
+        updateStatusBadge('Reconnecting…', 'warning');
+      });
+  }
+
+  function startStream() {
+    if (!!window.EventSource === false) {
+      startFallbackPolling();
+      return;
+    }
+
+    if (eventSource) {
+      eventSource.close();
+    }
+
+    eventSource = new EventSource('/stream/dashboard');
+    updateStatusBadge('Connecting…', 'warning');
+
+    eventSource.onmessage = (event) => {
+      try {
+        const payload = JSON.parse(event.data);
+        renderDashboard(payload);
+        stopFallbackPolling();
+        updateStatusBadge(payload.mqtt_connected ? 'Live' : 'Printer offline', payload.mqtt_connected ? 'success' : 'warning');
+      } catch (err) {
+        console.error('Failed to parse stream payload', err);
+      }
+    };
+
+    eventSource.onerror = () => {
+      updateStatusBadge('Reconnecting…', 'warning');
+      eventSource.close();
+      eventSource = null;
+      startFallbackPolling();
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      reconnectTimer = setTimeout(() => startStream(), 5000);
+    };
+  }
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && !eventSource) {
+      startStream();
+    }
+  });
+
+  document.addEventListener('DOMContentLoaded', () => {
+    renderDashboard(INITIAL_DASHBOARD_DATA);
+    startStream();
+  });
+</script>
 {% endblock %}

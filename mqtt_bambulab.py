@@ -1,6 +1,7 @@
 import json
 import ssl
 import traceback
+from queue import SimpleQueue
 from threading import Thread
 
 import paho.mqtt.client as mqtt
@@ -24,6 +25,9 @@ PRINTER_STATE = {}
 PRINTER_STATE_LAST = {}
 
 PENDING_PRINT_METADATA = {}
+
+DASHBOARD_VERSION = 0
+DASHBOARD_SUBSCRIBERS = set()
 
 def getPrinterModel():
     global PRINTER_ID
@@ -53,6 +57,31 @@ def getPrinterModel():
 
 def num2letter(num):
   return chr(ord("A") + int(num))
+
+
+def register_dashboard_listener():
+    queue = SimpleQueue()
+    queue.put_nowait(get_dashboard_version())
+    DASHBOARD_SUBSCRIBERS.add(queue)
+    return queue
+
+
+def unregister_dashboard_listener(queue):
+    DASHBOARD_SUBSCRIBERS.discard(queue)
+
+
+def _increment_dashboard_version():
+    global DASHBOARD_VERSION
+    DASHBOARD_VERSION += 1
+    for queue in list(DASHBOARD_SUBSCRIBERS):
+        try:
+            queue.put_nowait(DASHBOARD_VERSION)
+        except Exception:
+            continue
+
+
+def get_dashboard_version():
+    return DASHBOARD_VERSION
   
 def update_dict(original: dict, updates: dict) -> dict:
     for key, value in updates.items():
@@ -210,12 +239,18 @@ def on_message(client, userdata, msg):
         processMessage(data)
       
     # Save external spool tray data
+    updated = False
+
     if "print" in data and "vt_tray" in data["print"]:
-      LAST_AMS_CONFIG["vt_tray"] = data["print"]["vt_tray"]
+      if data["print"]["vt_tray"] != LAST_AMS_CONFIG.get("vt_tray"):
+        LAST_AMS_CONFIG["vt_tray"] = data["print"]["vt_tray"]
+        updated = True
 
     # Save ams spool data
     if "print" in data and "ams" in data["print"] and "ams" in data["print"]["ams"]:
-      LAST_AMS_CONFIG["ams"] = data["print"]["ams"]["ams"]
+      if data["print"]["ams"].get("ams") != LAST_AMS_CONFIG.get("ams"):
+        LAST_AMS_CONFIG["ams"] = data["print"]["ams"]["ams"]
+        updated = True
       for ams in data["print"]["ams"]["ams"]:
         print(f"AMS [{num2letter(ams['id'])}] (hum: {ams['humidity']}, temp: {ams['temp']}ºC)")
         for tray in ams["tray"]:
@@ -249,6 +284,9 @@ def on_message(client, userdata, msg):
               print("      - No Spool or non Bambulab Spool!")
             elif not found:
               print("      - Not found. Update spool tag!")
+
+    if updated:
+      _increment_dashboard_version()
               
   except Exception as e:
     traceback.print_exc()
@@ -260,11 +298,13 @@ def on_connect(client, userdata, flags, rc):
   client.subscribe(f"device/{PRINTER_ID}/report")
   publish(client, GET_VERSION)
   publish(client, PUSH_ALL)
+  _increment_dashboard_version()
 
 def on_disconnect(client, userdata, rc):
   global MQTT_CLIENT_CONNECTED
   MQTT_CLIENT_CONNECTED = False
   print("Disconnected with result code " + str(rc))
+  _increment_dashboard_version()
   
 def async_subscribe():
   global MQTT_CLIENT
