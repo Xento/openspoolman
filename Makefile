@@ -3,8 +3,9 @@
 playwright-install:
 @python - <<'PY'
 import importlib.util, sys
+
 if importlib.util.find_spec("playwright") is None:
-    sys.stderr.write("Playwright is not installed. Run 'pip install -r requirements.txt' first.\n")
+    sys.stderr.write("Playwright is not installed. Install optional dependencies via 'pip install -r requirements-screenshots.txt' (Python < 3.13).\n")
     sys.exit(1)
 PY
 python -m playwright install chromium

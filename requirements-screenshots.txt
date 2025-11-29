@@ -1,0 +1,2 @@
+# Optional dependency set for screenshot generation (requires Playwright sync API)
+playwright==1.47.0 ; python_version < "3.13"
