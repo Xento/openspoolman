@@ -13,6 +13,7 @@ from messages import AMS_FILAMENT_SETTING
 from spoolman_service import augmentTrayDataWithSpoolMan, trayUid
 
 USE_TEST_DATA = os.getenv("OPENSPOOLMAN_TEST_DATA") == "1"
+READ_ONLY_MODE = (not USE_TEST_DATA) and os.getenv("OPENSPOOLMAN_LIVE_READONLY") == "1"
 
 if USE_TEST_DATA:
   from test_data import (
@@ -102,6 +103,9 @@ def fill():
 
   spool_id = request.args.get("spool_id")
   if spool_id:
+    if READ_ONLY_MODE:
+      return render_template('error.html', exception="Live read-only mode: assigning spools to trays is disabled.")
+
     spool_data = getSpoolById(spool_id)
     setActiveTray(spool_id, spool_data["extra"], ams_id, tray_id)
     setActiveSpool(ams_id, tray_id, spool_data)
@@ -228,6 +232,9 @@ def tray_load():
   if not all([ams_id, tray_id, spool_id]):
     return render_template('error.html', exception="Missing AMS ID, or Tray ID or spool_id.")
 
+  if READ_ONLY_MODE:
+    return render_template('error.html', exception="Live read-only mode: assigning spools to trays is disabled.")
+
   try:
     # Update Spoolman with the selected tray
     spool_data = getSpoolById(spool_id)
@@ -240,7 +247,7 @@ def tray_load():
     return render_template('error.html', exception=str(e))
 
 def setActiveSpool(ams_id, tray_id, spool_data):
-  if USE_TEST_DATA:
+  if USE_TEST_DATA or READ_ONLY_MODE:
     return None
 
   if not isMqttClientConnected():
@@ -370,6 +377,9 @@ def assign_tag():
 @app.route("/write_tag")
 def write_tag():
   try:
+    if READ_ONLY_MODE:
+      return render_template('error.html', exception="Live read-only mode: writing NFC tags is disabled.")
+
     spool_id = request.args.get("spool_id")
 
     if not spool_id:
@@ -407,6 +417,9 @@ def print_history():
 
   if not old_spool_id:
     old_spool_id = -1
+
+  if READ_ONLY_MODE and all([ams_slot, print_id, spool_id]):
+    return render_template('error.html', exception="Live read-only mode: updating print-to-spool assignments is disabled.")
 
   if all([ams_slot, print_id, spool_id]):
     filament = get_filament_for_slot(print_id, ams_slot)

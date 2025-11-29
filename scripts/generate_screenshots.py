@@ -49,7 +49,12 @@ def wait_for_server(url: str, timeout: int = 30) -> None:
     raise RuntimeError(f"Server at {url} did not become ready in time")
 
 
-def start_server(port: int, use_test_data: bool = True, snapshot_path: str | None = None) -> subprocess.Popen:
+def start_server(
+    port: int,
+    use_test_data: bool = True,
+    snapshot_path: str | None = None,
+    live_read_only: bool = True,
+) -> subprocess.Popen:
     env = os.environ.copy()
     env.setdefault("FLASK_APP", "app")
     env["FLASK_RUN_PORT"] = str(port)
@@ -57,6 +62,8 @@ def start_server(port: int, use_test_data: bool = True, snapshot_path: str | Non
         env["OPENSPOOLMAN_TEST_DATA"] = "1"
     if snapshot_path:
         env["OPENSPOOLMAN_TEST_SNAPSHOT"] = snapshot_path
+    if live_read_only and not use_test_data:
+        env["OPENSPOOLMAN_LIVE_READONLY"] = "1"
     env.setdefault("OPENSPOOLMAN_BASE_URL", f"http://127.0.0.1:{port}")
 
     process = subprocess.Popen(
@@ -84,6 +91,7 @@ def main() -> int:
     parser.add_argument("--base-url", dest="base_url", help="Use an already-running server instead of starting one")
     parser.add_argument("--mode", choices=["seed", "live"], default="seed", help="Start Flask in seeded test mode or against live data")
     parser.add_argument("--snapshot", dest="snapshot", help="Path to a snapshot JSON to load when using test data")
+    parser.add_argument("--allow-live-actions", action="store_true", help="Permit live mode to make state changes instead of running read-only")
     args = parser.parse_args()
 
     server_process = None
@@ -91,8 +99,15 @@ def main() -> int:
 
     try:
         if not args.base_url:
-            server_process = start_server(args.port, use_test_data=args.mode == "seed", snapshot_path=args.snapshot)
+            server_process = start_server(
+                args.port,
+                use_test_data=args.mode == "seed",
+                snapshot_path=args.snapshot,
+                live_read_only=not args.allow_live_actions,
+            )
             wait_for_server(f"{base_url}/health")
+        elif args.mode == "live" and not args.allow_live_actions:
+            print("Live mode reminder: set OPENSPOOLMAN_LIVE_READONLY=1 on the target server to avoid state changes.")
 
         asyncio.run(capture_pages(base_url, SCREENSHOT_TARGETS, tuple(args.viewport)))
         return 0
