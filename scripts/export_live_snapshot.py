@@ -5,10 +5,13 @@ import sys
 import time
 from pathlib import Path
 
-# Ensure repository root is importable when the script is run from the scripts/ folder
+# Ensure repository root is importable and the working directory matches the project root
 REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
+
+# Align the working directory so relative paths (e.g., SQLite DBs) resolve like running from repo root
+os.chdir(REPO_ROOT)
 
 from mqtt_bambulab import getLastAMSConfig, getPrinterModel, init_mqtt, isMqttClientConnected
 from print_history import get_prints_with_filament
