@@ -1,4 +1,5 @@
 import json
+import math
 import traceback
 import uuid
 
@@ -340,22 +341,32 @@ def health():
 def print_history():
   spoolman_settings = getSettings()
 
+  try:
+    page = max(int(request.args.get("page", 1)), 1)
+  except ValueError:
+    page = 1
+  per_page = 50
+  offset = max((page - 1) * per_page, 0)
+
   ams_slot = request.args.get("ams_slot")
   print_id = request.args.get("print_id")
   spool_id = request.args.get("spool_id")
   old_spool_id = request.args.get("old_spool_id")
+
+  if not old_spool_id:
+    old_spool_id = -1
 
   if all([ams_slot, print_id, spool_id]):
     filament = get_filament_for_slot(print_id, ams_slot)
     update_filament_spool(print_id, ams_slot, spool_id)
 
     if(filament["spool_id"] != int(spool_id) and (not old_spool_id or (old_spool_id and filament["spool_id"] == int(old_spool_id)))):
-      if old_spool_id:
+      if old_spool_id and int(old_spool_id) != -1:
         consumeSpool(old_spool_id, filament["grams_used"] * -1)
         
       consumeSpool(spool_id, filament["grams_used"])
 
-  prints = get_prints_with_filament()
+  prints, total_prints = get_prints_with_filament(limit=per_page, offset=offset)
 
   spool_list = fetchSpools()
 
@@ -372,7 +383,16 @@ def print_history():
             print["total_cost"] += filament["cost"]
             break
   
-  return render_template('print_history.html', prints=prints, currencysymbol=spoolman_settings["currency_symbol"])
+  total_pages = max(1, math.ceil(total_prints / per_page))
+
+  return render_template(
+    'print_history.html',
+    prints=prints,
+    currencysymbol=spoolman_settings["currency_symbol"],
+    page=page,
+    total_pages=total_pages,
+    per_page=per_page,
+  )
 
 @app.route("/print_select_spool")
 def print_select_spool():
@@ -380,13 +400,41 @@ def print_select_spool():
   try:
     ams_slot = request.args.get("ams_slot")
     print_id = request.args.get("print_id")
+    old_spool_id = request.args.get("old_spool_id")
+    
+    change_spool = request.args.get("change_spool", "false").lower() == "true"
+    
+    if not old_spool_id:
+      old_spool_id = -1
 
     if not all([ams_slot, print_id]):
       return render_template('error.html', exception="Missing spool ID or print ID.")
 
     spools = fetchSpools()
-        
-    return render_template('print_select_spool.html', spools=spools, ams_slot=ams_slot, print_id=print_id)
+
+    materials = extract_materials(spools)
+    selected_materials = []
+
+    filament = get_filament_for_slot(print_id, ams_slot)
+
+    try:
+      filament_material = filament["filament_type"] if filament else None
+
+      if filament_material and filament_material in materials:
+        selected_materials.append(filament_material)
+    except Exception:
+      pass
+
+    return render_template(
+      'print_select_spool.html',
+      spools=spools,
+      ams_slot=ams_slot,
+      print_id=print_id,
+      old_spool_id=old_spool_id,
+      change_spool=change_spool,
+      materials=materials,
+      selected_materials=selected_materials,
+    )
   except Exception as e:
     traceback.print_exc()
     return render_template('error.html', exception=str(e))
