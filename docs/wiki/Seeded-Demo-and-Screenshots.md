@@ -1,0 +1,22 @@
+# Seeded demo & screenshot generation
+
+Use the seeded dataset to generate documentation screenshots or run tests with predictable data.
+
+## Prepare data
+- Export a live snapshot first (default path `data/live_snapshot.json`) with `python scripts/export_live_snapshot.py --output data/live_snapshot.json`. Snapshot-based runs expect this file and will warn if it is missing.
+- Provide your own print-history database (default path `data/demo.db`) or override with `OPENSPOOLMAN_PRINT_HISTORY_DB=/path/to/history.db` or `--print-history-db` when using the screenshot helper.
+
+## Install dependencies
+- Install the core app dependencies via `pip install -r requirements.txt`.
+- Install the screenshot extras only when regenerating docs: `pip install -r requirements-screenshots.txt` followed by `python -m playwright install chromium`.
+
+## Generate screenshots
+- Configure which routes and devices get captured via `scripts/screenshot_config.json` (supports per-target or per-screenshot `max_height`, device-specific viewports, and automatic device-prefixed filenames). Override or extend it with `--config <path>` and target specific devices with `--devices desktop,mobile` when you run the generator.
+- Run `python scripts/generate_screenshots.py` to start the app in snapshot-backed test mode, open the configured routes in headless Chromium, and refresh the images under `docs/img/` (or another folder via `--output-dir`). Screenshots default to the viewport height unless a per-target/device `max_height` is set (or `full_page: true`); `--max-height` provides a config-wide fallback.
+- Pass `--color-scheme dark` (or set `color_scheme` in the config) to capture pages in dark mode; omit it to follow the default auto/light behavior.
+- To generate pictures from real printer/SpoolMan data, run the generator in live mode to start the current app against your configured devices: `python scripts/generate_screenshots.py --mode live --live-readonly`. If you need to target a remote instance, pass `--base-url http://<host>:<port>`. Environment variables (`OPENSPOOLMAN_TEST_DATA=1 OPENSPOOLMAN_TEST_SNAPSHOT=data/live_snapshot.json` or `OPENSPOOLMAN_LIVE_READONLY=1`) work as alternatives. When live data is used or captured, the app and scripts automatically load `config.env` from the repository root (if present) so credentials and URLs are available even when running tools from subfolders.
+- The script can be called in CI after UI changes to automatically regenerate and version the example screenshots.
+
+## Using seeded data in tests
+- For unit tests, reuse the seeded dataset without environment variables: add `--use-seeded-data` to your pytest command for auto-mocking, request the `seeded_data_overrides` fixture in a test, or wrap your test body in `with test_data.apply_test_overrides(): ...`.
+- To generate documentation screenshots inside pytest, run `pytest -m screenshots --generate-screenshots` (optionally pass `--screenshot-output <dir>`, `--screenshot-mode live`, `--screenshot-devices <list>`, or `--screenshot-config <path>`); the test will spin up Flask in seeded mode by default and reuse the same capture logic as `scripts/generate_screenshots.py`.
