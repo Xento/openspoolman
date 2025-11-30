@@ -31,10 +31,26 @@ def wait_for_mqtt_ready(timeout: int = 30) -> bool:
     return False
 
 
+def wait_for_ams_data(timeout: int = 30) -> dict:
+    start = time.time()
+    while time.time() - start < timeout:
+        config = getLastAMSConfig() or {}
+        if config.get("ams") or config.get("vt_tray"):
+            return config
+        time.sleep(0.5)
+    return getLastAMSConfig() or {}
+
+
 def export_snapshot(path: Path, include_prints: bool = True) -> None:
     init_mqtt(daemon=True)
 
-    if not wait_for_mqtt_ready():
+    last_ams_config = {}
+
+    if wait_for_mqtt_ready():
+        last_ams_config = wait_for_ams_data()
+        if not (last_ams_config.get("ams") or last_ams_config.get("vt_tray")):
+            print("⚠️ AMS data not received before timeout; continuing without trays")
+    else:
         print("⚠️ MQTT connection not ready; continuing without AMS tray data")
 
     spools = fetchSpoolList()
@@ -51,7 +67,6 @@ def export_snapshot(path: Path, include_prints: bool = True) -> None:
             else:
                 spool["cost_per_gram"] = 0
     settings = getSettings()
-    last_ams_config = getLastAMSConfig() or {}
     printer = getPrinterModel()
 
     prints: list[dict] = []
