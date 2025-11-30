@@ -132,5 +132,11 @@ cython_debug/
 .idea/
 
 config.env
-static/prints/
-data/
+
+# Playwright
+node_modules/
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/playwright/.auth/

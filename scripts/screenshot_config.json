@@ -1,0 +1,44 @@
+{
+  "color_scheme": "dark",
+  "default_devices": ["desktop", "mobile"],
+  "devices": {
+    "desktop": {"viewport": "1280x720"},
+    "mobile": {"viewport": "414x896"}
+  },
+  "targets": [
+    {
+      "name": "home",
+      "route": "/",
+      "output": "docs/img/home.PNG",
+      "max_height": {"desktop": 1100, "mobile": 1100}
+    },
+    {
+      "name": "fill_tray", 
+      "route": "/fill?ams=1&tray=1", 
+      "output": "docs/img/fill_tray.PNG"
+    },
+    {
+      "name": "print_history",
+      "route": "/print_history",
+      "output": "docs/img/print_history.PNG",
+      "max_height": {"desktop": 1100}
+    },
+    {
+      "name": "spool_info", 
+      "route": "/spool_info?spool_id=10", 
+      "output": "docs/img/spool_info.jpeg", 
+      "max_height": {"desktop": 1100}
+    },
+    {
+      "name": "assign_nfc", 
+      "route": "/write_tag?spool_id=10", 
+      "output": "docs/img/assign_nfc.jpeg"
+    },
+    {
+      "name": "change_spool",
+      "route": "/print_select_spool?ams_slot=1&print_id=352&old_spool_id=33&change_spool=True",
+      "output": "docs/img/change_spool.PNG",
+      "max_height": {"desktop": 1100, "mobile": 1100}
+    }
+  ]
+}

@@ -310,9 +310,9 @@ def async_subscribe():
 
     time.sleep(15)
 
-def init_mqtt():
+def init_mqtt(daemon: bool = False):
   # Start the asynchronous processing in a separate thread
-  thread = Thread(target=async_subscribe)
+  thread = Thread(target=async_subscribe, daemon=daemon)
   thread.start()
 
 def getLastAMSConfig():

@@ -1,0 +1,2224 @@
+{
+  "spools": [
+    {
+      "id": 10,
+      "registered": "2025-02-02T10:35:23Z",
+      "first_used": "2025-01-19T23:00:00Z",
+      "last_used": "2025-04-09T08:56:08Z",
+      "filament": {
+        "id": 10,
+        "registered": "2025-02-02T10:34:26Z",
+        "name": "Grau",
+        "vendor": {
+          "id": 4,
+          "registered": "2025-02-02T10:33:14Z",
+          "name": "Amazon",
+          "empty_spool_weight": 210.0,
+          "extra": {}
+        },
+        "material": "PETG",
+        "price": 15.19,
+        "density": 1.25,
+        "diameter": 1.75,
+        "weight": 1000.0,
+        "comment": "1",
+        "color_hex": "5e5e5e",
+        "extra": {
+          "type": "\" Basic\""
+        }
+      },
+      "price": 15.19,
+      "remaining_weight": 634.48,
+      "initial_weight": 1000.0,
+      "used_weight": 365.52,
+      "remaining_length": 211028.9048407683,
+      "used_length": 121572.445620662,
+      "comment": "1",
+      "archived": false,
+      "extra": {
+        "tag": "\"a4debdab-7c1a-4880-bb20-5bbb7c5fd2be\"",
+        "active_tray": "\"\""
+      },
+      "cost_per_gram": 0.015189999999999999
+    },
+    {
+      "id": 7,
+      "registered": "2025-01-11T07:46:58Z",
+      "first_used": "2025-01-17T23:00:00Z",
+      "last_used": "2025-03-27T17:36:22Z",
+      "filament": {
+        "id": 7,
+        "registered": "2025-01-11T07:46:58Z",
+        "name": "Transparent",
+        "vendor": {
+          "id": 1,
+          "registered": "2025-01-10T16:06:02Z",
+          "name": "Bambu Lab",
+          "external_id": "Bambu Lab",
+          "extra": {}
+        },
+        "material": "PETG",
+        "density": 1.2,
+        "diameter": 1.75,
+        "weight": 1000.0,
+        "spool_weight": 250.0,
+        "settings_extruder_temp": 250,
+        "settings_bed_temp": 100,
+        "color_hex": "FFFFFF",
+        "external_id": "bambulab_pc_transparent_1000_175_n",
+        "extra": {
+          "type": "\" Translucent\""
+        }
+      },
+      "price": 25.99,
+      "remaining_weight": 999.0,
+      "initial_weight": 1000.0,
+      "spool_weight": 250.0,
+      "used_weight": 1.0,
+      "remaining_length": 346113.2803239259,
+      "used_length": 346.4597400639899,
+      "archived": false,
+      "extra": {
+        "tag": "\"7e0a3112-7bfc-445b-a189-60f1ec1ccbba\"",
+        "active_tray": "\"\""
+      },
+      "cost_per_gram": 0.02599
+    },
+    {
+      "id": 29,
+      "registered": "2025-04-18T09:36:41Z",
+      "first_used": "2025-08-15T19:21:21Z",
+      "last_used": "2025-11-28T07:26:37Z",
+      "filament": {
+        "id": 29,
+        "registered": "2025-04-18T09:33:41Z",
+        "name": "Black",
+        "vendor": {
+          "id": 5,
+          "registered": "2025-02-17T17:19:47Z",
+          "name": "Geetech",
+          "empty_spool_weight": 185.0,
+          "extra": {}
+        },
+        "material": "PETG",
+        "price": 6.5,
+        "density": 1.0,
+        "diameter": 1.75,
+        "weight": 1000.0,
+        "spool_weight": 185.0,
+        "comment": "",
+        "color_hex": "050505",
+        "extra": {
+          "nozzle_temperature": "[190,230]",
+          "type": "\" Basic\""
+        }
+      },
+      "price": 6.5,
+      "remaining_weight": 415.6300000000001,
+      "initial_weight": 1000.0,
+      "spool_weight": 185.0,
+      "used_weight": 584.3699999999999,
+      "remaining_length": 172798.8741153554,
+      "used_length": 242952.81396143246,
+      "archived": false,
+      "extra": {
+        "tag": "\"2b375b81-c836-4c6b-b2cd-a143eecb5a97\"",
+        "active_tray": "\"03919D4A2404685_0_2\""
+      },
+      "cost_per_gram": 0.0065
+    },
+    {
+      "id": 30,
+      "registered": "2025-04-18T09:37:01Z",
+      "first_used": "2025-11-27T22:00:51Z",
+      "last_used": "2025-11-28T07:15:31Z",
+      "filament": {
+        "id": 29,
+        "registered": "2025-04-18T09:33:41Z",
+        "name": "Black",
+        "vendor": {
+          "id": 5,
+          "registered": "2025-02-17T17:19:47Z",
+          "name": "Geetech",
+          "empty_spool_weight": 185.0,
+          "extra": {}
+        },
+        "material": "PETG",
+        "price": 6.5,
+        "density": 1.0,
+        "diameter": 1.75,
+        "weight": 1000.0,
+        "spool_weight": 185.0,
+        "comment": "",
+        "color_hex": "050505",
+        "extra": {
+          "nozzle_temperature": "[190,230]",
+          "type": "\" Basic\""
+        }
+      },
+      "price": 5.69,
+      "remaining_weight": 1000.0,
+      "initial_weight": 1000.0,
+      "spool_weight": 185.0,
+      "used_weight": 0.0,
+      "remaining_length": 415751.68807678786,
+      "used_length": 0.0,
+      "archived": false,
+      "extra": {
+        "active_tray": "\"\"",
+        "tag": "\"8ad6490e-5738-4bf0-adb3-f7b89ed23067\""
+      },
+      "cost_per_gram": 0.005690000000000001
+    },
+    {
+      "id": 32,
+      "registered": "2025-04-26T06:56:10Z",
+      "filament": {
+        "id": 29,
+        "registered": "2025-04-18T09:33:41Z",
+        "name": "Black",
+        "vendor": {
+          "id": 5,
+          "registered": "2025-02-17T17:19:47Z",
+          "name": "Geetech",
+          "empty_spool_weight": 185.0,
+          "extra": {}
+        },
+        "material": "PETG",
+        "price": 6.5,
+        "density": 1.0,
+        "diameter": 1.75,
+        "weight": 1000.0,
+        "spool_weight": 185.0,
+        "comment": "",
+        "color_hex": "050505",
+        "extra": {
+          "nozzle_temperature": "[190,230]",
+          "type": "\" Basic\""
+        }
+      },
+      "price": 6.9,
+      "remaining_weight": 1000.0,
+      "initial_weight": 1000.0,
+      "spool_weight": 185.0,
+      "used_weight": 0.0,
+      "remaining_length": 415751.68807678786,
+      "used_length": 0.0,
+      "archived": false,
+      "extra": {
+        "active_tray": "\"\"",
+        "tag": "\"a5cbc634-9b0d-4a52-9934-d064d2eb5a0a\""
+      },
+      "cost_per_gram": 0.006900000000000001
+    },
+    {
+      "id": 34,
+      "registered": "2025-04-26T07:03:55Z",
+      "filament": {
+        "id": 29,
+        "registered": "2025-04-18T09:33:41Z",
+        "name": "Black",
+        "vendor": {
+          "id": 5,
+          "registered": "2025-02-17T17:19:47Z",
+          "name": "Geetech",
+          "empty_spool_weight": 185.0,
+          "extra": {}
+        },
+        "material": "PETG",
+        "price": 6.5,
+        "density": 1.0,
+        "diameter": 1.75,
+        "weight": 1000.0,
+        "spool_weight": 185.0,
+        "comment": "",
+        "color_hex": "050505",
+        "extra": {
+          "nozzle_temperature": "[190,230]",
+          "type": "\" Basic\""
+        }
+      },
+      "price": 7.89,
+      "remaining_weight": 1000.0,
+      "initial_weight": 1000.0,
+      "spool_weight": 185.0,
+      "used_weight": 0.0,
+      "remaining_length": 415751.68807678786,
+      "used_length": 0.0,
+      "archived": false,
+      "extra": {
+        "active_tray": "\"\""
+      },
+      "cost_per_gram": 0.00789
+    },
+    {
+      "id": 38,
+      "registered": "2025-09-07T08:50:04Z",
+      "first_used": "2025-09-07T08:51:53Z",
+      "last_used": "2025-10-13T15:47:02Z",
+      "filament": {
+        "id": 28,
+        "registered": "2025-04-18T09:32:43Z",
+        "name": "White",
+        "vendor": {
+          "id": 5,
+          "registered": "2025-02-17T17:19:47Z",
+          "name": "Geetech",
+          "empty_spool_weight": 185.0,
+          "extra": {}
+        },
+        "material": "PETG",
+        "price": 6.1,
+        "density": 1.0,
+        "diameter": 1.75,
+        "weight": 1000.0,
+        "spool_weight": 185.0,
+        "color_hex": "fff5f5",
+        "extra": {
+          "nozzle_temperature": "[190,230]",
+          "type": "\" Basic\""
+        }
+      },
+      "price": 6.1,
+      "remaining_weight": 189.0,
+      "initial_weight": 1000.0,
+      "spool_weight": 185.0,
+      "used_weight": 811.0,
+      "remaining_length": 78577.0690465129,
+      "used_length": 337174.619030275,
+      "archived": false,
+      "extra": {
+        "active_tray": "\"\""
+      },
+      "cost_per_gram": 0.0060999999999999995
+    },
+    {
+      "id": 39,
+      "registered": "2025-11-14T10:32:24Z",
+      "first_used": "2025-11-14T10:49:20Z",
+      "last_used": "2025-11-14T10:49:20Z",
+      "filament": {
+        "id": 28,
+        "registered": "2025-04-18T09:32:43Z",
+        "name": "White",
+        "vendor": {
+          "id": 5,
+          "registered": "2025-02-17T17:19:47Z",
+          "name": "Geetech",
+          "empty_spool_weight": 185.0,
+          "extra": {}
+        },
+        "material": "PETG",
+        "price": 6.1,
+        "density": 1.0,
+        "diameter": 1.75,
+        "weight": 1000.0,
+        "spool_weight": 185.0,
+        "color_hex": "fff5f5",
+        "extra": {
+          "nozzle_temperature": "[190,230]",
+          "type": "\" Basic\""
+        }
+      },
+      "remaining_weight": 696.26,
+      "initial_weight": 1000.0,
+      "spool_weight": 185.0,
+      "used_weight": 303.74,
+      "remaining_length": 289471.27034034434,
+      "used_length": 126280.41773644355,
+      "archived": false,
+      "extra": {
+        "active_tray": "\"03919D4A2404685_255_254\""
+      },
+      "cost_per_gram": 0.0060999999999999995
+    },
+    {
+      "id": 43,
+      "registered": "2025-11-20T17:53:56Z",
+      "filament": {
+        "id": 28,
+        "registered": "2025-04-18T09:32:43Z",
+        "name": "White",
+        "vendor": {
+          "id": 5,
+          "registered": "2025-02-17T17:19:47Z",
+          "name": "Geetech",
+          "empty_spool_weight": 185.0,
+          "extra": {}
+        },
+        "material": "PETG",
+        "price": 6.1,
+        "density": 1.0,
+        "diameter": 1.75,
+        "weight": 1000.0,
+        "spool_weight": 185.0,
+        "color_hex": "fff5f5",
+        "extra": {
+          "nozzle_temperature": "[190,230]",
+          "type": "\" Basic\""
+        }
+      },
+      "price": 5.55,
+      "remaining_weight": 1000.0,
+      "initial_weight": 1000.0,
+      "spool_weight": 185.0,
+      "used_weight": 0.0,
+      "remaining_length": 415751.68807678786,
+      "used_length": 0.0,
+      "archived": false,
+      "extra": {
+        "active_tray": "\"\""
+      },
+      "cost_per_gram": 0.00555
+    },
+    {
+      "id": 44,
+      "registered": "2025-11-20T17:53:56Z",
+      "filament": {
+        "id": 28,
+        "registered": "2025-04-18T09:32:43Z",
+        "name": "White",
+        "vendor": {
+          "id": 5,
+          "registered": "2025-02-17T17:19:47Z",
+          "name": "Geetech",
+          "empty_spool_weight": 185.0,
+          "extra": {}
+        },
+        "material": "PETG",
+        "price": 6.1,
+        "density": 1.0,
+        "diameter": 1.75,
+        "weight": 1000.0,
+        "spool_weight": 185.0,
+        "color_hex": "fff5f5",
+        "extra": {
+          "nozzle_temperature": "[190,230]",
+          "type": "\" Basic\""
+        }
+      },
+      "price": 5.55,
+      "remaining_weight": 1000.0,
+      "initial_weight": 1000.0,
+      "spool_weight": 185.0,
+      "used_weight": 0.0,
+      "remaining_length": 415751.68807678786,
+      "used_length": 0.0,
+      "archived": false,
+      "extra": {
+        "active_tray": "\"\""
+      },
+      "cost_per_gram": 0.00555
+    },
+    {
+      "id": 45,
+      "registered": "2025-11-20T17:53:56Z",
+      "filament": {
+        "id": 28,
+        "registered": "2025-04-18T09:32:43Z",
+        "name": "White",
+        "vendor": {
+          "id": 5,
+          "registered": "2025-02-17T17:19:47Z",
+          "name": "Geetech",
+          "empty_spool_weight": 185.0,
+          "extra": {}
+        },
+        "material": "PETG",
+        "price": 6.1,
+        "density": 1.0,
+        "diameter": 1.75,
+        "weight": 1000.0,
+        "spool_weight": 185.0,
+        "color_hex": "fff5f5",
+        "extra": {
+          "nozzle_temperature": "[190,230]",
+          "type": "\" Basic\""
+        }
+      },
+      "price": 5.55,
+      "remaining_weight": 1000.0,
+      "initial_weight": 1000.0,
+      "spool_weight": 185.0,
+      "used_weight": 0.0,
+      "remaining_length": 415751.68807678786,
+      "used_length": 0.0,
+      "archived": false,
+      "extra": {
+        "active_tray": "\"\""
+      },
+      "cost_per_gram": 0.00555
+    },
+    {
+      "id": 21,
+      "registered": "2025-03-23T09:02:03Z",
+      "filament": {
+        "id": 21,
+        "registered": "2025-03-23T08:59:42Z",
+        "name": "Yellow",
+        "vendor": {
+          "id": 5,
+          "registered": "2025-02-17T17:19:47Z",
+          "name": "Geetech",
+          "empty_spool_weight": 185.0,
+          "extra": {}
+        },
+        "material": "PETG",
+        "price": 8.76,
+        "density": 1.0,
+        "diameter": 1.75,
+        "weight": 1000.0,
+        "spool_weight": 175.0,
+        "color_hex": "f2ff00",
+        "extra": {
+          "nozzle_temperature": "[190,230]",
+          "type": "\" Basic\""
+        }
+      },
+      "price": 8.76,
+      "remaining_weight": 1000.0,
+      "initial_weight": 1000.0,
+      "spool_weight": 175.0,
+      "used_weight": 0.0,
+      "remaining_length": 415751.68807678786,
+      "used_length": 0.0,
+      "comment": "Test",
+      "archived": false,
+      "extra": {
+        "active_tray": "\"\""
+      },
+      "cost_per_gram": 0.00876
+    },
+    {
+      "id": 35,
+      "registered": "2025-04-30T20:02:27Z",
+      "first_used": "2025-05-31T19:42:33Z",
+      "last_used": "2025-05-31T19:42:33Z",
+      "filament": {
+        "id": 21,
+        "registered": "2025-03-23T08:59:42Z",
+        "name": "Yellow",
+        "vendor": {
+          "id": 5,
+          "registered": "2025-02-17T17:19:47Z",
+          "name": "Geetech",
+          "empty_spool_weight": 185.0,
+          "extra": {}
+        },
+        "material": "PETG",
+        "price": 8.76,
+        "density": 1.0,
+        "diameter": 1.75,
+        "weight": 1000.0,
+        "spool_weight": 175.0,
+        "color_hex": "f2ff00",
+        "extra": {
+          "nozzle_temperature": "[190,230]",
+          "type": "\" Basic\""
+        }
+      },
+      "price": 5.4,
+      "remaining_weight": 978.27,
+      "initial_weight": 1000.0,
+      "spool_weight": 175.0,
+      "used_weight": 21.73,
+      "remaining_length": 406717.4038948793,
+      "used_length": 9034.2841819086,
+      "archived": false,
+      "extra": {
+        "active_tray": "\"\"",
+        "tag": "\"dfd4a0a4-9000-46e3-9458-bf166d67d39d\""
+      },
+      "cost_per_gram": 0.0054
+    },
+    {
+      "id": 27,
+      "registered": "2025-04-15T18:23:57Z",
+      "first_used": "2025-04-15T19:34:10Z",
+      "last_used": "2025-08-09T08:00:42Z",
+      "filament": {
+        "id": 26,
+        "registered": "2025-04-15T18:21:18Z",
+        "name": "Black",
+        "vendor": {
+          "id": 7,
+          "registered": "2025-04-15T18:18:10Z",
+          "name": "Jayo",
+          "empty_spool_weight": 126.0,
+          "extra": {}
+        },
+        "material": "PETG",
+        "price": 12.34,
+        "density": 1.0,
+        "diameter": 1.75,
+        "weight": 1100.0,
+        "spool_weight": 126.0,
+        "comment": "1",
+        "settings_extruder_temp": 230,
+        "settings_bed_temp": 60,
+        "color_hex": "000000",
+        "extra": {
+          "nozzle_temperature": "[230,260]",
+          "type": "\" Basic\"",
+          "filament_id": "\"\""
+        }
+      },
+      "price": 12.34,
+      "remaining_weight": 0.0,
+      "initial_weight": 1100.0,
+      "spool_weight": 126.0,
+      "used_weight": 2314.7600000000007,
+      "remaining_length": 0.0,
+      "used_length": 962365.3774926256,
+      "archived": false,
+      "extra": {
+        "active_tray": "\"\""
+      },
+      "cost_per_gram": 0.011218181818181818
+    },
+    {
+      "id": 2,
+      "registered": "2025-01-10T16:07:08Z",
+      "first_used": "2025-01-09T23:00:00Z",
+      "last_used": "2025-11-20T19:34:31Z",
+      "filament": {
+        "id": 2,
+        "registered": "2025-01-10T16:07:08Z",
+        "name": "Matte Charcoal",
+        "vendor": {
+          "id": 1,
+          "registered": "2025-01-10T16:06:02Z",
+          "name": "Bambu Lab",
+          "external_id": "Bambu Lab",
+          "extra": {}
+        },
+        "material": "PLA",
+        "density": 1.31,
+        "diameter": 1.75,
+        "weight": 1000.0,
+        "spool_weight": 250.0,
+        "settings_extruder_temp": 220,
+        "settings_bed_temp": 60,
+        "color_hex": "000000",
+        "external_id": "bambulab_pla_mattecharcoal_1000_175_n",
+        "extra": {
+          "type": "\" Matte\""
+        }
+      },
+      "price": 16.99,
+      "remaining_weight": 0.0,
+      "initial_weight": 1000.0,
+      "spool_weight": 250.0,
+      "used_weight": 1016.3000000000001,
+      "remaining_length": 0.0,
+      "used_length": 322540.7943453737,
+      "archived": false,
+      "extra": {
+        "tag": "\"0C10E4498A444769A519CD0B4E1AF35F\"",
+        "active_tray": "\"03919D4A2404685_0_0\""
+      },
+      "cost_per_gram": 0.016989999999999998
+    },
+    {
+      "id": 3,
+      "registered": "2025-01-10T16:16:08Z",
+      "first_used": "2025-01-13T23:00:00Z",
+      "last_used": "2025-11-21T09:08:03Z",
+      "filament": {
+        "id": 3,
+        "registered": "2025-01-10T16:16:08Z",
+        "name": "Matte Ivory White",
+        "vendor": {
+          "id": 1,
+          "registered": "2025-01-10T16:06:02Z",
+          "name": "Bambu Lab",
+          "external_id": "Bambu Lab",
+          "extra": {}
+        },
+        "material": "PLA",
+        "density": 1.31,
+        "diameter": 1.75,
+        "weight": 1000.0,
+        "spool_weight": 250.0,
+        "settings_extruder_temp": 220,
+        "settings_bed_temp": 60,
+        "color_hex": "FFFFFF",
+        "external_id": "bambulab_pla_matteivorywhite_1000_175_n",
+        "extra": {
+          "type": "\" Matte\""
+        }
+      },
+      "price": 16.99,
+      "remaining_weight": 191.65999999999997,
+      "initial_weight": 1000.0,
+      "spool_weight": 250.0,
+      "used_weight": 808.34,
+      "remaining_length": 60826.69353953981,
+      "used_length": 256541.00728243566,
+      "archived": false,
+      "extra": {
+        "tag": "\"C4342B28CC2C4A08ADF74DD220C3C967\"",
+        "active_tray": "\"03919D4A2404685_0_3\""
+      },
+      "cost_per_gram": 0.016989999999999998
+    },
+    {
+      "id": 4,
+      "registered": "2025-01-10T16:17:36Z",
+      "first_used": "2025-01-14T23:00:00Z",
+      "last_used": "2025-10-08T05:57:34Z",
+      "filament": {
+        "id": 4,
+        "registered": "2025-01-10T16:17:36Z",
+        "name": "Matte Mandarin Orange",
+        "vendor": {
+          "id": 1,
+          "registered": "2025-01-10T16:06:02Z",
+          "name": "Bambu Lab",
+          "external_id": "Bambu Lab",
+          "extra": {}
+        },
+        "material": "PLA",
+        "density": 1.31,
+        "diameter": 1.75,
+        "weight": 1000.0,
+        "spool_weight": 250.0,
+        "comment": "1",
+        "settings_extruder_temp": 220,
+        "settings_bed_temp": 60,
+        "color_hex": "F99963",
+        "external_id": "bambulab_pla_mattemandarinorange_1000_175_n",
+        "extra": {
+          "nozzle_temperature": "[190,220]",
+          "type": "\" Matte\""
+        }
+      },
+      "price": 16.99,
+      "remaining_weight": 571.71,
+      "initial_weight": 1000.0,
+      "spool_weight": 250.0,
+      "used_weight": 428.29,
+      "remaining_length": 181442.28823693158,
+      "used_length": 135925.41258504387,
+      "comment": "1",
+      "archived": false,
+      "extra": {
+        "tag": "\"DB90CB1204DD415F9BE835953C71624D\"",
+        "active_tray": "\"\""
+      },
+      "cost_per_gram": 0.016989999999999998
+    },
+    {
+      "id": 48,
+      "registered": "2025-11-20T18:56:32Z",
+      "filament": {
+        "id": 23,
+        "registered": "2025-03-28T18:51:39Z",
+        "name": "Black",
+        "vendor": {
+          "id": 6,
+          "registered": "2025-03-28T18:50:04Z",
+          "name": "Deeplee ",
+          "empty_spool_weight": 134.0,
+          "extra": {}
+        },
+        "material": "PLA",
+        "price": 11.99,
+        "density": 0.98,
+        "diameter": 1.75,
+        "weight": 1000.0,
+        "spool_weight": 134.0,
+        "comment": "1",
+        "settings_extruder_temp": 210,
+        "settings_bed_temp": 60,
+        "color_hex": "000000",
+        "extra": {
+          "nozzle_temperature": "[190,220]",
+          "type": "\" Basic\""
+        }
+      },
+      "price": 12.99,
+      "remaining_weight": 1000.0,
+      "initial_weight": 1000.0,
+      "spool_weight": 134.0,
+      "used_weight": 0.0,
+      "remaining_length": 424236.4164048856,
+      "used_length": 0.0,
+      "archived": false,
+      "extra": {
+        "active_tray": "\"\""
+      },
+      "cost_per_gram": 0.01299
+    },
+    {
+      "id": 42,
+      "registered": "2025-11-20T17:42:03Z",
+      "filament": {
+        "id": 33,
+        "registered": "2025-11-20T17:36:58Z",
+        "name": "Matt Blau ",
+        "vendor": {
+          "id": 8,
+          "registered": "2025-11-20T17:34:15Z",
+          "name": "Geeetech - neue Spulen",
+          "empty_spool_weight": 150.0,
+          "extra": {}
+        },
+        "material": "PLA",
+        "price": 6.92,
+        "density": 1.0,
+        "diameter": 1.75,
+        "weight": 1000.0,
+        "spool_weight": 150.0,
+        "color_hex": "1c277e",
+        "extra": {
+          "nozzle_temperature": "[190,230]",
+          "type": "\" Matte\"",
+          "filament_id": "\"\""
+        }
+      },
+      "remaining_weight": 1000.0,
+      "initial_weight": 1000.0,
+      "spool_weight": 150.0,
+      "used_weight": 0.0,
+      "remaining_length": 415751.68807678786,
+      "used_length": 0.0,
+      "archived": false,
+      "extra": {
+        "active_tray": "\"\"",
+        "tag": "\"f4bf2f0f-c13c-46db-b7d6-6e0139ffbb9c\""
+      },
+      "cost_per_gram": 0.00692
+    },
+    {
+      "id": 41,
+      "registered": "2025-11-20T17:41:19Z",
+      "filament": {
+        "id": 34,
+        "registered": "2025-11-20T17:39:20Z",
+        "name": "Matt Olive Grün",
+        "vendor": {
+          "id": 8,
+          "registered": "2025-11-20T17:34:15Z",
+          "name": "Geeetech - neue Spulen",
+          "empty_spool_weight": 150.0,
+          "extra": {}
+        },
+        "material": "PLA",
+        "price": 6.92,
+        "density": 1.0,
+        "diameter": 1.75,
+        "weight": 1000.0,
+        "spool_weight": 150.0,
+        "color_hex": "2a3910",
+        "extra": {
+          "nozzle_temperature": "[190,230]",
+          "type": "\" Matte\"",
+          "filament_id": "\"\""
+        }
+      },
+      "remaining_weight": 1000.0,
+      "initial_weight": 1000.0,
+      "spool_weight": 150.0,
+      "used_weight": 0.0,
+      "remaining_length": 415751.68807678786,
+      "used_length": 0.0,
+      "archived": false,
+      "extra": {
+        "active_tray": "\"\""
+      },
+      "cost_per_gram": 0.00692
+    },
+    {
+      "id": 28,
+      "registered": "2025-04-18T09:36:08Z",
+      "first_used": "2025-05-20T18:42:29Z",
+      "last_used": "2025-11-20T19:12:48Z",
+      "filament": {
+        "id": 27,
+        "registered": "2025-04-18T09:03:44Z",
+        "name": "Black",
+        "vendor": {
+          "id": 5,
+          "registered": "2025-02-17T17:19:47Z",
+          "name": "Geetech",
+          "empty_spool_weight": 185.0,
+          "extra": {}
+        },
+        "material": "PLA",
+        "price": 6.9,
+        "density": 1.0,
+        "diameter": 1.75,
+        "weight": 1000.0,
+        "spool_weight": 185.0,
+        "color_hex": "000000",
+        "extra": {
+          "nozzle_temperature": "[190,230]",
+          "type": "\" Basic\""
+        }
+      },
+      "price": 6.9,
+      "remaining_weight": 57.549999999999955,
+      "initial_weight": 1000.0,
+      "spool_weight": 185.0,
+      "used_weight": 942.45,
+      "remaining_length": 23926.509648819123,
+      "used_length": 391825.1784279687,
+      "archived": false,
+      "extra": {
+        "active_tray": "\"\""
+      },
+      "cost_per_gram": 0.006900000000000001
+    },
+    {
+      "id": 49,
+      "registered": "2025-11-20T19:01:35Z",
+      "filament": {
+        "id": 27,
+        "registered": "2025-04-18T09:03:44Z",
+        "name": "Black",
+        "vendor": {
+          "id": 5,
+          "registered": "2025-02-17T17:19:47Z",
+          "name": "Geetech",
+          "empty_spool_weight": 185.0,
+          "extra": {}
+        },
+        "material": "PLA",
+        "price": 6.9,
+        "density": 1.0,
+        "diameter": 1.75,
+        "weight": 1000.0,
+        "spool_weight": 185.0,
+        "color_hex": "000000",
+        "extra": {
+          "nozzle_temperature": "[190,230]",
+          "type": "\" Basic\""
+        }
+      },
+      "remaining_weight": 986.0,
+      "initial_weight": 1000.0,
+      "spool_weight": 185.0,
+      "used_weight": 14.0,
+      "remaining_length": 409931.16444371286,
+      "used_length": 5820.52363307503,
+      "archived": false,
+      "extra": {
+        "active_tray": "\"\""
+      },
+      "cost_per_gram": 0.006900000000000001
+    },
+    {
+      "id": 33,
+      "registered": "2025-04-26T06:59:34Z",
+      "first_used": "2025-11-28T12:22:26Z",
+      "last_used": "2025-11-28T12:22:26Z",
+      "filament": {
+        "id": 30,
+        "registered": "2025-04-26T06:59:09Z",
+        "name": "Black Matte",
+        "vendor": {
+          "id": 5,
+          "registered": "2025-02-17T17:19:47Z",
+          "name": "Geetech",
+          "empty_spool_weight": 185.0,
+          "extra": {}
+        },
+        "material": "PLA",
+        "price": 6.31,
+        "density": 1.0,
+        "diameter": 1.75,
+        "weight": 1000.0,
+        "spool_weight": 185.0,
+        "color_hex": "000000",
+        "extra": {
+          "nozzle_temperature": "[190,230]",
+          "type": "\" Matte\"",
+          "filament_id": "\"\""
+        }
+      },
+      "price": 6.9,
+      "remaining_weight": 892.46,
+      "initial_weight": 1000.0,
+      "spool_weight": 185.0,
+      "used_weight": 107.54,
+      "remaining_length": 371041.7515410101,
+      "used_length": 44709.936535777764,
+      "archived": false,
+      "extra": {
+        "active_tray": "\"03919D4A2404685_0_1\""
+      },
+      "cost_per_gram": 0.006900000000000001
+    },
+    {
+      "id": 23,
+      "registered": "2025-03-23T09:02:45Z",
+      "first_used": "2025-10-15T06:00:33Z",
+      "last_used": "2025-10-15T11:55:29Z",
+      "filament": {
+        "id": 19,
+        "registered": "2025-03-23T08:57:13Z",
+        "name": "Glow Yellow ",
+        "vendor": {
+          "id": 5,
+          "registered": "2025-02-17T17:19:47Z",
+          "name": "Geetech",
+          "empty_spool_weight": 185.0,
+          "extra": {}
+        },
+        "material": "PLA",
+        "price": 13.36,
+        "density": 1.0,
+        "diameter": 1.75,
+        "weight": 1000.0,
+        "spool_weight": 175.0,
+        "multi_color_hexes": "f7fa2e,fffdfe",
+        "multi_color_direction": "coaxial",
+        "extra": {
+          "nozzle_temperature": "[190,230]",
+          "type": "\" Basic\""
+        }
+      },
+      "price": 13.36,
+      "remaining_weight": 837.98,
+      "initial_weight": 1000.0,
+      "spool_weight": 175.0,
+      "used_weight": 162.02,
+      "remaining_length": 348391.59957458667,
+      "used_length": 67360.08850220116,
+      "archived": false,
+      "extra": {
+        "active_tray": "\"\""
+      },
+      "cost_per_gram": 0.013359999999999999
+    },
+    {
+      "id": 22,
+      "registered": "2025-03-23T09:02:27Z",
+      "first_used": "2025-05-23T08:31:07Z",
+      "last_used": "2025-11-18T18:16:22Z",
+      "filament": {
+        "id": 20,
+        "registered": "2025-03-23T08:58:09Z",
+        "name": "Gray",
+        "vendor": {
+          "id": 5,
+          "registered": "2025-02-17T17:19:47Z",
+          "name": "Geetech",
+          "empty_spool_weight": 185.0,
+          "extra": {}
+        },
+        "material": "PLA",
+        "price": 8.76,
+        "density": 1.0,
+        "diameter": 1.75,
+        "weight": 1000.0,
+        "spool_weight": 175.0,
+        "color_hex": "696868",
+        "extra": {
+          "nozzle_temperature": "[190,230]",
+          "type": "\" Basic\""
+        }
+      },
+      "price": 8.76,
+      "remaining_weight": 598.32,
+      "initial_weight": 1000.0,
+      "spool_weight": 175.0,
+      "used_weight": 401.67999999999995,
+      "remaining_length": 248752.5500101037,
+      "used_length": 166999.13806668413,
+      "archived": false,
+      "extra": {
+        "active_tray": "\"\""
+      },
+      "cost_per_gram": 0.00876
+    },
+    {
+      "id": 25,
+      "registered": "2025-04-10T18:33:10Z",
+      "first_used": "2025-04-27T07:51:08Z",
+      "last_used": "2025-10-15T11:55:29Z",
+      "filament": {
+        "id": 24,
+        "registered": "2025-04-10T18:32:19Z",
+        "name": "Marbel Brown",
+        "vendor": {
+          "id": 5,
+          "registered": "2025-02-17T17:19:47Z",
+          "name": "Geetech",
+          "empty_spool_weight": 185.0,
+          "extra": {}
+        },
+        "material": "PLA",
+        "price": 10.35,
+        "density": 1.0,
+        "diameter": 1.75,
+        "weight": 1000.0,
+        "spool_weight": 175.0,
+        "comment": "1",
+        "multi_color_hexes": "ffffff,934c00",
+        "multi_color_direction": "coaxial",
+        "extra": {
+          "nozzle_temperature": "[190,230]",
+          "type": "\" Basic\""
+        }
+      },
+      "price": 10.35,
+      "remaining_weight": 816.0,
+      "initial_weight": 1000.0,
+      "spool_weight": 175.0,
+      "used_weight": 184.0,
+      "remaining_length": 339253.3774706589,
+      "used_length": 76498.31060612897,
+      "archived": false,
+      "extra": {
+        "active_tray": "\"\""
+      },
+      "cost_per_gram": 0.01035
+    },
+    {
+      "id": 51,
+      "registered": "2025-11-20T19:15:51Z",
+      "filament": {
+        "id": 38,
+        "registered": "2025-11-20T19:15:35Z",
+        "name": "Orange",
+        "vendor": {
+          "id": 5,
+          "registered": "2025-02-17T17:19:47Z",
+          "name": "Geetech",
+          "empty_spool_weight": 185.0,
+          "extra": {}
+        },
+        "material": "PLA",
+        "price": 7.71,
+        "density": 1.0,
+        "diameter": 1.75,
+        "weight": 1000.0,
+        "spool_weight": 185.0,
+        "color_hex": "ff8c00",
+        "extra": {
+          "nozzle_temperature": "[190,230]",
+          "type": "\" Basic\"",
+          "filament_id": "\"\""
+        }
+      },
+      "remaining_weight": 1000.0,
+      "spool_weight": 185.0,
+      "used_weight": 0.0,
+      "remaining_length": 415751.68807678786,
+      "used_length": 0.0,
+      "archived": false,
+      "extra": {
+        "active_tray": "\"\""
+      },
+      "cost_per_gram": 0.00771
+    },
+    {
+      "id": 40,
+      "registered": "2025-11-20T17:38:07Z",
+      "first_used": "2025-11-15T23:00:00Z",
+      "last_used": "2025-11-20T19:12:14Z",
+      "filament": {
+        "id": 32,
+        "registered": "2025-11-17T19:11:04Z",
+        "name": "Pink ",
+        "vendor": {
+          "id": 5,
+          "registered": "2025-02-17T17:19:47Z",
+          "name": "Geetech",
+          "empty_spool_weight": 185.0,
+          "extra": {}
+        },
+        "material": "PLA",
+        "price": 5.46,
+        "density": 1.0,
+        "diameter": 1.5,
+        "weight": 1000.0,
+        "spool_weight": 185.0,
+        "comment": "",
+        "color_hex": "e37cfa",
+        "extra": {
+          "nozzle_temperature": "[190,230]",
+          "type": "\" Basic\"",
+          "filament_id": "\"\""
+        }
+      },
+      "remaining_weight": 997.04,
+      "initial_weight": 1000.0,
+      "spool_weight": 185.0,
+      "used_weight": 2.96,
+      "remaining_length": 564209.2247478873,
+      "used_length": 1675.0173566293697,
+      "archived": false,
+      "extra": {
+        "active_tray": "\"\""
+      },
+      "cost_per_gram": 0.00546
+    },
+    {
+      "id": 36,
+      "registered": "2025-04-30T20:04:08Z",
+      "first_used": "2025-05-28T15:25:11Z",
+      "last_used": "2025-05-28T15:25:11Z",
+      "filament": {
+        "id": 31,
+        "registered": "2025-04-30T20:03:40Z",
+        "name": "Red",
+        "vendor": {
+          "id": 5,
+          "registered": "2025-02-17T17:19:47Z",
+          "name": "Geetech",
+          "empty_spool_weight": 185.0,
+          "extra": {}
+        },
+        "material": "PLA",
+        "price": 8.79,
+        "density": 1.0,
+        "diameter": 1.75,
+        "weight": 1000.0,
+        "spool_weight": 185.0,
+        "color_hex": "ff0000",
+        "extra": {
+          "nozzle_temperature": "[190,230]",
+          "type": "\" Basic\"",
+          "filament_id": "\"\""
+        }
+      },
+      "price": 8.79,
+      "remaining_weight": 980.64,
+      "initial_weight": 1000.0,
+      "spool_weight": 185.0,
+      "used_weight": 19.36,
+      "remaining_length": 407702.7353956213,
+      "used_length": 8048.952681166613,
+      "archived": false,
+      "extra": {
+        "active_tray": "\"\""
+      },
+      "cost_per_gram": 0.00879
+    },
+    {
+      "id": 46,
+      "registered": "2025-11-20T18:52:13Z",
+      "filament": {
+        "id": 36,
+        "registered": "2025-11-20T18:51:17Z",
+        "name": "Silber",
+        "vendor": {
+          "id": 5,
+          "registered": "2025-02-17T17:19:47Z",
+          "name": "Geetech",
+          "empty_spool_weight": 185.0,
+          "extra": {}
+        },
+        "material": "PLA",
+        "price": 5.75,
+        "density": 1.0,
+        "diameter": 1.75,
+        "weight": 1000.0,
+        "spool_weight": 185.0,
+        "color_hex": "737373",
+        "extra": {
+          "nozzle_temperature": "[190,230]",
+          "type": "\" Basic\"",
+          "filament_id": "\"\""
+        }
+      },
+      "remaining_weight": 1000.0,
+      "initial_weight": 1000.0,
+      "spool_weight": 185.0,
+      "used_weight": 0.0,
+      "remaining_length": 415751.68807678786,
+      "used_length": 0.0,
+      "archived": false,
+      "extra": {
+        "active_tray": "\"\""
+      },
+      "cost_per_gram": 0.00575
+    },
+    {
+      "id": 17,
+      "registered": "2025-02-23T20:41:03Z",
+      "first_used": "2025-03-21T08:04:06Z",
+      "last_used": "2025-05-15T19:27:54Z",
+      "filament": {
+        "id": 17,
+        "registered": "2025-02-23T20:40:12Z",
+        "name": "Silk Bronze Rainbow",
+        "vendor": {
+          "id": 5,
+          "registered": "2025-02-17T17:19:47Z",
+          "name": "Geetech",
+          "empty_spool_weight": 185.0,
+          "extra": {}
+        },
+        "material": "PLA",
+        "price": 11.39,
+        "density": 1.0,
+        "diameter": 1.75,
+        "weight": 1000.0,
+        "spool_weight": 185.0,
+        "comment": "1",
+        "multi_color_hexes": "8e2e2e,938e39",
+        "multi_color_direction": "longitudinal",
+        "extra": {
+          "nozzle_temperature": "[190,230]",
+          "type": "\"Silk\""
+        }
+      },
+      "remaining_weight": 783.87,
+      "initial_weight": 1000.0,
+      "spool_weight": 185.0,
+      "used_weight": 216.13000000000002,
+      "remaining_length": 325895.2757327517,
+      "used_length": 89856.41234403617,
+      "comment": "1",
+      "archived": false,
+      "extra": {
+        "tag": "\"388e40ae-9f4b-4548-9331-637d43f469a6\"",
+        "active_tray": "\"\""
+      },
+      "cost_per_gram": 0.01139
+    },
+    {
+      "id": 26,
+      "registered": "2025-04-11T07:23:52Z",
+      "first_used": "2025-04-11T07:26:18Z",
+      "last_used": "2025-04-11T13:10:30Z",
+      "filament": {
+        "id": 25,
+        "registered": "2025-04-11T07:22:11Z",
+        "name": "Silk Red Gold Purple",
+        "vendor": {
+          "id": 5,
+          "registered": "2025-02-17T17:19:47Z",
+          "name": "Geetech",
+          "empty_spool_weight": 185.0,
+          "extra": {}
+        },
+        "material": "PLA",
+        "density": 1.0,
+        "diameter": 1.75,
+        "weight": 1000.0,
+        "spool_weight": 175.0,
+        "comment": "1",
+        "multi_color_hexes": "ff0602,ffd500,5a68b6",
+        "multi_color_direction": "coaxial",
+        "extra": {
+          "nozzle_temperature": "[195,230]",
+          "type": "\"Silk\""
+        }
+      },
+      "price": 13.98,
+      "remaining_weight": 963.15,
+      "initial_weight": 1000.0,
+      "spool_weight": 175.0,
+      "used_weight": 36.85,
+      "remaining_length": 400431.23837115825,
+      "used_length": 15320.449705629633,
+      "comment": "1",
+      "archived": false,
+      "extra": {
+        "active_tray": "\"\""
+      },
+      "cost_per_gram": 0.013980000000000001
+    },
+    {
+      "id": 16,
+      "registered": "2025-02-23T20:40:34Z",
+      "first_used": "2025-02-25T07:48:46Z",
+      "last_used": "2025-09-03T08:15:52Z",
+      "filament": {
+        "id": 16,
+        "registered": "2025-02-23T09:29:38Z",
+        "name": "Silk Tri Color  PLA",
+        "vendor": {
+          "id": 5,
+          "registered": "2025-02-17T17:19:47Z",
+          "name": "Geetech",
+          "empty_spool_weight": 185.0,
+          "extra": {}
+        },
+        "material": "PLA",
+        "price": 12.49,
+        "density": 1.0,
+        "diameter": 1.75,
+        "weight": 1000.0,
+        "spool_weight": 185.0,
+        "comment": "1",
+        "multi_color_hexes": "fd0000,fffb00,0800ff",
+        "multi_color_direction": "coaxial",
+        "extra": {
+          "nozzle_temperature": "[190,230]",
+          "type": "\"Silk\""
+        }
+      },
+      "remaining_weight": 286.29999999999995,
+      "initial_weight": 1000.0,
+      "spool_weight": 185.0,
+      "used_weight": 713.7,
+      "remaining_length": 119029.70829638434,
+      "used_length": 296721.9797804035,
+      "comment": "1",
+      "archived": false,
+      "extra": {
+        "tag": "\"55c61341-d64c-4120-9dc9-4bfb573eeba0\"",
+        "active_tray": "\"\""
+      },
+      "cost_per_gram": 0.01249
+    },
+    {
+      "id": 20,
+      "registered": "2025-03-23T09:00:58Z",
+      "first_used": "2025-04-06T08:44:18Z",
+      "last_used": "2025-11-09T18:52:45Z",
+      "filament": {
+        "id": 22,
+        "registered": "2025-03-23T09:00:26Z",
+        "name": "Warm White",
+        "vendor": {
+          "id": 5,
+          "registered": "2025-02-17T17:19:47Z",
+          "name": "Geetech",
+          "empty_spool_weight": 185.0,
+          "extra": {}
+        },
+        "material": "PLA",
+        "price": 8.08,
+        "density": 1.0,
+        "diameter": 1.75,
+        "weight": 1000.0,
+        "spool_weight": 175.0,
+        "comment": "1",
+        "color_hex": "e9e6e6",
+        "extra": {
+          "nozzle_temperature": "[190,230]",
+          "type": "\" Basic\"",
+          "filament_id": "\"\""
+        }
+      },
+      "price": 8.08,
+      "remaining_weight": 81.0,
+      "initial_weight": 1000.0,
+      "spool_weight": 175.0,
+      "used_weight": 919.0,
+      "remaining_length": 33675.886734219814,
+      "used_length": 382075.80134256807,
+      "comment": "1",
+      "archived": false,
+      "extra": {
+        "active_tray": "\"\""
+      },
+      "cost_per_gram": 0.00808
+    },
+    {
+      "id": 47,
+      "registered": "2025-11-20T18:52:36Z",
+      "filament": {
+        "id": 35,
+        "registered": "2025-11-20T18:50:55Z",
+        "name": "White",
+        "vendor": {
+          "id": 5,
+          "registered": "2025-02-17T17:19:47Z",
+          "name": "Geetech",
+          "empty_spool_weight": 185.0,
+          "extra": {}
+        },
+        "material": "PLA",
+        "price": 5.75,
+        "density": 1.0,
+        "diameter": 1.75,
+        "weight": 1000.0,
+        "spool_weight": 185.0,
+        "color_hex": "ffffff",
+        "extra": {
+          "nozzle_temperature": "[190,230]",
+          "type": "\" Basic\"",
+          "filament_id": "\"\""
+        }
+      },
+      "remaining_weight": 1000.0,
+      "initial_weight": 1000.0,
+      "spool_weight": 185.0,
+      "used_weight": 0.0,
+      "remaining_length": 415751.68807678786,
+      "used_length": 0.0,
+      "archived": false,
+      "extra": {
+        "active_tray": "\"\""
+      },
+      "cost_per_gram": 0.00575
+    },
+    {
+      "id": 50,
+      "registered": "2025-11-20T19:04:39Z",
+      "filament": {
+        "id": 35,
+        "registered": "2025-11-20T18:50:55Z",
+        "name": "White",
+        "vendor": {
+          "id": 5,
+          "registered": "2025-02-17T17:19:47Z",
+          "name": "Geetech",
+          "empty_spool_weight": 185.0,
+          "extra": {}
+        },
+        "material": "PLA",
+        "price": 5.75,
+        "density": 1.0,
+        "diameter": 1.75,
+        "weight": 1000.0,
+        "spool_weight": 185.0,
+        "color_hex": "ffffff",
+        "extra": {
+          "nozzle_temperature": "[190,230]",
+          "type": "\" Basic\"",
+          "filament_id": "\"\""
+        }
+      },
+      "remaining_weight": 1000.0,
+      "initial_weight": 1000.0,
+      "spool_weight": 185.0,
+      "used_weight": 0.0,
+      "remaining_length": 415751.68807678786,
+      "used_length": 0.0,
+      "archived": false,
+      "extra": {
+        "active_tray": "\"\""
+      },
+      "cost_per_gram": 0.00575
+    },
+    {
+      "id": 18,
+      "registered": "2025-03-17T18:40:17Z",
+      "first_used": "2025-03-17T18:59:25Z",
+      "last_used": "2025-11-18T15:18:46Z",
+      "filament": {
+        "id": 18,
+        "registered": "2025-03-17T18:39:33Z",
+        "name": "Wood Black Walnut",
+        "vendor": {
+          "id": 5,
+          "registered": "2025-02-17T17:19:47Z",
+          "name": "Geetech",
+          "empty_spool_weight": 185.0,
+          "extra": {}
+        },
+        "material": "PLA",
+        "price": 9.88,
+        "density": 1.2,
+        "diameter": 1.75,
+        "weight": 1000.0,
+        "spool_weight": 175.0,
+        "settings_extruder_temp": 200,
+        "settings_bed_temp": 65,
+        "color_hex": "df9d59",
+        "extra": {
+          "nozzle_temperature": "[185,210]",
+          "type": "\" Basic\""
+        }
+      },
+      "price": 9.88,
+      "remaining_weight": 895.09,
+      "initial_weight": 1000.0,
+      "spool_weight": 175.0,
+      "used_weight": 104.91,
+      "remaining_length": 310112.6487338767,
+      "used_length": 36347.09133011318,
+      "archived": false,
+      "extra": {
+        "tag": "\"f6c0071e-af7e-4134-8980-3e8c67b408dd\"",
+        "active_tray": "\"\""
+      },
+      "cost_per_gram": 0.009880000000000002
+    },
+    {
+      "id": 14,
+      "registered": "2025-02-17T20:29:40Z",
+      "first_used": "2025-02-27T20:12:27Z",
+      "last_used": "2025-11-18T15:18:46Z",
+      "filament": {
+        "id": 14,
+        "registered": "2025-02-17T20:28:14Z",
+        "name": "Grün - Basic",
+        "vendor": {
+          "id": 2,
+          "registered": "2025-01-20T20:17:59Z",
+          "name": "eSun Cardboard",
+          "empty_spool_weight": 170.0,
+          "external_id": "eSun",
+          "extra": {}
+        },
+        "material": "PLA",
+        "price": 12.79,
+        "density": 1.0,
+        "diameter": 1.75,
+        "weight": 1000.0,
+        "spool_weight": 170.0,
+        "comment": "1",
+        "color_hex": "0dff00",
+        "extra": {
+          "nozzle_temperature": "[190,230]",
+          "type": "\" Basic\""
+        }
+      },
+      "price": 12.79,
+      "remaining_weight": 826.6700000000001,
+      "initial_weight": 1000.0,
+      "spool_weight": 170.0,
+      "used_weight": 173.32999999999998,
+      "remaining_length": 343689.44798243826,
+      "used_length": 72062.24009434963,
+      "comment": "1",
+      "archived": false,
+      "extra": {
+        "tag": "\"b6a5e6ae-c70a-457e-b91a-f9a7c5c44fbe\"",
+        "active_tray": "\"\""
+      },
+      "cost_per_gram": 0.01279
+    },
+    {
+      "id": 13,
+      "registered": "2025-02-17T20:29:19Z",
+      "first_used": "2025-03-07T09:25:22Z",
+      "last_used": "2025-11-20T19:12:25Z",
+      "filament": {
+        "id": 13,
+        "registered": "2025-02-17T20:20:48Z",
+        "name": "Hellblau - Basic",
+        "vendor": {
+          "id": 2,
+          "registered": "2025-01-20T20:17:59Z",
+          "name": "eSun Cardboard",
+          "empty_spool_weight": 170.0,
+          "external_id": "eSun",
+          "extra": {}
+        },
+        "material": "PLA",
+        "price": 12.79,
+        "density": 1.0,
+        "diameter": 1.75,
+        "weight": 1000.0,
+        "comment": "1",
+        "color_hex": "00bbff",
+        "extra": {
+          "nozzle_temperature": "[190,230]",
+          "type": "\" Basic\""
+        }
+      },
+      "price": 12.79,
+      "remaining_weight": 864.59,
+      "initial_weight": 1000.0,
+      "used_weight": 135.41,
+      "remaining_length": 359454.75199431,
+      "used_length": 56296.93608247784,
+      "comment": "1",
+      "archived": false,
+      "extra": {
+        "tag": "\"4a15b22d-44fd-4598-b4f7-9064c85f31bf\"",
+        "active_tray": "\"\""
+      },
+      "cost_per_gram": 0.01279
+    },
+    {
+      "id": 12,
+      "registered": "2025-02-17T20:29:07Z",
+      "first_used": "2025-02-25T20:30:22Z",
+      "last_used": "2025-11-08T16:44:52Z",
+      "filament": {
+        "id": 12,
+        "registered": "2025-02-17T20:18:22Z",
+        "name": "Lila - Basic",
+        "vendor": {
+          "id": 2,
+          "registered": "2025-01-20T20:17:59Z",
+          "name": "eSun Cardboard",
+          "empty_spool_weight": 170.0,
+          "external_id": "eSun",
+          "extra": {}
+        },
+        "material": "PLA",
+        "price": 12.79,
+        "density": 1.0,
+        "diameter": 1.75,
+        "weight": 1000.0,
+        "comment": "1",
+        "color_hex": "c800ff",
+        "extra": {
+          "nozzle_temperature": "[190,230]",
+          "type": "\" Basic\""
+        }
+      },
+      "price": 12.79,
+      "remaining_weight": 691.85,
+      "initial_weight": 1000.0,
+      "used_weight": 308.15,
+      "remaining_length": 287637.8053959257,
+      "used_length": 128113.88268086218,
+      "comment": "1",
+      "archived": false,
+      "extra": {
+        "tag": "\"277ba76f-36b2-4f9b-bd0d-1c168d7e9001\"",
+        "active_tray": "\"\""
+      },
+      "cost_per_gram": 0.01279
+    },
+    {
+      "id": 19,
+      "registered": "2025-03-23T08:54:29Z",
+      "filament": {
+        "id": 15,
+        "registered": "2025-02-21T11:45:35Z",
+        "name": "White - Basic",
+        "vendor": {
+          "id": 2,
+          "registered": "2025-01-20T20:17:59Z",
+          "name": "eSun Cardboard",
+          "empty_spool_weight": 170.0,
+          "external_id": "eSun",
+          "extra": {}
+        },
+        "material": "PLA",
+        "density": 1.0,
+        "diameter": 1.75,
+        "weight": 1000.0,
+        "spool_weight": 170.0,
+        "comment": "1",
+        "settings_extruder_temp": 210,
+        "settings_bed_temp": 45,
+        "color_hex": "fffafa",
+        "extra": {
+          "nozzle_temperature": "[210,230]",
+          "type": "\" Basic\""
+        }
+      },
+      "remaining_weight": 1000.0,
+      "initial_weight": 1000.0,
+      "spool_weight": 170.0,
+      "used_weight": 0.0,
+      "remaining_length": 415751.68807678786,
+      "used_length": 0.0,
+      "archived": false,
+      "extra": {
+        "tag": "\"\"",
+        "active_tray": "\"\""
+      },
+      "cost_per_gram": 0
+    },
+    {
+      "id": 11,
+      "registered": "2025-02-17T17:26:55Z",
+      "first_used": "2025-02-15T23:00:00Z",
+      "last_used": "2025-09-19T16:32:28Z",
+      "filament": {
+        "id": 11,
+        "registered": "2025-02-17T17:21:28Z",
+        "name": "TPU",
+        "vendor": {
+          "id": 5,
+          "registered": "2025-02-17T17:19:47Z",
+          "name": "Geetech",
+          "empty_spool_weight": 185.0,
+          "extra": {}
+        },
+        "material": "TPU",
+        "price": 10.0,
+        "density": 1.0,
+        "diameter": 1.75,
+        "weight": 1000.0,
+        "settings_extruder_temp": 210,
+        "settings_bed_temp": 45,
+        "color_hex": "000000",
+        "extra": {
+          "nozzle_temperature": "[190,230]",
+          "type": "\" Flexible\""
+        }
+      },
+      "price": 10.0,
+      "remaining_weight": 951.56,
+      "initial_weight": 1000.0,
+      "used_weight": 48.44,
+      "remaining_length": 395612.67630634824,
+      "used_length": 20139.011770439603,
+      "archived": false,
+      "extra": {
+        "tag": "\"7088fcdb-4f87-499e-8c34-bffa56147b73\"",
+        "active_tray": "\"\""
+      },
+      "cost_per_gram": 0.01
+    }
+  ],
+  "last_ams_config": {
+    "vt_tray": {
+      "id": "254",
+      "tag_uid": "0000000000000000",
+      "tray_id_name": "",
+      "tray_info_idx": "GFG99",
+      "tray_type": "PETG",
+      "tray_sub_brands": "",
+      "tray_color": "FFFFFFFF",
+      "tray_weight": "0",
+      "tray_diameter": "0.00",
+      "tray_temp": "0",
+      "tray_time": "0",
+      "bed_temp_type": "0",
+      "bed_temp": "0",
+      "nozzle_temp_max": "270",
+      "nozzle_temp_min": "220",
+      "xcam_info": "000000000000000000000000",
+      "tray_uuid": "00000000000000000000000000000000",
+      "remain": 0,
+      "k": 0.019999999552965164,
+      "n": 1,
+      "cali_idx": -1
+    },
+    "ams": [
+      {
+        "chip_id": "160e31383039160130323339fffffff",
+        "check": 0,
+        "id": "0",
+        "humidity": "5",
+        "humidity_raw": "0",
+        "temp": "0.0",
+        "dry_time": 0,
+        "info": "1002",
+        "tray": [
+          {
+            "id": "0"
+          },
+          {
+            "id": "1",
+            "state": 3,
+            "remain": 0,
+            "k": 0.019999999552965164,
+            "n": 1,
+            "cali_idx": -1,
+            "total_len": 330000,
+            "tag_uid": "0000000000000000",
+            "tray_id_name": "",
+            "tray_info_idx": "GFB00",
+            "tray_type": "ABS",
+            "tray_sub_brands": "",
+            "tray_color": "0ACC38FF",
+            "tray_weight": "0",
+            "tray_diameter": "0.00",
+            "tray_temp": "0",
+            "tray_time": "0",
+            "bed_temp_type": "0",
+            "bed_temp": "0",
+            "nozzle_temp_max": "280",
+            "nozzle_temp_min": "240",
+            "xcam_info": "000000000000000000000000",
+            "tray_uuid": "00000000000000000000000000000000",
+            "ctype": 0,
+            "cols": [
+              "0ACC38FF"
+            ]
+          },
+          {
+            "id": "2",
+            "state": 3,
+            "remain": 0,
+            "k": 0.03999999910593033,
+            "n": 1,
+            "cali_idx": -1,
+            "total_len": 330000,
+            "tag_uid": "0000000000000000",
+            "tray_id_name": "",
+            "tray_info_idx": "GFG99",
+            "tray_type": "PETG",
+            "tray_sub_brands": "",
+            "tray_color": "000000FF",
+            "tray_weight": "0",
+            "tray_diameter": "0.00",
+            "tray_temp": "0",
+            "tray_time": "0",
+            "bed_temp_type": "0",
+            "bed_temp": "0",
+            "nozzle_temp_max": "270",
+            "nozzle_temp_min": "220",
+            "xcam_info": "000000000000000000000000",
+            "tray_uuid": "00000000000000000000000000000000",
+            "ctype": 0,
+            "cols": [
+              "000000FF"
+            ]
+          },
+          {
+            "id": "3",
+            "state": 3,
+            "remain": 0,
+            "k": 0.019999999552965164,
+            "n": 1,
+            "cali_idx": -1,
+            "total_len": 330000,
+            "tag_uid": "1AF0CEEE00000100",
+            "tray_id_name": "A01-W2",
+            "tray_info_idx": "GFA01",
+            "tray_type": "PLA",
+            "tray_sub_brands": "PLA Matte",
+            "tray_color": "FFFFFFFF",
+            "tray_weight": "1000",
+            "tray_diameter": "1.75",
+            "tray_temp": "55",
+            "tray_time": "8",
+            "bed_temp_type": "0",
+            "bed_temp": "0",
+            "nozzle_temp_max": "230",
+            "nozzle_temp_min": "190",
+            "xcam_info": "D007D007E803E8030000803F",
+            "tray_uuid": "C4342B28CC2C4A08ADF74DD220C3C967",
+            "ctype": 0,
+            "cols": [
+              "FFFFFFFF"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "settings": {
+    "extra_fields_spool": [
+      {
+        "name": "tag",
+        "order": 1,
+        "unit": null,
+        "field_type": "text",
+        "default_value": null,
+        "choices": null,
+        "multi_choice": null,
+        "key": "tag",
+        "entity_type": "spool"
+      },
+      {
+        "name": "Active Tray",
+        "order": 2,
+        "unit": null,
+        "field_type": "text",
+        "default_value": "\"\"",
+        "choices": null,
+        "multi_choice": null,
+        "key": "active_tray",
+        "entity_type": "spool"
+      }
+    ],
+    "extra_fields_filament": [
+      {
+        "name": "Nozzle Temperature",
+        "order": 2,
+        "unit": "°C",
+        "field_type": "integer_range",
+        "default_value": "[190,230]",
+        "choices": null,
+        "multi_choice": null,
+        "key": "nozzle_temperature",
+        "entity_type": "filament"
+      },
+      {
+        "name": "Type",
+        "order": 1,
+        "unit": null,
+        "field_type": "choice",
+        "default_value": "\" Basic\"",
+        "choices": [
+          "Silk",
+          " Basic",
+          " High Speed",
+          " Matte",
+          " Plus",
+          " Flexible",
+          " Translucent"
+        ],
+        "multi_choice": false,
+        "key": "type",
+        "entity_type": "filament"
+      },
+      {
+        "name": "Filament ID",
+        "order": 3,
+        "unit": null,
+        "field_type": "text",
+        "default_value": "\"\"",
+        "choices": null,
+        "multi_choice": null,
+        "key": "filament_id",
+        "entity_type": "filament"
+      }
+    ],
+    "base_url": "http://192.168.158.10:7912",
+    "currency": "EUR",
+    "currency_symbol": "€"
+  },
+  "prints": [
+    {
+      "id": 33,
+      "print_date": "2025-04-22 18:30:30",
+      "file_name": "Easter bunny.3mf",
+      "print_type": "local",
+      "image_file": "20250422183025.png",
+      "filament_info": "[{\"spool_id\":29,\"filament_type\":\"PLA\",\"color\":\"#FFFFFF\",\"grams_used\":79.18,\"ams_slot\":1}]"
+    },
+    {
+      "id": 32,
+      "print_date": "2025-04-22 15:30:19",
+      "file_name": "Easter bunny.3mf",
+      "print_type": "local",
+      "image_file": "20250422144241.png",
+      "filament_info": "[{\"spool_id\":null,\"filament_type\":\"PLA\",\"color\":\"#FFFFFF\",\"grams_used\":79.18,\"ams_slot\":3}]"
+    },
+    {
+      "id": 31,
+      "print_date": "2025-04-22 14:35:59",
+      "file_name": "Easter bunny.3mf",
+      "print_type": "local",
+      "image_file": "20250422143543.png",
+      "filament_info": "[{\"spool_id\":null,\"filament_type\":\"PLA\",\"color\":\"#FFFFFF\",\"grams_used\":79.18,\"ams_slot\":3}]"
+    },
+    {
+      "id": 30,
+      "print_date": "2025-04-22 14:19:46",
+      "file_name": "Easter bunny.3mf",
+      "print_type": "local",
+      "image_file": "20250422141918.png",
+      "filament_info": "[{\"spool_id\":null,\"filament_type\":\"PLA\",\"color\":\"#FFFFFF\",\"grams_used\":79.18,\"ams_slot\":3}]"
+    },
+    {
+      "id": 29,
+      "print_date": "2025-04-22 14:10:27",
+      "file_name": "Easter bunny.3mf",
+      "print_type": "local",
+      "image_file": "20250422140955.png",
+      "filament_info": "[{\"spool_id\":null,\"filament_type\":\"PLA\",\"color\":\"#FFFFFF\",\"grams_used\":79.18,\"ams_slot\":3}]"
+    },
+    {
+      "id": 28,
+      "print_date": "2025-04-22 13:59:24",
+      "file_name": "Easter bunny.3mf",
+      "print_type": "local",
+      "image_file": "20250422135500.png",
+      "filament_info": "[{\"spool_id\":null,\"filament_type\":\"PLA\",\"color\":\"#FFFFFF\",\"grams_used\":79.18,\"ams_slot\":3}]"
+    },
+    {
+      "id": 27,
+      "print_date": "2025-04-22 13:45:11",
+      "file_name": "Easter bunny.3mf",
+      "print_type": "local",
+      "image_file": "20250422134502.png",
+      "filament_info": "[{\"spool_id\":null,\"filament_type\":\"PLA\",\"color\":\"#FFFFFF\",\"grams_used\":79.18,\"ams_slot\":3}]"
+    },
+    {
+      "id": 26,
+      "print_date": "2025-04-15 20:33:22",
+      "file_name": "Garden Pole stand fence fixed",
+      "print_type": "cloud",
+      "image_file": "20250415203322.png",
+      "filament_info": "[{\"spool_id\":27,\"filament_type\":\"PETG\",\"color\":\"#C2D3CD\",\"grams_used\":10.96,\"ams_slot\":1}]"
+    },
+    {
+      "id": 25,
+      "print_date": "2025-04-15 20:32:22",
+      "file_name": "Garden Pole stand fence fixed",
+      "print_type": "cloud",
+      "image_file": "20250415203222.png",
+      "filament_info": "[{\"spool_id\":null,\"filament_type\":\"PETG\",\"color\":\"#C2D3CD\",\"grams_used\":10.96,\"ams_slot\":1}]"
+    },
+    {
+      "id": 24,
+      "print_date": "2025-04-15 19:46:36",
+      "file_name": "Garden Pole stand fence fixed",
+      "print_type": "cloud",
+      "image_file": "20250415194636.png",
+      "filament_info": "[{\"spool_id\":null,\"filament_type\":\"PETG\",\"color\":\"#C2D3CD\",\"grams_used\":10.96,\"ams_slot\":1}]"
+    },
+    {
+      "id": 23,
+      "print_date": "2025-04-15 19:45:14",
+      "file_name": "Garden Pole stand fence fixed",
+      "print_type": "cloud",
+      "image_file": "20250415194514.png",
+      "filament_info": "[{\"spool_id\":null,\"filament_type\":\"PETG\",\"color\":\"#C2D3CD\",\"grams_used\":10.96,\"ams_slot\":1}]"
+    },
+    {
+      "id": 22,
+      "print_date": "2025-04-15 19:44:27",
+      "file_name": "Garden Pole stand fence fixed",
+      "print_type": "cloud",
+      "image_file": "20250415194427.png",
+      "filament_info": "[{\"spool_id\":null,\"filament_type\":\"PETG\",\"color\":\"#C2D3CD\",\"grams_used\":10.96,\"ams_slot\":1}]"
+    },
+    {
+      "id": 21,
+      "print_date": "2025-04-15 19:43:14",
+      "file_name": "Garden Pole stand fence fixed",
+      "print_type": "cloud",
+      "image_file": "20250415194227.png",
+      "filament_info": "[{\"spool_id\":null,\"filament_type\":\"PETG\",\"color\":\"#C2D3CD\",\"grams_used\":10.96,\"ams_slot\":1}]"
+    },
+    {
+      "id": 20,
+      "print_date": "2025-03-20 18:53:18",
+      "file_name": "Scheibe",
+      "print_type": "idle",
+      "image_file": "20250320185318.png",
+      "filament_info": "[]"
+    },
+    {
+      "id": 19,
+      "print_date": "2025-03-20 18:52:36",
+      "file_name": "Scheibe",
+      "print_type": "idle",
+      "image_file": "20250320185236.png",
+      "filament_info": "[{\"spool_id\":null,\"filament_type\":\"TPU\",\"color\":\"#000000\",\"grams_used\":0.81,\"ams_slot\":1}]"
+    },
+    {
+      "id": 18,
+      "print_date": "2025-03-18 20:03:51",
+      "file_name": "CLIPPY - filament clip - flat version.3mf",
+      "print_type": "local",
+      "image_file": "20250318200351.png",
+      "filament_info": "[{\"spool_id\":null,\"filament_type\":\"PLA\",\"color\":\"#000000\",\"grams_used\":1.28,\"ams_slot\":1},{\"spool_id\":8,\"filament_type\":\"PLA\",\"color\":\"#FFFAFA\",\"grams_used\":0.46,\"ams_slot\":2},{\"spool_id\":null,\"filament_type\":\"PLA\",\"color\":\"#FFFFFF\",\"grams_used\":1.02,\"ams_slot\":3},{\"spool_id\":null,\"filament_type\":\"PLA\",\"color\":\"#00BBFF\",\"grams_used\":0.7,\"ams_slot\":4}]"
+    },
+    {
+      "id": 17,
+      "print_date": "2025-03-18 20:02:07",
+      "file_name": "CLIPPY - filament clip - flat version.3mf",
+      "print_type": "local",
+      "image_file": "20250318200206.png",
+      "filament_info": "[{\"spool_id\":null,\"filament_type\":\"PLA\",\"color\":\"#000000\",\"grams_used\":1.28,\"ams_slot\":1},{\"spool_id\":null,\"filament_type\":\"PLA\",\"color\":\"#FFFAFA\",\"grams_used\":0.46,\"ams_slot\":2},{\"spool_id\":null,\"filament_type\":\"PLA\",\"color\":\"#FFFFFF\",\"grams_used\":1.02,\"ams_slot\":3},{\"spool_id\":null,\"filament_type\":\"PLA\",\"color\":\"#00BBFF\",\"grams_used\":0.7,\"ams_slot\":4}]"
+    },
+    {
+      "id": 16,
+      "print_date": "2025-03-18 19:56:54",
+      "file_name": "Einschweißhilfe für Vakuum Tüten.3mf",
+      "print_type": "local",
+      "image_file": "20250318195654.png",
+      "filament_info": "[{\"spool_id\":null,\"filament_type\":\"PLA\",\"color\":\"#FFFAFA\",\"grams_used\":2.0,\"ams_slot\":1}]"
+    },
+    {
+      "id": 15,
+      "print_date": "2025-03-18 19:56:03",
+      "file_name": "Einschweißhilfe für Vakuum Tüten.3mf",
+      "print_type": "local",
+      "image_file": "20250318195603.png",
+      "filament_info": "[{\"spool_id\":null,\"filament_type\":\"PLA\",\"color\":\"#FFFAFA\",\"grams_used\":2.0,\"ams_slot\":1}]"
+    },
+    {
+      "id": 14,
+      "print_date": "2025-03-17 10:02:07",
+      "file_name": "Einschweißhilfe für Vakuum Tüten.3mf",
+      "print_type": "local",
+      "image_file": "20250317100206.png",
+      "filament_info": "[{\"spool_id\":null,\"filament_type\":\"PLA\",\"color\":\"#FFFAFA\",\"grams_used\":2.0,\"ams_slot\":1}]"
+    },
+    {
+      "id": 13,
+      "print_date": "2025-03-17 09:54:01",
+      "file_name": "Einschweißhilfe für Vakuum Tüten.3mf",
+      "print_type": "local",
+      "image_file": "20250317095401.png",
+      "filament_info": "[{\"spool_id\":null,\"filament_type\":\"PLA\",\"color\":\"#FFFAFA\",\"grams_used\":2.0,\"ams_slot\":1}]"
+    },
+    {
+      "id": 12,
+      "print_date": "2025-03-17 09:51:38",
+      "file_name": "Einschweißhilfe für Vakuum Tüten.3mf",
+      "print_type": "local",
+      "image_file": "20250317095138.png",
+      "filament_info": "[{\"spool_id\":null,\"filament_type\":\"PLA\",\"color\":\"#FFFAFA\",\"grams_used\":2.0,\"ams_slot\":1}]"
+    },
+    {
+      "id": 11,
+      "print_date": "2025-03-17 09:44:32",
+      "file_name": "CLIPPY - filament clip - flat version.3mf",
+      "print_type": "local",
+      "image_file": "20250317094432.png",
+      "filament_info": "[{\"spool_id\":null,\"filament_type\":\"PLA\",\"color\":\"#000000\",\"grams_used\":1.28,\"ams_slot\":1},{\"spool_id\":null,\"filament_type\":\"PLA\",\"color\":\"#FFFAFA\",\"grams_used\":0.46,\"ams_slot\":2},{\"spool_id\":null,\"filament_type\":\"PLA\",\"color\":\"#FFFFFF\",\"grams_used\":1.02,\"ams_slot\":3},{\"spool_id\":null,\"filament_type\":\"PLA\",\"color\":\"#00BBFF\",\"grams_used\":0.7,\"ams_slot\":4}]"
+    },
+    {
+      "id": 10,
+      "print_date": "2025-03-16 20:52:36",
+      "file_name": "Einschweißhilfe für Vakuum Tüten.3mf",
+      "print_type": "local",
+      "image_file": "20250316205236.png",
+      "filament_info": "[{\"spool_id\":null,\"filament_type\":\"PLA\",\"color\":\"#FFFAFA\",\"grams_used\":2.0,\"ams_slot\":1}]"
+    },
+    {
+      "id": 9,
+      "print_date": "2025-03-16 20:51:39",
+      "file_name": "Einschweißhilfe für Vakuum Tüten.3mf",
+      "print_type": "local",
+      "image_file": "20250316205139.png",
+      "filament_info": "[{\"spool_id\":null,\"filament_type\":\"PLA\",\"color\":\"#FFFAFA\",\"grams_used\":2.0,\"ams_slot\":1}]"
+    },
+    {
+      "id": 8,
+      "print_date": "2025-03-16 20:50:58",
+      "file_name": "CLIPPY - filament clip - flat version.3mf",
+      "print_type": "local",
+      "image_file": "20250316205058.png",
+      "filament_info": "[{\"spool_id\":null,\"filament_type\":\"PLA\",\"color\":\"#000000\",\"grams_used\":1.28,\"ams_slot\":1},{\"spool_id\":null,\"filament_type\":\"PLA\",\"color\":\"#FFFAFA\",\"grams_used\":0.46,\"ams_slot\":2},{\"spool_id\":null,\"filament_type\":\"PLA\",\"color\":\"#FFFFFF\",\"grams_used\":1.02,\"ams_slot\":3},{\"spool_id\":null,\"filament_type\":\"PLA\",\"color\":\"#00BBFF\",\"grams_used\":0.7,\"ams_slot\":4}]"
+    },
+    {
+      "id": 7,
+      "print_date": "2025-03-16 20:50:36",
+      "file_name": "CLIPPY - filament clip - flat version.3mf",
+      "print_type": "local",
+      "image_file": "20250316205036.png",
+      "filament_info": "[{\"spool_id\":null,\"filament_type\":\"PLA\",\"color\":\"#000000\",\"grams_used\":1.28,\"ams_slot\":1},{\"spool_id\":null,\"filament_type\":\"PLA\",\"color\":\"#FFFAFA\",\"grams_used\":0.46,\"ams_slot\":2},{\"spool_id\":null,\"filament_type\":\"PLA\",\"color\":\"#FFFFFF\",\"grams_used\":1.02,\"ams_slot\":3},{\"spool_id\":null,\"filament_type\":\"PLA\",\"color\":\"#00BBFF\",\"grams_used\":0.7,\"ams_slot\":4}]"
+    },
+    {
+      "id": 6,
+      "print_date": "2025-03-16 20:49:21",
+      "file_name": "CLIPPY - filament clip - flat version.3mf",
+      "print_type": "local",
+      "image_file": "20250316204921.png",
+      "filament_info": "[{\"spool_id\":null,\"filament_type\":\"PLA\",\"color\":\"#000000\",\"grams_used\":1.28,\"ams_slot\":1},{\"spool_id\":null,\"filament_type\":\"PLA\",\"color\":\"#FFFAFA\",\"grams_used\":0.46,\"ams_slot\":2},{\"spool_id\":null,\"filament_type\":\"PLA\",\"color\":\"#FFFFFF\",\"grams_used\":1.02,\"ams_slot\":3},{\"spool_id\":null,\"filament_type\":\"PLA\",\"color\":\"#00BBFF\",\"grams_used\":0.7,\"ams_slot\":4}]"
+    },
+    {
+      "id": 5,
+      "print_date": "2025-03-16 19:47:26",
+      "file_name": "CLIPPY - filament clip - flat version.3mf",
+      "print_type": "local",
+      "image_file": "20250316194726.png",
+      "filament_info": "[{\"spool_id\":null,\"filament_type\":\"PLA\",\"color\":\"#000000\",\"grams_used\":1.28,\"ams_slot\":1},{\"spool_id\":null,\"filament_type\":\"PLA\",\"color\":\"#FFFAFA\",\"grams_used\":0.46,\"ams_slot\":2},{\"spool_id\":null,\"filament_type\":\"PLA\",\"color\":\"#FFFFFF\",\"grams_used\":1.02,\"ams_slot\":3},{\"spool_id\":null,\"filament_type\":\"PLA\",\"color\":\"#00BBFF\",\"grams_used\":0.7,\"ams_slot\":4}]"
+    },
+    {
+      "id": 4,
+      "print_date": "2025-03-16 19:43:52",
+      "file_name": "CLIPPY - filament clip - flat version.3mf",
+      "print_type": "local",
+      "image_file": "20250316194255.png",
+      "filament_info": "[{\"spool_id\":null,\"filament_type\":\"PLA\",\"color\":\"#000000\",\"grams_used\":1.28,\"ams_slot\":1},{\"spool_id\":null,\"filament_type\":\"PLA\",\"color\":\"#FFFAFA\",\"grams_used\":0.46,\"ams_slot\":2},{\"spool_id\":null,\"filament_type\":\"PLA\",\"color\":\"#FFFFFF\",\"grams_used\":1.02,\"ams_slot\":3},{\"spool_id\":null,\"filament_type\":\"PLA\",\"color\":\"#00BBFF\",\"grams_used\":0.7,\"ams_slot\":4}]"
+    },
+    {
+      "id": 3,
+      "print_date": "2025-03-16 19:41:12",
+      "file_name": "Einschweißhilfe für Vakuum Tüten.3mf",
+      "print_type": "local",
+      "image_file": "20250316194112.png",
+      "filament_info": "[{\"spool_id\":null,\"filament_type\":\"PLA\",\"color\":\"#FFFAFA\",\"grams_used\":2.0,\"ams_slot\":1}]"
+    },
+    {
+      "id": 2,
+      "print_date": "2025-03-16 19:40:41",
+      "file_name": "Einschweißhilfe für Vakuum Tüten.3mf",
+      "print_type": "local",
+      "image_file": "20250316194041.png",
+      "filament_info": "[{\"spool_id\":null,\"filament_type\":\"PLA\",\"color\":\"#FFFAFA\",\"grams_used\":2.0,\"ams_slot\":1}]"
+    },
+    {
+      "id": 1,
+      "print_date": "2025-03-16 19:35:12",
+      "file_name": "Einschweißhilfe für Vakuum Tüten.3mf",
+      "print_type": "local",
+      "image_file": "20250316193059.png",
+      "filament_info": "[{\"spool_id\":null,\"filament_type\":\"PLA\",\"color\":\"#FFFAFA\",\"grams_used\":2.0,\"ams_slot\":1}]"
+    }
+  ],
+  "printer": {
+    "model": "A1",
+    "devicename": "3DP-039-685"
+  }
+}

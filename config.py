@@ -1,4 +1,11 @@
 import os
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+# Load environment variables from config.env when present so live runs have access
+# to printer and Spoolman credentials without manual exports.
+load_dotenv(Path(__file__).resolve().parent / "config.env")
 EXTERNAL_SPOOL_AMS_ID = 255 # don't change
 EXTERNAL_SPOOL_ID = 254 #  don't change
 
