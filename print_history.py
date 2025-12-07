@@ -3,7 +3,7 @@ import sqlite3
 from datetime import datetime
 from pathlib import Path
 
-DEFAULT_DB_NAME = "demo.db"
+DEFAULT_DB_NAME = "3d_printer_logs.db"
 DB_ENV_VAR = "OPENSPOOLMAN_PRINT_HISTORY_DB"
 
 

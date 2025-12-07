@@ -166,13 +166,14 @@ SpoolMan can print QR-code stickers for every spool; follow the SpoolMan label g
 </details>
 
 #### Environment configuration
- - Rename `config.env.template` to `config.env` or set environment properties and:
-   - set `OPENSPOOLMAN_BASE_URL` — the HTTPS URL where OpenSpoolMan will be available on your network (no trailing slash, required for NFC writes).
-   - set `PRINTER_ID` — find it in the printer settings under Setting → Device → Printer SN.
+- Rename `config.env.template` to `config.env` or set environment properties and:
+  - set `OPENSPOOLMAN_BASE_URL` — the HTTPS URL where OpenSpoolMan will be available on your network (no trailing slash, required for NFC writes).
+  - set `PRINTER_ID` — find it in the printer settings under Setting → Device → Printer SN.
    - set `PRINTER_ACCESS_CODE` — find it in Setting → LAN Only Mode → Access Code (the LAN Only Mode toggle may stay off).
    - set `PRINTER_IP` — found in Setting → LAN Only Mode → IP Address.
    - set `SPOOLMAN_BASE_URL` — the URL of your SpoolMan installation without trailing slash.
-   - set `AUTO_SPEND` to `True` if you want automatic filament usage tracking (see the AUTO SPEND notes below).
+  - set `AUTO_SPEND` to `True` if you want automatic filament usage tracking (see the AUTO SPEND notes below).
+ - By default, the app reads `data/3d_printer_logs.db` for print history; override it through `OPENSPOOLMAN_PRINT_HISTORY_DB` or via the screenshot helper (which targets `data/demo.db` by default).
  
  - Run SpoolMan.
  - Add these extra fields in SpoolMan:

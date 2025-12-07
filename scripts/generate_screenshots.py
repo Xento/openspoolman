@@ -265,7 +265,12 @@ def main() -> int:
         default=str(DEFAULT_SNAPSHOT_PATH),
         help="Path to a snapshot JSON to load when using test data (defaults to data/live_snapshot.json)",
     )
-    parser.add_argument("--print-history-db", dest="print_history_db", help="Path to a SQLite DB for print history")
+    parser.add_argument(
+        "--print-history-db",
+        dest="print_history_db",
+        default=str(Path("data") / "demo.db"),
+        help="Path to a SQLite DB for print history (defaults to data/demo.db for screenshot runs)",
+    )
     parser.add_argument(
         "--test-data",
         action="store_true",
