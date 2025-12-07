@@ -1,48 +1,53 @@
 # <img alt="logo" src="static/logo.png" height="36" /> OpenSpoolMan 
-Use any filament like Bambu filaments with automatic recognition and filament usage updates in your AMS!
+Use any filament like Bambu filaments while OpenSpoolMan automatically subtracts the estimated usage from the SpoolMan-managed spool records (see [AUTO SPEND](#auto-spend---automatic-filament-usage-based-on-slicer-estimate)). BambuLab filament is auto-tracked once it shows up in a tray; only third-party spools must be assigned manually through the UI.
 
-No need for cloud or any special hardware, just your phone and some NFC tags!
+No need for cloud or additional hardware—NFC Tags are optional and you can rely solely on the web GUI. In SpoolMan you can generate QR-code stickers that link straight back to OpenSpoolMan so users can tap a label from their mobile device; change the base URL in SpoolMan settings to OpenSpoolMan before generating the sticker (see [SpoolMan stickers](#spoolman-stickers)).
 
-Similar functionality to https://github.com/spuder/OpenSpool using only your phone, server and NFC tags integrated with SpoolMan
+Similar functionality to https://github.com/spuder/OpenSpool using only your phone, server, and NFC tags integrated with SpoolMan.
 
-Everything works locally without cloud access, you can use scripts/init_bambulab.py script to access your PRINTER_ID and PRINTER_CODE if it is not available on your printer.
+Everything works locally without cloud access; you can use `scripts/init_bambulab.py` to fetch your `PRINTER_ID`/`PRINTER_CODE` if the printer does not expose them.
 
 Docker: https://ghcr.io/drndos/openspoolman
 
 ### News
-- [v.0.2.0b](https://github.com/drndos/openspoolman/releases/tag/v.0.2.0b) - 07.12.2025
-- [v0.1.9](https://github.com/drndos/openspoolman/releases/tag/v0.1.9) - 25.05.2025
-- [v0.1.8](https://github.com/drndos/openspoolman/releases/tag/v0.1.8) - 20.04.2025
-- [v0.1.7](https://github.com/drndos/openspoolman/releases/tag/v0.1.7) - 17.04.2025
-- [0.1.6](https://github.com/drndos/openspoolman/releases/tag/0.1.6) - 09.04.2025
-- [0.1.4](https://github.com/drndos/openspoolman/releases/tag/0.1.4) - 09.02.2025
-- [0.1.3](https://github.com/drndos/openspoolman/releases/tag/0.1.3) - 22.12.2024
+- [v0.2.0](https://github.com/drndos/openspoolman/releases/tag/v0.2.0) - 07.12.2025 — Adds material-aware tray/spool mismatch detection, tray color cues, print reassign/pagination, spool material filters, and SpoolMan URL handling with refreshed responsive layouts.
+- [v0.1.9](https://github.com/drndos/openspoolman/releases/tag/v0.1.9) - 25.05.2025 — Ships post-print spool assignment, multi-platform Docker images, customizable spool sorting, timezone config, and compatibility/uI polish.
+- [v0.1.8](https://github.com/drndos/openspoolman/releases/tag/v0.1.8) - 20.04.2025 — Starts importing each filament’s SpoolMan `filament_id` for accurate matching (requires the `filament_id` custom field).
+- [v0.1.7](https://github.com/drndos/openspoolman/releases/tag/v0.1.7) - 17.04.2025 — Introduces print cost tracking, printer header info, SPA gating improvements, and fixes for drawer colors/local prints.
+- [0.1.6](https://github.com/drndos/openspoolman/releases/tag/0.1.6) - 09.04.2025 — Published container images (main service + Helm chart) and packaged artifacts for easier deployments.
 
 ### Main features
 
-#### Desktop overview
-![OpenSpoolMan overview](docs/img/desktop_home.PNG)
+#### Dashboard overview
+*Overview over the trays and the assigned spools and spool information*
+<img alt="OpenSpoolMan overview" src="docs/img/desktop_home.PNG" />
 
 <details>
 <summary>Desktop screenshots (expand to view)</summary>
 
-##### Dashboard overview
-![Desktop dashboard](docs/img/desktop_home.PNG)
+<h4>Dashboard overview</h4>
+<p>Overview over the trays and the assigned spools and spool information</p>
+<img alt="Desktop dashboard" src="docs/img/desktop_home.PNG" />
 
-##### Fill tray workflow
-![Desktop fill tray](docs/img/desktop_fill_tray.PNG)
+<h4>Fill tray workflow</h4>
+<p>Assign a spool to a tray with quick filters.</p>
+<img alt="Desktop fill tray" src="docs/img/desktop_fill_tray.PNG" />
 
-##### Print history
-![Desktop print history](docs/img/desktop_print_history.PNG)
+<h4>Print history</h4>
+<p>Track every print with filament usage, used spools and costs.</p>
+<img alt="Desktop print history" src="docs/img/desktop_print_history.PNG" />
 
-##### Spool detail info
-![Desktop spool info](docs/img/desktop_spool_info.jpeg)
+<h4>Spool detail info</h4>
+<p>Shows informations about the spool and allows to assign it to a tray.</p>
+<img alt="Desktop spool info" src="docs/img/desktop_spool_info.jpeg" />
 
-##### NFC tag assignment
-![Desktop assign NFC](docs/img/desktop_assign_nfc.jpeg)
+<h4>NFC tag assignment</h4>
+<p>Assign and refresh NFC tags so you can scan them with you mobile and get directly to the spool info.</p>
+<img alt="Desktop assign NFC" src="docs/img/desktop_assign_nfc.jpeg" />
 
-##### Slot change view
-![Desktop change spool](docs/img/desktop_change_spool.PNG)
+<h4>Spool change view from print history</h4>
+<p>Change or remove the spool assignment after a print Useful when the wrong spool was assigned or the print was canceled.</p>
+<img alt="Desktop change spool" src="docs/img/desktop_change_spool.PNG" />
 
 </details>
 
@@ -51,41 +56,44 @@ Docker: https://ghcr.io/drndos/openspoolman
 
 <table>
   <tr>
-    <td>
-      <h5>Dashboard overview</h5>
+    <td valign="top">
+      <h4>Dashboard overview</h4>
+      <p>Overview over the trays and the assigned spools and spool information</p>
       <img alt="Mobile dashboard" src="docs/img/mobile_home.PNG" />
     </td>
-    <td>
-      <h5>Fill tray workflow</h5>
+    <td valign="top">
+      <h4>Fill tray workflow</h4>
+      <p>Assign a spool to a tray with quick filters.</p>
       <img alt="Mobile fill tray" src="docs/img/mobile_fill_tray.PNG" />
     </td>
   </tr>
   <tr>
-    <td>
-      <h5>Print history</h5>
+    <td valign="top">
+      <h4>Print history</h4>
+      <p>View recent prints, AMS slots, and filament usage anytime.</p>
       <img alt="Mobile print history" src="docs/img/mobile_print_history.PNG" />
     </td>
-    <td>
-      <h5>Spool detail info</h5>
+    <td valign="top">
+      <h4>Spool detail info</h4>
+      <p>Spool metadata and NFC tags are accessible on the phone.</p>
       <img alt="Mobile spool info" src="docs/img/mobile_spool_info.jpeg" />
     </td>
   </tr>
   <tr>
-    <td>
-      <h5>NFC tag assignment</h5>
+    <td valign="top">
+      <h4>NFC tag assignment</h4>
+      <p>Assign and refresh NFC tags so you can scan them with you mobile and get directly to the spool info.</p>
       <img alt="Mobile assign NFC" src="docs/img/mobile_assign_nfc.jpeg" />
     </td>
-    <td>
-      <h5>Slot change view</h5>
+    <td valign="top">
+      <h4>Spool change view from print history</h4>
+      <p>Change or remove the spool assignment after a print Useful when the wrong spool was assigned or the print was canceled.</p>
       <img alt="Mobile change spool" src="docs/img/mobile_change_spool.PNG" />
     </td>
   </tr>
 </table>
 
 </details>
-
-### Screenshots
-Details for the screenshot gallery and capture workflow live in [docs/screenshots.md](docs/screenshots.md).
 
 ### What you need:
  - Android Phone with Chrome web browser or iPhone (manual process much more complicated if using NFC Tags)
@@ -95,47 +103,103 @@ Details for the screenshot gallery and capture workflow live in [docs/screenshot
  - SpoolMan installed https://github.com/Donkie/Spoolman
  - NFC Tags (optional) https://eu.store.bambulab.com/en-sk/collections/nfc/products/nfc-tag-with-adhesive https://www.aliexpress.com/item/1005006332360160.html
 
+### SpoolMan stickers
+SpoolMan can print QR-code stickers for every spool; follow the SpoolMan label guide (https://github.com/Donkie/Spoolman/wiki/Printing-Labels) to generate them. Before printing, update the base URL in SpoolMan’s settings to point at OpenSpoolMan so every sticker redirects to OpenSpoolMan instead of SpoolMan.
+
 ### How to setup:
- - Rename config.env.template to config.env or set environment properies and: 
-   - set OPENSPOOLMAN_BASE_URL - that is the URL where OpenSpoolMan will be available on your network. Must be https for NFC write to work. without trailing slash
-   - set PRINTER_ID - On your printer clicking on Setting -> Device -> Printer SN
-   - set PRINTER_ACCESS_CODE - On your printer clicking on Setting -> Lan Only Mode -> Access Code (you _don't_ need to enable the LAN Only Mode)
-   - set PRINTER_IP - On your printer clicking on Setting -> Lan Only Mode -> IP Address (you _don't_ need to enable the LAN Only Mode)
-   - set SPOOLMAN_BASE_URL - according to your SpoolMan installation without trailing slash
-   - set AUTO_SPEND - to True if you want for system to track your filament spending (check AUTO_SPEND issues below) default to False
- - Run the server (wsgi.py)
- - Run Spool Man
- - Add following extra Fields to your SpoolMan:
-   - Filaments
-     - "type","Type","Choice","Basic","Silk, Basic, High Speed, Matte, Plus, Flexible, Translucent","No"
+
+<details>
+<summary>Python / venv deployment (see Environment configuration below)</summary>
+
+1. Clone the repository and switch to the desired branch:
+   ```bash
+   git clone https://github.com/drndos/openspoolman.git
+   cd openspoolman
+   git checkout <branch>
+   ```
+2. Create and activate a virtual environment, then install the dependencies:
+   ```bash
+   python3 -m venv .venv
+   source .venv/bin/activate
+   pip install -r requirements.txt
+   ```
+3. Configure the environment variables (see below).
+4. Run the server with:
+   ```bash
+   python wsgi.py
+   ```
+   OpenSpoolMan listens on port `8001` by default so it does not clash with SpoolMan on the same host.
+
+</details>
+
+<details>
+<summary>Docker deployment (see Environment configuration below)</summary>
+
+1. Make sure `docker` and `docker compose` are installed.
+2. Configure the environment variables (see below).
+3. Copy `docker-compose.yaml` to your deployment directory (or ensure `./docker-compose.yaml` matches your environment) and adjust any host volumes or ports as needed.
+4. Build and start the containers:
+   ```bash
+   docker compose up -d
+   ```
+
+</details>
+
+<details>
+<summary>Kubernetes (Helm) deployment (see Environment configuration below)</summary>
+
+1. Use the bundled Helm chart under `./helm/openspoolman`:
+   ```bash
+   helm dependency update helm/openspoolman
+   ```
+2. Create a `values.yaml` (or use `helm/openspoolman/values.yaml`) that overrides the same `config.env` entries and configures an ingress with TLS for your cluster.
+3. Install or upgrade the release:
+   ```bash
+   helm upgrade --install openspoolman helm/openspoolman -f values.yaml --namespace openspoolman --create-namespace
+   ```
+4. Verify the pods and ingress:
+   ```bash
+   kubectl get pods -n openspoolman
+   kubectl describe ingress -n openspoolman
+   ```
+
+</details>
+
+#### Environment configuration
+ - Rename `config.env.template` to `config.env` or set environment properties and:
+   - set `OPENSPOOLMAN_BASE_URL` — the HTTPS URL where OpenSpoolMan will be available on your network (no trailing slash, required for NFC writes).
+   - set `PRINTER_ID` — find it in the printer settings under Setting → Device → Printer SN.
+   - set `PRINTER_ACCESS_CODE` — find it in Setting → LAN Only Mode → Access Code (the LAN Only Mode toggle may stay off).
+   - set `PRINTER_IP` — found in Setting → LAN Only Mode → IP Address.
+   - set `SPOOLMAN_BASE_URL` — the URL of your SpoolMan installation without trailing slash.
+   - set `AUTO_SPEND` to `True` if you want automatic filament usage tracking (see the AUTO SPEND notes below).
+ 
+ - Run SpoolMan.
+ - Add these extra fields in SpoolMan:
+   - **Filaments**
+     - "type","Type","Choice", "Basic,Matte,Silk,Tough,Sparkle,Galaxy,Basic,HF,Translucent,W,G,for PLA,95A,for AMS"
      - "nozzle_temperature","Nozzle Temperature","Integer Range","°C","190 – 230"
-	 - "filament_id","Filament ID", "Text"
-   - Spools
+     - "filament_id","Filament ID", "Text"
+   - **Spools**
      - "tag","tag","Text"
-     - "active_tray","Active Tray","Text
- - Add your Manufacturers, Filaments and Spools to Spool Man (when adding filament you can try "Import from External" for faster workflow)
- - The filament id can be found in the json files in C:\Users\USERNAME\AppData\Roaming\BambuStudio\user\USERID\filament\base
-   It is the same for each printer and nozzle.
- - Open the server base url in browser on your mobile phone
- - Optionally add Bambu Lab RFIDs to extra tag on your Bambu Spools so they will be matching. You can get the tag id from logs or from browser in AMS info.
+     - "active_tray","Active Tray","Text"
+ - Add your Manufacturers, Filaments and Spools to SpoolMan (consider 'Import from External' for faster workflow).
+ - The filament id lives in `C:\Users\USERNAME\AppData\Roaming\BambuStudio\user\USERID\filament\base` (same for each printer/nozzle).
+ - Open the server base URL in your mobile browser.
+ - Optionally copy Bambu Lab RFIDs into the extra tag on spools so they match automatically; read the tag id from logs or the AMS info page.
 
- With NFC Tags:
- - For non Bambu Lab filaments click on the filament and click Write and hold empty NFC tag to your phone (allow NFC in popup if prompted)
- - Attach NFC tag to your filament
- - Load filament to your AMS by loading it and then putting your phone near NFC tag and allowing your phone to open the website
- - On the website pick the slot you put your filament in
+With NFC Tags:
+ - For non-Bambu filament, select it in SpoolMan, click 'Write,' and tap an NFC tag near your phone (allow NFC).
+ - Attach the NFC tag to the filament.
+ - Load the filament into AMS, then bring the phone near the NFC tag so it opens OpenSpoolMan.
+ - Assign the AMS slot you used in the UI.
 
- Without NFC Tags:
- - Click fill on the tray and select the desired spool
- - Done
+Without NFC Tags:
+ - Click 'Fill' on a tray and select the desired spool.
+ - Done.
 
-### Deployment
-Run locally in venv by configuring environment properties and running wsgi.py, supports adhoc ssl.
-
-Run in docker by configuring config.env and running compose.yaml, you will need more setup/config to run ssl.
-
-Run in kubernetes using helm chart, where you can configure the ingress with SSL. https://github.com/truecharts/public/blob/master/charts/library/common/values.yaml
-
+### Accessing OpenSpoolMan
+Once the server is running (via `wsgi.py`, Gunicorn, Docker, or Helm), open `https://<host>:8443` if you used the built-in adhoc SSL mode, or `http://<host>:8001` when the service listens on the default port 8001. Replace `<host>` with your server's IP/DNS and ensure the port matches your chosen deployment (`PORT` env var or docker-compose mapping). For Docker deployments, you can also use `docker compose port openspoolman 8001` to see the mapped host port.
 ### AUTO SPEND - Automatic filament usage based on slicer estimate
 You can turn this feature on to automatically update the spool usage in SpoolMan. 
 This feature is using slicer information about predicted filament weight usage (and in future correlating it with the progress of the printer to compute the estimate of filament used).
@@ -158,9 +222,7 @@ This feature has currently following issues/drawbacks:
  - Code cleanup
  - Video showcase
  - Docker compose SSL
- - Logs
  - TODOs
- - Click to resolve issue - WIP
  - Reduce the amount of files in docker container
  - Cloud service for controlled redirect so you don't have to reconfigure NFC tags
  - QR codes
