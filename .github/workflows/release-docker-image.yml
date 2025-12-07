@@ -1,4 +1,4 @@
-name: Push released docker image
+name: Build and publish Docker image
 
 on:
   release:
@@ -12,19 +12,24 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Git tag (z.B. v0.1.9) – wenn gesetzt, wird ein versioniertes Image wie bei einem Release gebaut'
+        description: 'Git tag (e.g. v0.1.9). If set, a versioned image will be built from this tag.'
         required: false
         type: string
+      mark_as_latest:
+        description: 'Also tag the built image as "latest" (only for manual runs with tag).'
+        required: false
+        type: boolean
+        default: false
   workflow_call:
 
 jobs:
-  # run tests
   test:
     name: Run tests and linter
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Set up Python 3.10
         uses: actions/setup-python@v3
@@ -50,7 +55,7 @@ jobs:
       #     pytest
 
   build-and-push:
-    name: Build image & push
+    name: Build image and push
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -59,7 +64,7 @@ jobs:
     needs: [test]
 
     steps:
-      # Checkout für Releases (Tag aus Release)
+      # Checkout for release events (use the release tag)
       - name: Checkout code for release
         if: ${{ github.event_name == 'release' }}
         uses: actions/checkout@v4
@@ -67,7 +72,7 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.event.release.tag_name }}
 
-      # Checkout für manuellen Lauf mit Tag
+      # Checkout for manual runs with explicit tag
       - name: Checkout code for manual tag build
         if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag != '' }}
         uses: actions/checkout@v4
@@ -75,7 +80,7 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.event.inputs.tag }}
 
-      # Standard-Checkout (z.B. push auf main, workflow_dispatch ohne Tag)
+      # Default checkout (e.g. push on main, workflow_call, manual run without tag)
       - name: Checkout code (default)
         if: ${{ !(github.event_name == 'release') && !(github.event_name == 'workflow_dispatch' && github.event.inputs.tag != '') }}
         uses: actions/checkout@v4
@@ -92,7 +97,7 @@ jobs:
           fi
 
           if [[ -n "$VERSION" ]]; then
-            # refs/tags/ und führendes v entfernen
+            # Strip refs/tags/ and a leading "v"
             VERSION="${VERSION#refs/tags/}"
             VERSION="${VERSION#v}"
             echo "Version is $VERSION"
@@ -118,10 +123,20 @@ jobs:
       - name: Determine tags
         run: |
           if [[ -n "${VERSION:-}" ]]; then
-            # Release oder manueller Tag: versioniertes Image + latest
-            echo "TAGS=ghcr.io/${{ env.REPO_NAME }}:${VERSION},ghcr.io/${{ env.REPO_NAME }}:latest" >> "$GITHUB_ENV"
+            # Versioned image for release or manual tag run
+            TAGS="ghcr.io/${{ env.REPO_NAME }}:${VERSION}"
+
+            # Always mark releases as latest
+            if [[ "${{ github.event_name }}" == "release" ]]; then
+              TAGS="$TAGS,ghcr.io/${{ env.REPO_NAME }}:latest"
+            # For manual runs: mark as latest only if requested
+            elif [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ github.event.inputs.mark_as_latest }}" == 'true' ]]; then
+              TAGS="$TAGS,ghcr.io/${{ env.REPO_NAME }}:latest"
+            fi
+
+            echo "TAGS=$TAGS" >> "$GITHUB_ENV"
           elif [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
-            # nur dev-Image (z.B. Push auf main oder manueller Lauf ohne Tag)
+            # Dev image for pushes to main (and equivalent contexts)
             echo "TAGS=ghcr.io/${{ env.REPO_NAME }}:dev" >> "$GITHUB_ENV"
           fi
 
