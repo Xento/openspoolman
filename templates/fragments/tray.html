@@ -40,7 +40,7 @@
         <div class="text-start">
           <div class="fw-semibold">Filament type mismatch</div>
           <small>
-            AMS reports {{ tray_data.tray_type }}{% if tray_data.tray_sub_brands %} {{ tray_data.tray_sub_brand }}{% endif %}, but the assigned spool is {% if tray_data.spool_material %} {{ tray_data.spool_material }}{% if tray_data.spool_sub_brand %} {{ tray_data.spool_sub_brand }}{% endif %}{% endif %}.
+            AMS reports <span class="text-primary fw-semibold">{{ tray_data.tray_type }}</span>{% if tray_data.tray_sub_brand %} <span class="text-muted">(starts at {{ tray_data.tray_sub_brand }})</span>{% endif %}, but the assigned spool is {% if tray_data.spool_material %} <span class="text-success fw-semibold">{{ tray_data.spool_material }}</span>{% if tray_data.spool_sub_brand %} <span class="text-muted">({{ tray_data.spool_sub_brand }})</span>{% endif %}{% endif %}.
           </small>
         </div>
       </div>
