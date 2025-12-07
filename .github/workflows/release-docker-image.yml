@@ -10,6 +10,11 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Git tag (z.B. v0.1.9) – wenn gesetzt, wird ein versioniertes Image wie bei einem Release gebaut'
+        required: false
+        type: string
   workflow_call:
 
 jobs:
@@ -54,7 +59,7 @@ jobs:
     needs: [test]
 
     steps:
-      # Checkout exakt den Tag des Releases für versionierte Images
+      # Checkout für Releases (Tag aus Release)
       - name: Checkout code for release
         if: ${{ github.event_name == 'release' }}
         uses: actions/checkout@v4
@@ -62,26 +67,40 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.event.release.tag_name }}
 
-      # Standard-Checkout für alle Nicht-Release-Events (dev-Image)
-      - name: Checkout code for non-release
-        if: ${{ github.event_name != 'release' }}
+      # Checkout für manuellen Lauf mit Tag
+      - name: Checkout code for manual tag build
+        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag != '' }}
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.inputs.tag }}
+
+      # Standard-Checkout (z.B. push auf main, workflow_dispatch ohne Tag)
+      - name: Checkout code (default)
+        if: ${{ !(github.event_name == 'release') && !(github.event_name == 'workflow_dispatch' && github.event.inputs.tag != '') }}
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Set repository name
+      - name: Determine VERSION and repository name
         run: |
+          VERSION=""
+          if [[ "${{ github.event_name }}" == "release" ]]; then
+            VERSION="${{ github.event.release.tag_name }}"
+          elif [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${{ github.event.inputs.tag }}" ]]; then
+            VERSION="${{ github.event.inputs.tag }}"
+          fi
+
+          if [[ -n "$VERSION" ]]; then
+            # refs/tags/ und führendes v entfernen
+            VERSION="${VERSION#refs/tags/}"
+            VERSION="${VERSION#v}"
+            echo "Version is $VERSION"
+            echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          fi
+
           REPO_NAME=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
           echo "REPO_NAME=$REPO_NAME" >> "$GITHUB_ENV"
-
-      - name: Extract version from release tag
-        if: ${{ github.event_name == 'release' }}
-        run: |
-          VERSION="${{ github.event.release.tag_name }}"
-          # optional: führendes "v" entfernen (v0.1.9 -> 0.1.9)
-          VERSION="${VERSION#v}"
-          echo "Version from release tag: $VERSION"
-          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v2
@@ -98,10 +117,11 @@ jobs:
 
       - name: Determine tags
         run: |
-          if [ "${{ github.event_name }}" = "release" ]; then
-            echo "TAGS=ghcr.io/${{ env.REPO_NAME }}:${{ env.VERSION }},ghcr.io/${{ env.REPO_NAME }}:latest" >> "$GITHUB_ENV"
-          else
-            # nur dev-Image für alle Nicht-Release-Events
+          if [[ -n "${VERSION:-}" ]]; then
+            # Release oder manueller Tag: versioniertes Image + latest
+            echo "TAGS=ghcr.io/${{ env.REPO_NAME }}:${VERSION},ghcr.io/${{ env.REPO_NAME }}:latest" >> "$GITHUB_ENV"
+          elif [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            # nur dev-Image (z.B. Push auf main oder manueller Lauf ohne Tag)
             echo "TAGS=ghcr.io/${{ env.REPO_NAME }}:dev" >> "$GITHUB_ENV"
           fi
 
