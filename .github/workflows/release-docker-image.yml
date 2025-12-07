@@ -2,7 +2,7 @@ name: Push released docker image
 
 on:
   release:
-    types: [published]
+    types: [published, edited]
   push:
     branches:
       - main
@@ -13,33 +13,36 @@ on:
   workflow_call:
 
 jobs:
-  #
-  # run tests#
-  #
+  # run tests
   test:
     name: Run tests and linter
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
+
       - name: Set up Python 3.10
         uses: actions/setup-python@v3
         with:
           python-version: "3.10"
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install flake8 pytest
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          if [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          fi
+
       - name: Lint with flake8
         run: |
           # stop the build if there are Python syntax errors or undefined names
-          flake8 . --count --select=E9,F63,F7,F82 --ignore=F824 --show-source --statistics 
+          flake8 . --count --select=E9,F63,F7,F82 --ignore=F824 --show-source --statistics
           # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
           flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
-    #- name: Test with pytest
-    #  run: |
-    #    pytest
+      # - name: Test with pytest
+      #   run: |
+      #     pytest
 
   build-and-push:
     name: Build image & push
@@ -49,17 +52,36 @@ jobs:
       packages: write
     if: ${{ github.event_name != 'pull_request' }}
     needs: [test]
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
 
-      - name: Extract version
+    steps:
+      # Checkout exakt den Tag des Releases für versionierte Images
+      - name: Checkout code for release
+        if: ${{ github.event_name == 'release' }}
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.release.tag_name }}
+
+      # Standard-Checkout für alle Nicht-Release-Events (dev-Image)
+      - name: Checkout code for non-release
+        if: ${{ github.event_name != 'release' }}
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set repository name
         run: |
-          VERSION=$(python -c "exec(open('__version__.py').read()); print(__version__)")
-          echo "Version is $VERSION"
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
           REPO_NAME=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
-          echo "REPO_NAME=$REPO_NAME" >> $GITHUB_ENV
+          echo "REPO_NAME=$REPO_NAME" >> "$GITHUB_ENV"
+
+      - name: Extract version from release tag
+        if: ${{ github.event_name == 'release' }}
+        run: |
+          VERSION="${{ github.event.release.tag_name }}"
+          # optional: führendes "v" entfernen (v0.1.9 -> 0.1.9)
+          VERSION="${VERSION#v}"
+          echo "Version from release tag: $VERSION"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v2
@@ -76,10 +98,11 @@ jobs:
 
       - name: Determine tags
         run: |
-          if [[ "${{ github.event_name }}" == "release" ]]; then
-            echo "TAGS=ghcr.io/${{ env.REPO_NAME }}:${{ env.VERSION }},ghcr.io/${{ env.REPO_NAME }}:latest" >> $GITHUB_ENV
-          elif [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
-            echo "TAGS=ghcr.io/${{ env.REPO_NAME }}:dev" >> $GITHUB_ENV
+          if [ "${{ github.event_name }}" = "release" ]; then
+            echo "TAGS=ghcr.io/${{ env.REPO_NAME }}:${{ env.VERSION }},ghcr.io/${{ env.REPO_NAME }}:latest" >> "$GITHUB_ENV"
+          else
+            # nur dev-Image für alle Nicht-Release-Events
+            echo "TAGS=ghcr.io/${{ env.REPO_NAME }}:dev" >> "$GITHUB_ENV"
           fi
 
       - name: Build and push
