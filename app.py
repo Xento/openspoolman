@@ -130,16 +130,16 @@ def fill():
 
 @app.route("/spool_info")
 def spool_info():
-  if not isMqttClientConnected():
+  if not mqtt_bambulab.isMqttClientConnected():
     return render_template('error.html', exception="MQTT is disconnected. Is the printer online?")
 
   try:
     tag_id = request.args.get("tag_id")
     spool_id = request.args.get("spool_id")
-    last_ams_config = getLastAMSConfig()
+    last_ams_config = mqtt_bambulab.getLastAMSConfig()
     ams_data = last_ams_config.get("ams", [])
     vt_tray_data = last_ams_config.get("vt_tray", {})
-    spool_list = fetchSpools()
+    spool_list = mqtt_bambulab.fetchSpools()
 
     issue = False
     #TODO: Fix issue when external spool info is reset via bambulab interface
@@ -154,7 +154,7 @@ def spool_info():
     if not tag_id and not spool_id:
       return render_template('error.html', exception="TAG ID or spool_id is required as a query parameter (e.g., ?tag_id=RFID123 or ?spool_id=1)")
 
-    spools = fetchSpools()
+    spools = mqtt_bambulab.fetchSpools()
     current_spool = None
 
     spool_id_int = None
@@ -209,7 +209,7 @@ def spoolman_compatible_spool_info(spool_id):
 
 @app.route("/tray_load")
 def tray_load():
-  if not isMqttClientConnected():
+  if not mqtt_bambulab.isMqttClientConnected():
     return render_template('error.html', exception="MQTT is disconnected. Is the printer online?")
   
   tag_id = request.args.get("tag_id")
