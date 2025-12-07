@@ -1,39 +1,121 @@
-name: Build and Push Helm Chart
+name: Build and publish Helm chart
 
 on:
+  release:
+    types: [published, edited]
   push:
     branches:
       - main
-    tags:
-      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Git tag (e.g. v0.1.9). If set, a versioned chart will be built from this tag.'
+        required: false
+        type: string
+  workflow_call:
 
 jobs:
+  lint:
+    name: Lint Python project
+    uses: ./.github/workflows/python-lint.yml
+    with:
+      python-version: "3.10"
+      # Use the same ref as the chart build:
+      # - release: use the release tag
+      # - workflow_dispatch with tag: use that tag
+      # - others (push on main): empty => default ref (branch)
+      ref: ${{ github.event_name == 'release' && github.event.release.tag_name || (github.event_name == 'workflow_dispatch' && github.event.inputs.tag || '') }}
+
   build-and-push:
     name: Build chart & push
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
+    needs: [lint]
 
     steps:
-      # Step 1: Check out the repository
-      - name: Checkout code
-        uses: actions/checkout@v3
+      # Checkout for release events (use the release tag)
+      - name: Checkout code for release
+        if: ${{ github.event_name == 'release' }}
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.release.tag_name }}
 
-      # Step 2: Extract version from __version__.py
-      - name: Extract version
+      # Checkout for manual runs with explicit tag
+      - name: Checkout code for manual tag build
+        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag != '' }}
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.inputs.tag }}
+
+      # Default checkout (e.g. push on main, workflow_call, manual run without tag)
+      - name: Checkout code (default)
+        if: ${{ !(github.event_name == 'release') && !(github.event_name == 'workflow_dispatch' && github.event.inputs.tag != '') }}
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Determine versions and repo name
         run: |
-          VERSION=$(python -c "exec(open('__version__.py').read()); print(__version__)")
-          echo "Version is $VERSION"
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          APP_VERSION=""
+          CHART_VERSION=""
+          CHART_VERSION_ALIAS=""
 
-      # Step 3: Set up Helm
+          if [[ "${{ github.event_name }}" == "release" ]]; then
+            # Real app version from release tag
+            APP_VERSION="${{ github.event.release.tag_name }}"
+            APP_VERSION="${APP_VERSION#refs/tags/}"
+            APP_VERSION="${APP_VERSION#v}"
+
+            # Chart version = real version
+            CHART_VERSION="$APP_VERSION"
+            # Additional "latest" alias
+            CHART_VERSION_ALIAS="9.9.9-latest-release"
+
+          elif [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${{ github.event.inputs.tag }}" ]]; then
+            # Real app version from manually provided tag
+            APP_VERSION="${{ github.event.inputs.tag }}"
+            APP_VERSION="${APP_VERSION#refs/tags/}"
+            APP_VERSION="${APP_VERSION#v}"
+
+            CHART_VERSION="$APP_VERSION"
+            CHART_VERSION_ALIAS="9.9.9-latest-release"
+
+          elif [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            # Dev build from main
+            BASE_VERSION=$(python -c "exec(open('__version__.py').read()); print(__version__)")
+            APP_VERSION="${BASE_VERSION}-dev"
+            # Fixed dev chart version
+            CHART_VERSION="9.9.9-latest-dev"
+          else
+            echo "No valid context to determine chart versions. Aborting."
+            exit 1
+          fi
+
+          echo "APP_VERSION=$APP_VERSION"
+          echo "CHART_VERSION=$CHART_VERSION"
+          echo "CHART_VERSION_ALIAS=$CHART_VERSION_ALIAS"
+
+          echo "APP_VERSION=$APP_VERSION" >> "$GITHUB_ENV"
+          echo "CHART_VERSION=$CHART_VERSION" >> "$GITHUB_ENV"
+          echo "CHART_VERSION_ALIAS=$CHART_VERSION_ALIAS" >> "$GITHUB_ENV"
+
+          REPO_NAME=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          echo "REPO_NAME=$REPO_NAME" >> "$GITHUB_ENV"
+
       - name: Set up Helm
         uses: azure/setup-helm@v3
         with:
           version: v3.12.0
 
-      # Step 4: Authenticate to GitHub Container Registry
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v2
         with:
@@ -41,21 +123,42 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Step 5: Package the Helm Chart
-      - name: Package Helm Chart
+      - name: Package Helm chart(s)
         run: |
-          helm package helm/openspoolman --version=${{ env.VERSION }} --app-version=${{ env.VERSION }} --destination ./
+          CHART_DIR="helm/openspoolman"
 
-      # Step 6: Push the Helm Chart to GHCR
-      - name: Push Helm Chart to GHCR
+          # Get chart name from Chart.yaml
+          CHART_NAME=$(helm show chart "$CHART_DIR" | grep '^name:' | awk '{print $2}')
+          echo "Chart name: $CHART_NAME"
+
+          # Main chart: CHART_VERSION
+          echo "Packaging chart version ${CHART_VERSION} (app-version ${APP_VERSION})"
+          helm package "$CHART_DIR" \
+            --version="${CHART_VERSION}" \
+            --app-version="${APP_VERSION}" \
+            --destination ./
+
+          # Optional alias chart for "latest release"
+          if [[ -n "${CHART_VERSION_ALIAS}" ]]; then
+            echo "Packaging alias chart version ${CHART_VERSION_ALIAS} (app-version ${APP_VERSION})"
+            helm package "$CHART_DIR" \
+              --version="${CHART_VERSION_ALIAS}" \
+              --app-version="${APP_VERSION}" \
+              --destination ./
+          fi
+
+      - name: Push Helm chart(s) to GHCR
         run: |
           CHART_NAME=$(helm show chart helm/openspoolman | grep '^name:' | awk '{print $2}')
-          CHART_VERSION=${{ env.VERSION }}
-          CHART_FILE="${CHART_NAME}-${CHART_VERSION}.tgz"
-          echo "Pushing chart: $CHART_FILE"
 
-          # Convert repository name to lowercase
-          REPO_NAME=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          # Push main chart
+          MAIN_FILE="${CHART_NAME}-${CHART_VERSION}.tgz"
+          echo "Pushing chart: $MAIN_FILE"
+          helm push "$MAIN_FILE" oci://ghcr.io/${{ env.REPO_NAME }}/helm
 
-          # Push chart to GHCR
-          helm push "$CHART_FILE" oci://ghcr.io/${REPO_NAME}/helm
+          # Push alias chart if defined
+          if [[ -n "${CHART_VERSION_ALIAS}" ]]; then
+            ALIAS_FILE="${CHART_NAME}-${CHART_VERSION_ALIAS}.tgz"
+            echo "Pushing alias chart: $ALIAS_FILE"
+            helm push "$ALIAS_FILE" oci://ghcr.io/${{ env.REPO_NAME }}/helm
+          fi
