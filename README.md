@@ -10,10 +10,13 @@ Everything works locally without cloud access, you can use scripts/init_bambulab
 Docker: https://ghcr.io/drndos/openspoolman
 
 ### News
-- 0.1.3 - 22.12.2024 - Added manual assignment for empty slots
-- 0.1.4 - 09.02.2025 - Bugfixes, issue fixing WIP
-- 0.1.7 - 17.04.2025 - https://github.com/drndos/openspoolman/releases/tag/v0.1.7
-- 0.1.8 - 20.04.2025 - https://github.com/drndos/openspoolman/releases/tag/v0.1.8
+- [v.0.2.0b](https://github.com/drndos/openspoolman/releases/tag/v.0.2.0b) - 07.12.2025
+- [v0.1.9](https://github.com/drndos/openspoolman/releases/tag/v0.1.9) - 25.05.2025
+- [v0.1.8](https://github.com/drndos/openspoolman/releases/tag/v0.1.8) - 20.04.2025
+- [v0.1.7](https://github.com/drndos/openspoolman/releases/tag/v0.1.7) - 17.04.2025
+- [0.1.6](https://github.com/drndos/openspoolman/releases/tag/0.1.6) - 09.04.2025
+- [0.1.4](https://github.com/drndos/openspoolman/releases/tag/0.1.4) - 09.02.2025
+- [0.1.3](https://github.com/drndos/openspoolman/releases/tag/0.1.3) - 22.12.2024
 
 ### Main features
 
@@ -21,7 +24,7 @@ Docker: https://ghcr.io/drndos/openspoolman
 ![OpenSpoolMan overview](docs/img/desktop_home.PNG)
 
 <details>
-<summary>Desktop screenshots</summary>
+<summary>Desktop screenshots (expand to view)</summary>
 
 ##### Dashboard overview
 ![Desktop dashboard](docs/img/desktop_home.PNG)
@@ -44,25 +47,40 @@ Docker: https://ghcr.io/drndos/openspoolman
 </details>
 
 <details>
-<summary>Mobile screenshots</summary>
+<summary>Mobile screenshots (expand to view)</summary>
 
-##### Dashboard overview
-![Mobile dashboard](docs/img/mobile_home.PNG)
-
-##### Fill tray workflow
-![Mobile fill tray](docs/img/mobile_fill_tray.PNG)
-
-##### Print history
-![Mobile print history](docs/img/mobile_print_history.PNG)
-
-##### Spool detail info
-![Mobile spool info](docs/img/mobile_spool_info.jpeg)
-
-##### NFC tag assignment
-![Mobile assign NFC](docs/img/mobile_assign_nfc.jpeg)
-
-##### Slot change view
-![Mobile change spool](docs/img/mobile_change_spool.PNG)
+<table>
+  <tr>
+    <td>
+      ##### Dashboard overview
+      ![Mobile dashboard](docs/img/mobile_home.PNG)
+    </td>
+    <td>
+      ##### Fill tray workflow
+      ![Mobile fill tray](docs/img/mobile_fill_tray.PNG)
+    </td>
+  </tr>
+  <tr>
+    <td>
+      ##### Print history
+      ![Mobile print history](docs/img/mobile_print_history.PNG)
+    </td>
+    <td>
+      ##### Spool detail info
+      ![Mobile spool info](docs/img/mobile_spool_info.jpeg)
+    </td>
+  </tr>
+  <tr>
+    <td>
+      ##### NFC tag assignment
+      ![Mobile assign NFC](docs/img/mobile_assign_nfc.jpeg)
+    </td>
+    <td>
+      ##### Slot change view
+      ![Mobile change spool](docs/img/mobile_change_spool.PNG)
+    </td>
+  </tr>
+</table>
 
 </details>
 
