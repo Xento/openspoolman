@@ -118,10 +118,10 @@ def fill():
 def spool_info():
   if not isMqttClientConnected():
     return render_template('error.html', exception="MQTT is disconnected. Is the printer online?")
-    
+
   try:
-    tag_id = request.args.get("tag_id", "-1")
-    spool_id = request.args.get("spool_id", -1)
+    tag_id = request.args.get("tag_id")
+    spool_id = request.args.get("spool_id")
     last_ams_config = getLastAMSConfig()
     ams_data = last_ams_config.get("ams", [])
     vt_tray_data = last_ams_config.get("vt_tray", {})
@@ -130,22 +130,37 @@ def spool_info():
     issue = False
     #TODO: Fix issue when external spool info is reset via bambulab interface
     augmentTrayDataWithSpoolMan(spool_list, vt_tray_data, trayUid(EXTERNAL_SPOOL_AMS_ID, EXTERNAL_SPOOL_ID))
-    issue |= vt_tray_data["issue"]
+    issue |= vt_tray_data.get("issue", False)
 
     for ams in ams_data:
       for tray in ams["tray"]:
         augmentTrayDataWithSpoolMan(spool_list, tray, trayUid(ams["id"], tray["id"]))
-        issue |= tray["issue"]
+        issue |= tray.get("issue", False)
 
-    if not tag_id:
-      return render_template('error.html', exception="TAG ID is required as a query parameter (e.g., ?tag_id=RFID123)")
+    if not tag_id and not spool_id:
+      return render_template('error.html', exception="TAG ID or spool_id is required as a query parameter (e.g., ?tag_id=RFID123 or ?spool_id=1)")
 
     spools = fetchSpools()
     current_spool = None
+
+    spool_id_int = None
+    if spool_id is not None:
+      try:
+        spool_id_int = int(spool_id)
+      except ValueError:
+        return render_template('error.html', exception="Invalid spool_id provided")
+
     for spool in spools:
-      if spool['id'] == int(spool_id):
+      if spool_id_int is not None and spool['id'] == spool_id_int:
         current_spool = spool
+        if not tag_id:
+          tag_value = spool.get("extra", {}).get("tag")
+          if tag_value:
+            tag_id = json.loads(tag_value)
         break
+
+      if not tag_id:
+        continue
 
       if not spool.get("extra", {}).get("tag"):
         continue
@@ -155,15 +170,27 @@ def spool_info():
         continue
 
       current_spool = spool
+      break
 
     if current_spool:
-      # TODO: missing current_spool
       return render_template('spool_info.html', tag_id=tag_id, current_spool=current_spool, ams_data=ams_data, vt_tray_data=vt_tray_data, issue=issue)
     else:
       return render_template('error.html', exception="Spool not found")
   except Exception as e:
     traceback.print_exc()
     return render_template('error.html', exception=str(e))
+
+
+@app.route("/spool/info/<int:spool_id>")
+@app.route("/spool/show/<int:spool_id>")
+def spoolman_compatible_spool_info(spool_id):
+  query_params = {"spool_id": spool_id}
+  tag_id = request.args.get("tag_id")
+
+  if tag_id:
+    query_params["tag_id"] = tag_id
+
+  return redirect(url_for('spool_info', **query_params))
 
 
 @app.route("/tray_load")
