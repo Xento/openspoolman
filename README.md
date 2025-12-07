@@ -17,34 +17,57 @@ Docker: https://ghcr.io/drndos/openspoolman
 
 ### Main features
 
+#### Desktop overview
 ![OpenSpoolMan overview](docs/img/desktop_home.PNG)
 
 <details>
-<summary>Desktop &amp; mobile screenshots</summary>
+<summary>Desktop screenshots</summary>
 
-| Feature | Desktop | Mobile |
-| --- | --- | --- |
-| Dashboard overview | <img alt="Desktop dashboard" src="docs/img/desktop_home.PNG" width="250" /> | <img alt="Mobile dashboard" src="docs/img/mobile_home.PNG" width="150" /> |
-| Fill tray workflow | <img alt="Desktop fill tray" src="docs/img/desktop_fill_tray.PNG" width="250" /> | <img alt="Mobile fill tray" src="docs/img/mobile_fill_tray.PNG" width="150" /> |
-| Print history | <img alt="Desktop print history" src="docs/img/desktop_print_history.PNG" width="250" /> | <img alt="Mobile print history" src="docs/img/mobile_print_history.PNG" width="150" /> |
-| Spool detail info | <img alt="Desktop spool info" src="docs/img/desktop_spool_info.jpeg" width="250" /> | <img alt="Mobile spool info" src="docs/img/mobile_spool_info.jpeg" width="150" /> |
-| NFC tag assignment | <img alt="Desktop assign NFC" src="docs/img/desktop_assign_nfc.jpeg" width="250" /> | <img alt="Mobile assign NFC" src="docs/img/mobile_assign_nfc.jpeg" width="150" /> |
-| Slot change view | <img alt="Desktop change spool" src="docs/img/desktop_change_spool.PNG" width="250" /> | <img alt="Mobile change spool" src="docs/img/mobile_change_spool.PNG" width="150" /> |
+##### Dashboard overview
+![Desktop dashboard](docs/img/desktop_home.PNG)
+
+##### Fill tray workflow
+![Desktop fill tray](docs/img/desktop_fill_tray.PNG)
+
+##### Print history
+![Desktop print history](docs/img/desktop_print_history.PNG)
+
+##### Spool detail info
+![Desktop spool info](docs/img/desktop_spool_info.jpeg)
+
+##### NFC tag assignment
+![Desktop assign NFC](docs/img/desktop_assign_nfc.jpeg)
+
+##### Slot change view
+![Desktop change spool](docs/img/desktop_change_spool.PNG)
 
 </details>
 
-### Seeded demo & screenshots
-- Export a live snapshot first (default path `data/live_snapshot.json`) with `python scripts/export_live_snapshot.py --output data/live_snapshot.json`. Snapshot-based runs expect this file and will warn if it is missing.
-- Load the snapshot-backed test data with `OPENSPOOLMAN_TEST_DATA=1` or `--test-data` on the screenshot helper; override the snapshot path via `OPENSPOOLMAN_TEST_SNAPSHOT` or `--snapshot` when needed.
-- Install the core app dependencies via `pip install -r requirements.txt`. Only install the screenshot extras when regenerating docs: `pip install -r requirements-screenshots.txt` followed by `python -m playwright install chromium`.
-- Provide your own print-history database (default path `data/demo.db`) or override with `OPENSPOOLMAN_PRINT_HISTORY_DB=/path/to/history.db` or `--print-history-db` when using the screenshot helper.
-- Configure which routes and devices get captured via `scripts/screenshot_config.json` (supports per-target or per-screenshot `max_height`, device-specific viewports, and automatic device-prefixed filenames). Override or extend it with `--config <path>` and target specific devices with `--devices desktop,mobile` when you run the generator.
-- Run `python scripts/generate_screenshots.py` to start the app in snapshot-backed test mode, open the configured routes in headless Chromium, and refresh the images under `docs/img/` (or another folder via `--output-dir`). Screenshots default to the viewport height unless a per-target/device `max_height` is set (or `full_page: true`), and `--max-height` provides a config-wide fallback.
-- Pass `--color-scheme dark` (or set `color_scheme` in the config) to capture pages in dark mode; omit it to follow the default auto/light behavior.
-- To generate pictures from real printer/Spoolman data, run the generator in live mode to start the current app against your configured devices (`python scripts/generate_screenshots.py --mode live --live-readonly`). If you truly need to target a remote instance, pass `--base-url http://<host>:<port>`. Environment variables (`OPENSPOOLMAN_TEST_DATA=1 OPENSPOOLMAN_TEST_SNAPSHOT=data/live_snapshot.json` or `OPENSPOOLMAN_LIVE_READONLY=1`) work as alternatives. When live data is used or captured, the app and scripts automatically load `config.env` from the repository root (if present) so credentials and URLs are available even when running tools from subfolders.
-- The script can be called in CI after UI changes to automatically regenerate and version the example screenshots.
-- For unit tests, you can reuse the same seeded dataset without environment variables: add `--use-seeded-data` to your pytest command for auto-mocking, request the `seeded_data_overrides` fixture in a test, or wrap your test body in `with test_data.apply_test_overrides(): ...`.
-- To generate documentation screenshots inside pytest, run `pytest -m screenshots --generate-screenshots` (optionally pass `--screenshot-output <dir>`, `--screenshot-mode live`, `--screenshot-devices <list>`, or `--screenshot-config <path>`); the test will spin up Flask in seeded mode by default and reuse the same capture logic as `scripts/generate_screenshots.py`.
+<details>
+<summary>Mobile screenshots</summary>
+
+##### Dashboard overview
+![Mobile dashboard](docs/img/mobile_home.PNG)
+
+##### Fill tray workflow
+![Mobile fill tray](docs/img/mobile_fill_tray.PNG)
+
+##### Print history
+![Mobile print history](docs/img/mobile_print_history.PNG)
+
+##### Spool detail info
+![Mobile spool info](docs/img/mobile_spool_info.jpeg)
+
+##### NFC tag assignment
+![Mobile assign NFC](docs/img/mobile_assign_nfc.jpeg)
+
+##### Slot change view
+![Mobile change spool](docs/img/mobile_change_spool.PNG)
+
+</details>
+
+### Screenshots
+Details for the screenshot gallery and capture workflow live in [docs/screenshots.md](docs/screenshots.md).
 
 ### What you need:
  - Android Phone with Chrome web browser or iPhone (manual process much more complicated if using NFC Tags)
