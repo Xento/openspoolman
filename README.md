@@ -17,47 +17,21 @@ Docker: https://ghcr.io/drndos/openspoolman
 
 ### Main features
 
-<table>
-    <tbody>
-        <tr>
-            <td><b>Information about your AMS</b></td>
-            <td><b>Fill tray directly from overview</b></td>
-            <td><b>Print history</b></td>
-        </tr>
-        <tr>
-            <td><img alt="Information about your AMS" src="docs/img/info.PNG" width="250"/></td>
-            <td><img alt="Fill tray directly from overview" src="docs/img/fill_tray.PNG" width="250"/></td>
-            <td><img alt="Print history" src="docs/img/print_history.PNG" width="250"/></td>
-        <tr>
-            <td><b>Assign NFC tags to your spools in SpoolMan</b></td>
-            <td><b>Write the URL of the Spool detail to NFC tag directly from the browser</b></td>
-            <td></td>
-        </tr>
-            <td><img alt="Assign NFC tags to your spools in SpoolMan" src="docs/img/assign_nfc.jpeg" width="250"/></td>
-            <td><img alt="NFC write success" src="docs/img/nfc_write_success.jpeg" width="250"/></td>
-            <td></td>
-        </tr>
-        <tr>
-            <td colspan="2"><b>Bring Phone close to the NFC tag and open the spool detail</b></td>
-            <td><b>Pick the AMS slot where you want the spool to be loaded</b></td>
-        </tr>
-        <tr>
-            <td><img alt="Open NFC link" src="docs/img/open_link.jpeg" width="250"/></td>
-            <td><img alt="Spool info" src="docs/img/spool_info.jpeg" width="250"/></td>
-            <td><img alt="Pick tray" src="docs/img/pick_tray.jpeg" width="250"/></td>
-        </tr>
-        <tr>
-            <td><b>Automatically track the usage of your filaments based on the slicer estimates in SpoolMan</b></td>
-            <td><b>Track Bambu filaments without additional NFC Tags</b></td>
-            <td><b>Resolve issues with few clicks (soon)</b></td>
-        </tr>
-        <tr>
-            <td><img alt="Slicer estimate" src="docs/img/slicer_estimate.jpg" width="250"/></td>
-            <td><img alt="Bambu filament usgae tracking" src="docs/img/bambu_tracking.jpg" width="250"/></td>
-            <td><img alt="Resolve issues" src="docs/img/resolve_issues.jpeg" width="250"/></td>
-        </tr>
-    </tbody>
-</table>
+![OpenSpoolMan overview](docs/img/desktop_home.PNG)
+
+<details>
+<summary>Desktop &amp; mobile screenshots</summary>
+
+| Feature | Desktop | Mobile |
+| --- | --- | --- |
+| Dashboard overview | <img alt="Desktop dashboard" src="docs/img/desktop_home.PNG" width="250" /> | <img alt="Mobile dashboard" src="docs/img/mobile_home.PNG" width="150" /> |
+| Fill tray workflow | <img alt="Desktop fill tray" src="docs/img/desktop_fill_tray.PNG" width="250" /> | <img alt="Mobile fill tray" src="docs/img/mobile_fill_tray.PNG" width="150" /> |
+| Print history | <img alt="Desktop print history" src="docs/img/desktop_print_history.PNG" width="250" /> | <img alt="Mobile print history" src="docs/img/mobile_print_history.PNG" width="150" /> |
+| Spool detail info | <img alt="Desktop spool info" src="docs/img/desktop_spool_info.jpeg" width="250" /> | <img alt="Mobile spool info" src="docs/img/mobile_spool_info.jpeg" width="150" /> |
+| NFC tag assignment | <img alt="Desktop assign NFC" src="docs/img/desktop_assign_nfc.jpeg" width="250" /> | <img alt="Mobile assign NFC" src="docs/img/mobile_assign_nfc.jpeg" width="150" /> |
+| Slot change view | <img alt="Desktop change spool" src="docs/img/desktop_change_spool.PNG" width="250" /> | <img alt="Mobile change spool" src="docs/img/mobile_change_spool.PNG" width="150" /> |
+
+</details>
 
 ### Seeded demo & screenshots
 - Export a live snapshot first (default path `data/live_snapshot.json`) with `python scripts/export_live_snapshot.py --output data/live_snapshot.json`. Snapshot-based runs expect this file and will warn if it is missing.
