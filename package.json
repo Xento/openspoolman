@@ -1,0 +1,26 @@
+{
+  "name": "openspoolman",
+  "version": "1.0.0",
+  "description": "Use any filament like Bambu filaments with automatic recognition and filament usage updates in your AMS!",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {},
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Xento/openspoolman.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Xento/openspoolman/issues"
+  },
+  "homepage": "https://github.com/Xento/openspoolman#readme",
+  "devDependencies": {
+    "@playwright/test": "^1.57.0",
+    "@types/node": "^24.10.1"
+  }
+}

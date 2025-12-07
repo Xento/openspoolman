@@ -140,3 +140,7 @@ node_modules/
 /blob-report/
 /playwright/.cache/
 /playwright/.auth/
+
+static/prints/
+data/
+
