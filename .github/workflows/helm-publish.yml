@@ -2,7 +2,7 @@ name: Build and publish Helm chart
 
 on:
   release:
-    types: [published]
+    types: [published, edited]
   push:
     branches:
       - main
@@ -63,33 +63,51 @@ jobs:
         with:
           python-version: "3.10"
 
-      - name: Determine VERSION
+      - name: Determine versions and repo name
         run: |
-          VERSION=""
+          APP_VERSION=""
+          CHART_VERSION=""
+          CHART_VERSION_ALIAS=""
 
           if [[ "${{ github.event_name }}" == "release" ]]; then
-            # Use the release tag (e.g. v0.1.9)
-            VERSION="${{ github.event.release.tag_name }}"
+            # Real app version from release tag
+            APP_VERSION="${{ github.event.release.tag_name }}"
+            APP_VERSION="${APP_VERSION#refs/tags/}"
+            APP_VERSION="${APP_VERSION#v}"
+
+            # Chart version = real version
+            CHART_VERSION="$APP_VERSION"
+            # Additional "latest" alias
+            CHART_VERSION_ALIAS="9.9.9-latest-release"
+
           elif [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${{ github.event.inputs.tag }}" ]]; then
-            # Use manually provided tag
-            VERSION="${{ github.event.inputs.tag }}"
+            # Real app version from manually provided tag
+            APP_VERSION="${{ github.event.inputs.tag }}"
+            APP_VERSION="${APP_VERSION#refs/tags/}"
+            APP_VERSION="${APP_VERSION#v}"
+
+            CHART_VERSION="$APP_VERSION"
+            CHART_VERSION_ALIAS="9.9.9-latest-release"
+
           elif [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
-            # Dev chart from main branch
+            # Dev build from main
             BASE_VERSION=$(python -c "exec(open('__version__.py').read()); print(__version__)")
-            VERSION="${BASE_VERSION}-dev"
+            APP_VERSION="${BASE_VERSION}-dev"
+            # Fixed dev chart version
+            CHART_VERSION="9.9.9-latest-dev"
           else
-            echo "No valid context to determine chart version. Aborting."
+            echo "No valid context to determine chart versions. Aborting."
             exit 1
           fi
 
-          # Strip refs/tags/ and a leading "v"
-          VERSION="${VERSION#refs/tags/}"
-          VERSION="${VERSION#v}"
+          echo "APP_VERSION=$APP_VERSION"
+          echo "CHART_VERSION=$CHART_VERSION"
+          echo "CHART_VERSION_ALIAS=$CHART_VERSION_ALIAS"
 
-          echo "Chart version is $VERSION"
-          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "APP_VERSION=$APP_VERSION" >> "$GITHUB_ENV"
+          echo "CHART_VERSION=$CHART_VERSION" >> "$GITHUB_ENV"
+          echo "CHART_VERSION_ALIAS=$CHART_VERSION_ALIAS" >> "$GITHUB_ENV"
 
-          # Lowercase repo name for GHCR
           REPO_NAME=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
           echo "REPO_NAME=$REPO_NAME" >> "$GITHUB_ENV"
 
@@ -105,19 +123,42 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Package Helm chart
+      - name: Package Helm chart(s)
         run: |
-          helm package helm/openspoolman \
-            --version="${{ env.VERSION }}" \
-            --app-version="${{ env.VERSION }}" \
+          CHART_DIR="helm/openspoolman"
+
+          # Get chart name from Chart.yaml
+          CHART_NAME=$(helm show chart "$CHART_DIR" | grep '^name:' | awk '{print $2}')
+          echo "Chart name: $CHART_NAME"
+
+          # Main chart: CHART_VERSION
+          echo "Packaging chart version ${CHART_VERSION} (app-version ${APP_VERSION})"
+          helm package "$CHART_DIR" \
+            --version="${CHART_VERSION}" \
+            --app-version="${APP_VERSION}" \
             --destination ./
 
-      - name: Push Helm chart to GHCR
+          # Optional alias chart for "latest release"
+          if [[ -n "${CHART_VERSION_ALIAS}" ]]; then
+            echo "Packaging alias chart version ${CHART_VERSION_ALIAS} (app-version ${APP_VERSION})"
+            helm package "$CHART_DIR" \
+              --version="${CHART_VERSION_ALIAS}" \
+              --app-version="${APP_VERSION}" \
+              --destination ./
+          fi
+
+      - name: Push Helm chart(s) to GHCR
         run: |
           CHART_NAME=$(helm show chart helm/openspoolman | grep '^name:' | awk '{print $2}')
-          CHART_VERSION="${{ env.VERSION }}"
-          CHART_FILE="${CHART_NAME}-${CHART_VERSION}.tgz"
 
-          echo "Pushing chart: $CHART_FILE"
+          # Push main chart
+          MAIN_FILE="${CHART_NAME}-${CHART_VERSION}.tgz"
+          echo "Pushing chart: $MAIN_FILE"
+          helm push "$MAIN_FILE" oci://ghcr.io/${{ env.REPO_NAME }}/helm
 
-          helm push "$CHART_FILE" oci://ghcr.io/${{ env.REPO_NAME }}/helm
+          # Push alias chart if defined
+          if [[ -n "${CHART_VERSION_ALIAS}" ]]; then
+            ALIAS_FILE="${CHART_NAME}-${CHART_VERSION_ALIAS}.tgz"
+            echo "Pushing alias chart: $ALIAS_FILE"
+            helm push "$ALIAS_FILE" oci://ghcr.io/${{ env.REPO_NAME }}/helm
+          fi
