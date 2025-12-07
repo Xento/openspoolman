@@ -1,21 +1,36 @@
-import copy
 import os
 import sqlite3
-import json
 from datetime import datetime
-from collections.abc import Mapping
+from pathlib import Path
 
-db_config = {"db_path": os.path.join(os.getcwd(), 'data', "3d_printer_logs.db")}  # Configuration for database location
+DEFAULT_DB_NAME = "demo.db"
+DB_ENV_VAR = "OPENSPOOLMAN_PRINT_HISTORY_DB"
+
+
+def _default_db_path() -> Path:
+    """Resolve the print history database path, allowing an env override."""
+
+    env_path = os.getenv(DB_ENV_VAR)
+    if env_path:
+        return Path(env_path).expanduser().resolve()
+
+    return Path(__file__).resolve().parent / "data" / DEFAULT_DB_NAME
+
+
+db_config = {"db_path": str(_default_db_path())}  # Configuration for database location
+
 
 def create_database() -> None:
     """
-    Creates an SQLite database to store 3D printer print jobs and filament usage if it does not exist.
+    Create the SQLite database schema if it does not exist.
     """
-    if not os.path.exists(db_config["db_path"]):
-        conn = sqlite3.connect(db_config["db_path"])
+    db_path = Path(db_config["db_path"])
+    if not db_path.exists():
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+
+        conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
-        
-        # Create table for prints
+
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS prints (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -25,8 +40,7 @@ def create_database() -> None:
                 image_file TEXT
             )
         ''')
-        
-        # Create table for filament usage
+
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS filament_usage (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -39,9 +53,10 @@ def create_database() -> None:
                 FOREIGN KEY (print_id) REFERENCES prints (id) ON DELETE CASCADE
             )
         ''')
-        
+
         conn.commit()
         conn.close()
+
 
 def insert_print(file_name: str, print_type: str, image_file: str = None, print_date: str = None) -> int:
     """
@@ -50,7 +65,7 @@ def insert_print(file_name: str, print_type: str, image_file: str = None, print_
     """
     if print_date is None:
         print_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    
+
     conn = sqlite3.connect(db_config["db_path"])
     cursor = conn.cursor()
     cursor.execute('''
@@ -151,27 +166,15 @@ def get_filament_for_slot(print_id: int, ams_slot: int):
     conn = sqlite3.connect(db_config["db_path"])
     conn.row_factory = sqlite3.Row  # Enable column name access
     cursor = conn.cursor()
-    
+
     cursor.execute('''
         SELECT * FROM filament_usage
         WHERE print_id = ? AND ams_slot = ?
     ''', (print_id, ams_slot))
-    
+
     results = cursor.fetchone()
     conn.close()
     return results
 
 # Example for creating the database if it does not exist
 create_database()
-
-# Example usage
-#print_id = insert_print("test_print.gcode", "PLA", "test_print.png")
-#insert_filament_usage(print_id, 15.2, 1)  # Spool_id is unknown initially
-#insert_filament_usage(print_id, 10.5, 2, 123)  # Spool_id is known
-
-# Updating spool_id for the first filament entry
-#update_filament_spool(1, 456)  # Assigns spool_id to the first filament usage entry
-
-#print("All Prints:", get_prints())
-#print(f"Filament usage for print {print_id}:", get_filament_usage(print_id))
-#print(f"Prints using spool 123:", get_prints_by_spool(123))
