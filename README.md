@@ -52,32 +52,32 @@ Docker: https://ghcr.io/drndos/openspoolman
 <table>
   <tr>
     <td>
-      ##### Dashboard overview
-      ![Mobile dashboard](docs/img/mobile_home.PNG)
+      <h5>Dashboard overview</h5>
+      <img alt="Mobile dashboard" src="docs/img/mobile_home.PNG" />
     </td>
     <td>
-      ##### Fill tray workflow
-      ![Mobile fill tray](docs/img/mobile_fill_tray.PNG)
-    </td>
-  </tr>
-  <tr>
-    <td>
-      ##### Print history
-      ![Mobile print history](docs/img/mobile_print_history.PNG)
-    </td>
-    <td>
-      ##### Spool detail info
-      ![Mobile spool info](docs/img/mobile_spool_info.jpeg)
+      <h5>Fill tray workflow</h5>
+      <img alt="Mobile fill tray" src="docs/img/mobile_fill_tray.PNG" />
     </td>
   </tr>
   <tr>
     <td>
-      ##### NFC tag assignment
-      ![Mobile assign NFC](docs/img/mobile_assign_nfc.jpeg)
+      <h5>Print history</h5>
+      <img alt="Mobile print history" src="docs/img/mobile_print_history.PNG" />
     </td>
     <td>
-      ##### Slot change view
-      ![Mobile change spool](docs/img/mobile_change_spool.PNG)
+      <h5>Spool detail info</h5>
+      <img alt="Mobile spool info" src="docs/img/mobile_spool_info.jpeg" />
+    </td>
+  </tr>
+  <tr>
+    <td>
+      <h5>NFC tag assignment</h5>
+      <img alt="Mobile assign NFC" src="docs/img/mobile_assign_nfc.jpeg" />
+    </td>
+    <td>
+      <h5>Slot change view</h5>
+      <img alt="Mobile change spool" src="docs/img/mobile_change_spool.PNG" />
     </td>
   </tr>
 </table>
