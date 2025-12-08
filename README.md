@@ -1,152 +1,141 @@
-# <img alt="logo" src="static/logo.png" height="36" /> OpenSpoolMan 
-Use any filament like Bambu filaments with automatic recognition and filament usage updates in your AMS!
+# <img alt="logo" src="static/logo.png" height="36" /> OpenSpoolMan
 
-No need for cloud or any special hardware, just your phone and some NFC tags!
+Use any filament like Bambu filaments with automatic recognition and filament usage updates in your AMS — no cloud connection required.
 
-Similar functionality to https://github.com/spuder/OpenSpool using only your phone, server and NFC tags integrated with SpoolMan
+![Desktop home view](docs/img/desktop_home.PNG)
 
-Everything works locally without cloud access, you can use scripts/init_bambulab.py script to access your PRINTER_ID and PRINTER_CODE if it is not available on your printer.
+## Inhalt
+- [Überblick](#überblick)
+- [Setup & Deployment](#setup--deployment)
+- [SpoolMan-Felder](#spoolman-felder)
+- [Funktions-Überblick mit Popovers](#funktions-%C3%9Cberblick-mit-popovers)
+- [AUTO SPEND](#auto-spend)
+- [Demo & Screenshots](#demo--screenshots)
+- [Kompatibilität](#kompatibilit%C3%A4t)
+- [Release Notes](#release-notes)
+- [License](#license)
 
-Docker: https://ghcr.io/drndos/openspoolman
+## Überblick
+- NFC-Unterstützung ist **optional** – die App funktioniert auch ohne NFC-Smartphone.
+- Bambu-Cloud-Konten sind nicht nötig und werden nicht hinterlegt. Erforderlich sind nur **Seriennummer** und **Access Code** des Druckers.
+- Spools lassen sich automatisch erkennen, sortieren (`SPOOL_SORTING`) und nach einem Druck manuell zuordnen, falls keine automatische Erkennung möglich war.
 
-### News
-- 0.1.3 - 22.12.2024 - Added manual assignment for empty slots
-- 0.1.4 - 09.02.2025 - Bugfixes, issue fixing WIP
-- 0.1.7 - 17.04.2025 - https://github.com/drndos/openspoolman/releases/tag/v0.1.7
-- 0.1.8 - 20.04.2025 - https://github.com/drndos/openspoolman/releases/tag/v0.1.8
+## Setup & Deployment
+Richte die Umgebung ein und starte den Container – alles in einem Durchgang.
 
-### Main features
+### Voraussetzungen
+- Erreichbare **SpoolMan**-Instanz (`/api/v1`-Endpoint).
+- Bambu Lab Drucker mit **Seriennummer**, **Access Code**, **lokaler IP** und einem Anzeigenamen.
+- Öffentliche Basis-URL, unter der OpenSpoolMan erreichbar sein soll (`OPENSPOOLMAN_BASE_URL`).
 
-<table>
-    <tbody>
-        <tr>
-            <td><b>Information about your AMS</b></td>
-            <td><b>Fill tray directly from overview</b></td>
-            <td><b>Print history</b></td>
-        </tr>
-        <tr>
-            <td><img alt="Information about your AMS" src="docs/img/info.PNG" width="250"/></td>
-            <td><img alt="Fill tray directly from overview" src="docs/img/fill_tray.PNG" width="250"/></td>
-            <td><img alt="Print history" src="docs/img/print_history.PNG" width="250"/></td>
-        <tr>
-            <td><b>Assign NFC tags to your spools in SpoolMan</b></td>
-            <td><b>Write the URL of the Spool detail to NFC tag directly from the browser</b></td>
-            <td></td>
-        </tr>
-            <td><img alt="Assign NFC tags to your spools in SpoolMan" src="docs/img/assign_nfc.jpeg" width="250"/></td>
-            <td><img alt="NFC write success" src="docs/img/nfc_write_success.jpeg" width="250"/></td>
-            <td></td>
-        </tr>
-        <tr>
-            <td colspan="2"><b>Bring Phone close to the NFC tag and open the spool detail</b></td>
-            <td><b>Pick the AMS slot where you want the spool to be loaded</b></td>
-        </tr>
-        <tr>
-            <td><img alt="Open NFC link" src="docs/img/open_link.jpeg" width="250"/></td>
-            <td><img alt="Spool info" src="docs/img/spool_info.jpeg" width="250"/></td>
-            <td><img alt="Pick tray" src="docs/img/pick_tray.jpeg" width="250"/></td>
-        </tr>
-        <tr>
-            <td><b>Automatically track the usage of your filaments based on the slicer estimates in SpoolMan</b></td>
-            <td><b>Track Bambu filaments without additional NFC Tags</b></td>
-            <td><b>Resolve issues with few clicks (soon)</b></td>
-        </tr>
-        <tr>
-            <td><img alt="Slicer estimate" src="docs/img/slicer_estimate.jpg" width="250"/></td>
-            <td><img alt="Bambu filament usgae tracking" src="docs/img/bambu_tracking.jpg" width="250"/></td>
-            <td><img alt="Resolve issues" src="docs/img/resolve_issues.jpeg" width="250"/></td>
-        </tr>
-    </tbody>
-</table>
+### Konfiguration vorbereiten
+1. `cp config.env.template config.env`
+2. Fülle die wichtigsten Variablen in `config.env` aus:
+   - `OPENSPOOLMAN_BASE_URL` – öffentlicher Basis-Pfad der App.
+   - `PRINTER_ID`, `PRINTER_ACCESS_CODE`, `PRINTER_IP`, `PRINTER_NAME` – Druckerkennung ohne Cloud-Login.
+   - `SPOOLMAN_BASE_URL` – Basis-URL Deiner SpoolMan-Instanz.
+3. Optional anpassen:
+   - `AUTO_SPEND=True` für exakte Restgewichte aus Druckertelemetrie.
+   - `SPOOL_SORTING` für eigene Sortierreihenfolge (Standard: `filament.material:asc,filament.vendor.name:asc,filament.name:asc`).
+   - `TZ` für korrekte Zeitzonenstempel.
 
-### Seeded demo & screenshots
-- Export a live snapshot first (default path `data/live_snapshot.json`) with `python scripts/export_live_snapshot.py --output data/live_snapshot.json`. Snapshot-based runs expect this file and will warn if it is missing.
-- Load the snapshot-backed test data with `OPENSPOOLMAN_TEST_DATA=1` or `--test-data` on the screenshot helper; override the snapshot path via `OPENSPOOLMAN_TEST_SNAPSHOT` or `--snapshot` when needed.
-- Install the core app dependencies via `pip install -r requirements.txt`. Only install the screenshot extras when regenerating docs: `pip install -r requirements-screenshots.txt` followed by `python -m playwright install chromium`.
-- Provide your own print-history database (default path `data/demo.db`) or override with `OPENSPOOLMAN_PRINT_HISTORY_DB=/path/to/history.db` or `--print-history-db` when using the screenshot helper.
-- Configure which routes and devices get captured via `scripts/screenshot_config.json` (supports per-target or per-screenshot `max_height`, device-specific viewports, and automatic device-prefixed filenames). Override or extend it with `--config <path>` and target specific devices with `--devices desktop,mobile` when you run the generator.
-- Run `python scripts/generate_screenshots.py` to start the app in snapshot-backed test mode, open the configured routes in headless Chromium, and refresh the images under `docs/img/` (or another folder via `--output-dir`). Screenshots default to the viewport height unless a per-target/device `max_height` is set (or `full_page: true`), and `--max-height` provides a config-wide fallback.
-- Pass `--color-scheme dark` (or set `color_scheme` in the config) to capture pages in dark mode; omit it to follow the default auto/light behavior.
-- To generate pictures from real printer/Spoolman data, run the generator in live mode to start the current app against your configured devices (`python scripts/generate_screenshots.py --mode live --live-readonly`). If you truly need to target a remote instance, pass `--base-url http://<host>:<port>`. Environment variables (`OPENSPOOLMAN_TEST_DATA=1 OPENSPOOLMAN_TEST_SNAPSHOT=data/live_snapshot.json` or `OPENSPOOLMAN_LIVE_READONLY=1`) work as alternatives. When live data is used or captured, the app and scripts automatically load `config.env` from the repository root (if present) so credentials and URLs are available even when running tools from subfolders.
-- The script can be called in CI after UI changes to automatically regenerate and version the example screenshots.
-- For unit tests, you can reuse the same seeded dataset without environment variables: add `--use-seeded-data` to your pytest command for auto-mocking, request the `seeded_data_overrides` fixture in a test, or wrap your test body in `with test_data.apply_test_overrides(): ...`.
-- To generate documentation screenshots inside pytest, run `pytest -m screenshots --generate-screenshots` (optionally pass `--screenshot-output <dir>`, `--screenshot-mode live`, `--screenshot-devices <list>`, or `--screenshot-config <path>`); the test will spin up Flask in seeded mode by default and reuse the same capture logic as `scripts/generate_screenshots.py`.
+### Docker-Start
+1. Starte den Container (nutzt `config.env` automatisch):
+   ```bash
+   docker compose -f compose.yaml up -d
+   ```
+2. Öffne die UI unter `http://localhost:8000` (oder dem gemappten Host/Port).
+3. Prüfe die Verbindung über `http://localhost:8000/health` – sowohl SpoolMan als auch der Drucker müssen **OK** melden.
 
-### What you need:
- - Android Phone with Chrome web browser or iPhone (manual process much more complicated if using NFC Tags)
- - Server to run OpenSpoolMan with https (optional when not using NFC Tags) that is reachable from your Phone and can reach both SpoolMan and Bambu Lab printer on the network
- - Active Bambu Lab Account or PRINTER_ID and PRINTER_CODE on your printer
- - Bambu Lab printer https://eu.store.bambulab.com/collections/3d-printer
- - SpoolMan installed https://github.com/Donkie/Spoolman
- - NFC Tags (optional) https://eu.store.bambulab.com/en-sk/collections/nfc/products/nfc-tag-with-adhesive https://www.aliexpress.com/item/1005006332360160.html
+> Tipp: `docker-compose.yaml` mountet `logs/`, `data/` und `prints/` für persistente Daten. Passe Ports oder Volumes bei Bedarf an.
 
-### How to setup:
- - Rename config.env.template to config.env or set environment properies and: 
-   - set OPENSPOOLMAN_BASE_URL - that is the URL where OpenSpoolMan will be available on your network. Must be https for NFC write to work. without trailing slash
-   - set PRINTER_ID - On your printer clicking on Setting -> Device -> Printer SN
-   - set PRINTER_ACCESS_CODE - On your printer clicking on Setting -> Lan Only Mode -> Access Code (you _don't_ need to enable the LAN Only Mode)
-   - set PRINTER_IP - On your printer clicking on Setting -> Lan Only Mode -> IP Address (you _don't_ need to enable the LAN Only Mode)
-   - set SPOOLMAN_BASE_URL - according to your SpoolMan installation without trailing slash
-   - set AUTO_SPEND - to True if you want for system to track your filament spending (check AUTO_SPEND issues below) default to False
- - Run the server (wsgi.py)
- - Run Spool Man
- - Add following extra Fields to your SpoolMan:
-   - Filaments
-     - "type","Type","Choice","Basic","Silk, Basic, High Speed, Matte, Plus, Flexible, Translucent","No"
-     - "nozzle_temperature","Nozzle Temperature","Integer Range","°C","190 – 230"
-	 - "filament_id","Filament ID", "Text"
-   - Spools
-     - "tag","tag","Text"
-     - "active_tray","Active Tray","Text
- - Add your Manufacturers, Filaments and Spools to Spool Man (when adding filament you can try "Import from External" for faster workflow)
- - The filament id can be found in the json files in C:\Users\USERNAME\AppData\Roaming\BambuStudio\user\USERID\filament\base
-   It is the same for each printer and nozzle.
- - Open the server base url in browser on your mobile phone
- - Optionally add Bambu Lab RFIDs to extra tag on your Bambu Spools so they will be matching. You can get the tag id from logs or from browser in AMS info.
+### Entwicklung direkt aus dem Quellcode
+```bash
+pip install -r requirements.txt
+python app.py
+```
+Verwende dieselbe `config.env`, um die Umgebung auch lokal bereitzustellen.
 
- With NFC Tags:
- - For non Bambu Lab filaments click on the filament and click Write and hold empty NFC tag to your phone (allow NFC in popup if prompted)
- - Attach NFC tag to your filament
- - Load filament to your AMS by loading it and then putting your phone near NFC tag and allowing your phone to open the website
- - On the website pick the slot you put your filament in
+## SpoolMan-Felder
+Diese Felder solltest Du beim Anlegen einer Spule pflegen, damit OpenSpoolMan sie sauber zuordnen und schreiben kann:
 
- Without NFC Tags:
- - Click fill on the tray and select the desired spool
- - Done
+| SpoolMan-Feld | Beispiel | Verwendung in OpenSpoolMan |
+| --- | --- | --- |
+| **Filament → Name** | Bambu PLA Matte Grau | Beschriftet Buttons und Tray-Auswahl. |
+| **Filament → Material** | PLA | Filtert und sortiert (abhängig von `SPOOL_SORTING`). |
+| **Filament → Vendor/Marke** | Bambu Lab | Wird in Listen und Tag-Infos angezeigt. |
+| **Filament → Nozzle Temperature** | 210 | In Tag-Writes für Bambu kompatible Daten genutzt. |
+| **Filament → Filament ID** | BBL-PLA-GRAY | Eindeutiger Identifikator, der auf NFC/AMS geschrieben wird. |
+| **Spool → Tags** | `bambu`, `ams` | Kennzeichnet Spulen für AMS/NFC-Flows. |
+| **Spool → Aktiver Tray** | AMS 1 / Slot A | Verknüpft Spulen mit Slots für automatische Auswahl. |
+| **Spool → Gewichte** | Leer- & Vollgewicht | Basis für Restmengen, wenn `AUTO_SPEND` deaktiviert ist. |
 
-### Deployment
-Run locally in venv by configuring environment properties and running wsgi.py, supports adhoc ssl.
+## Funktions-Überblick mit Popovers
+Die Startseitenansicht ist oben sichtbar. Weitere Screenshots kannst Du direkt hier aufklappen, ohne die Seite zu verlassen.
 
-Run in docker by configuring config.env and running compose.yaml, you will need more setup/config to run ssl.
+<details>
+  <summary>Desktop: Tray füllen und Druckhistorie</summary>
 
-Run in kubernetes using helm chart, where you can configure the ingress with SSL. https://github.com/truecharts/public/blob/master/charts/library/common/values.yaml
+  ![Fill tray modal](docs/img/desktop_fill_tray.PNG)
+  
+  ![Desktop print history](docs/img/desktop_print_history.PNG)
+</details>
 
-### AUTO SPEND - Automatic filament usage based on slicer estimate
-You can turn this feature on to automatically update the spool usage in SpoolMan. 
-This feature is using slicer information about predicted filament weight usage (and in future correlating it with the progress of the printer to compute the estimate of filament used).
+<details>
+  <summary>Mobile: Dashboard, NFC und Tray-Wechsel</summary>
 
-This feature has currently following issues/drawbacks:
- - Spending on the start of the print
- - Not spending according to print process and spending full filament weight even if print fails
- - Don't know if it works with LAN mode, since it downloads the 3MF file from cloud
- - Not tested with multiple AMS systems
- - Not handling the mismatch between the SpoolMan and AMS (if you don't have the Active Tray information correct in spoolman it won't work properly)
+  ![Mobile home](docs/img/mobile_home.PNG)
+  
+  ![Mobile NFC assignment](docs/img/mobile_assign_nfc.jpeg)
+  
+  ![NFC write success](docs/img/nfc_write_success.jpeg)
+  
+  ![Mobile change spool](docs/img/mobile_change_spool.PNG)
+</details>
 
-### Notes:
- - If you change the BASE_URL of this app, you will need to reconfigure all NFC TAGS
+<details>
+  <summary>Spulendetails, Tracking & Slicer-Schätzungen</summary>
 
-### TBD:
- - Filament remaining in AMS (I have only AMS lite, if you have AMS we can test together)
- - Filament spending based on printing
-   - TODO: handle situation when the print doesn't finish
-   - TODO: test with multiple AMS
- - Code cleanup
- - Video showcase
- - Docker compose SSL
- - Logs
- - TODOs
- - Click to resolve issue - WIP
- - Reduce the amount of files in docker container
- - Cloud service for controlled redirect so you don't have to reconfigure NFC tags
- - QR codes
- - Add search to list of spools
+  ![Desktop spool details](docs/img/desktop_spool_info.jpeg)
+  
+  ![Mobile spool details](docs/img/mobile_spool_info.jpeg)
+  
+  ![Bambu tracking](docs/img/bambu_tracking.jpg)
+  
+  ![Slicer estimate](docs/img/slicer_estimate.jpg)
+</details>
+
+<details>
+  <summary>Workflow-Helfer</summary>
+
+  ![Resolve issues](docs/img/resolve_issues.jpeg)
+  
+  ![Pick tray](docs/img/pick_tray.jpeg)
+  
+  ![Open in SpoolMan](docs/img/open_link.jpeg)
+</details>
+
+## AUTO SPEND
+- `AUTO_SPEND=True` ersetzt Prozentanzeigen durch exakte Restgewichte aus der Druckertelemetrie.
+- Deaktiviere die Option, wenn der Drucker nur lesend erreichbar ist oder Telemetrie unzuverlässig ist.
+- Kombiniere sie mit `SPOOL_SORTING`, um passende Spulen oben anzuzeigen.
+
+## Demo & Screenshots
+- Mit Seed-Daten starten: `OPENSPOOLMAN_TEST_DATA=1 python app.py`
+- Screenshots automatisch erzeugen: `python scripts/generate_screenshots.py --mode seed --port 5001`
+- Playwright-Browser falls nötig installieren: `playwright install`
+
+## Kompatibilität
+- Funktioniert lokal ohne Bambu-Cloud; Zugriff zum Drucker erfolgt direkt per IP, Seriennummer und Access Code.
+- NFC-Workflows erfordern HTTPS auf der Server-URL, sind aber optional.
+- Bambu Studio **2.x** wird unterstützt.
+
+## Release Notes
+- 0.1.9 — 25.05.2025 — <https://github.com/drndos/openspoolman/releases/tag/v0.1.9>
+- 0.1.8 — 20.04.2025 — <https://github.com/drndos/openspoolman/releases/tag/v0.1.8>
+- 0.1.7 — 17.04.2025 — <https://github.com/drndos/openspoolman/releases/tag/v0.1.7>
+- 0.1.4 — 09.02.2025 — Bug fixes
+- 0.1.3 — 22.12.2024 — Added manual assignment for empty slots
+
+## License
+[Apache 2.0](LICENSE.txt)
