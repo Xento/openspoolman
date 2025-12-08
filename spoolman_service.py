@@ -1,8 +1,10 @@
 import os
 import math
-from config import PRINTER_ID, EXTERNAL_SPOOL_AMS_ID, EXTERNAL_SPOOL_ID
+import re
+from config import PRINTER_ID, EXTERNAL_SPOOL_AMS_ID, EXTERNAL_SPOOL_ID, DISABLE_MISMATCH_WARNING
 from datetime import datetime
 from zoneinfo import ZoneInfo
+from pathlib import Path
 from print_history import update_filament_spool
 import json
 
@@ -82,6 +84,21 @@ def color_distance(color1, color2):
 
   return math.sqrt((r1 - r2) ** 2 + (g1 - g2) ** 2 + (b1 - b2) ** 2)
 
+def _log_filament_mismatch(tray_data: dict, spool: dict) -> None:
+  try:
+    data_path = Path("data/filament_mismatch.json")
+    data_path.parent.mkdir(parents=True, exist_ok=True)
+    timestamp = datetime.utcnow().isoformat() + "Z"
+    
+    with data_path.open("w", encoding="utf-8") as f:
+      json.dump({
+        "timestamp": timestamp,
+        "tray": tray_data,
+        "spool": spool,
+      }, f)
+  except Exception:
+    pass
+
 def augmentTrayDataWithSpoolMan(spool_list, tray_data, tray_id):
   tray_data["matched"] = False
   tray_data["mismatch"] = False
@@ -116,27 +133,73 @@ def augmentTrayDataWithSpoolMan(spool_list, tray_data, tray_id):
         tray_data["spool_color"] = normalize_color_hex(spool["filament"].get("color_hex") or "")
         tray_data.pop('spool_color_orientation', None)
 
-      tray_material = (tray_data.get("tray_type") or "").strip().lower()
-      spool_material = (spool["filament"].get("material") or "").strip().lower()
-      material_mismatch = bool(tray_material and spool_material and tray_material != spool_material)
+      # --- Mismatch detection ---
+      # Normalize tray main type and keep a clean lower-case version for comparison.
+      tray_material = (tray_data.get("tray_type") or "").replace('"', '').strip()
+      tray_material_norm = tray_material.lower()
+      tray_material_main = re.split(r"[\s-]+", tray_material_norm)[0] if tray_material_norm else ""
+      tray_material_has_variant = bool(re.search(r"[\s-]", tray_material_norm))
 
-      if material_mismatch:
-        tray_sub_brands_raw = (tray_data.get("tray_sub_brands") or "").strip().lower()
-        if tray_sub_brands_raw and spool_material and spool_material in tray_sub_brands_raw:
+      # Extract tray sub-brand: remove main type and "Basic", keep the remaining variant (e.g., "CF").
+      tray_sub_brands_raw = (tray_data.get("tray_sub_brands") or "").replace('"', '').strip()
+      tray_sub_norm = tray_sub_brands_raw.lower().replace("basic", "").strip()
+      if tray_material_main and tray_sub_norm.startswith(tray_material_main):
+        tray_sub_norm = tray_sub_norm[len(tray_material_main):].strip()
+      tray_sub_norm_cmp = tray_sub_norm.replace("-", " ").strip()
+
+      # Split spool material into main and sub-parts.
+      # Examples:
+      #   "PLA CF"     -> parts=["pla","cf"], main="pla", sub="cf", sub_display="CF"
+      #   "PLA-S"      -> parts=["pla","s"],  main="pla", sub="s",  sub_display="S"
+      #   "PETG"       -> parts=["petg"],     main="petg", sub="",  sub_display=""
+      #   (only sub removes 'basic': "PLA Basic" -> main="pla", sub="basic" -> sub="" after cleanup)
+      spool_material_raw = (spool["filament"].get("material") or "").replace('"', '').strip()
+      spool_material_parts = [p for p in re.split(r"[\s-]+", spool_material_raw.lower()) if p]
+      spool_material_parts_display = [p for p in re.split(r"[\s-]+", spool_material_raw) if p]
+      spool_material_main = spool_material_parts[0] if spool_material_parts else ""
+      spool_material_sub = " ".join(spool_material_parts[1:]) if len(spool_material_parts) > 1 else ""
+      spool_material_sub = spool_material_sub.replace("basic", "").strip()
+      spool_material_sub_display = " ".join(spool_material_parts_display[1:]) if len(spool_material_parts_display) > 1 else ""
+      spool_material_full_norm = spool_material_raw.lower().strip()
+
+      # Prefer explicit extra.type unless it is empty/"-" /"basic"; otherwise fall back to material sub-part.
+      spool_type_raw = (spool["filament"].get("extra", {}).get("type") or "").replace('"', '').strip()
+      spool_type_norm = spool_type_raw.lower()
+      if spool_type_norm in ("", "-", "basic"):
+        spool_type_norm = ""
+
+      spool_sub_norm = spool_type_norm or spool_material_sub
+      spool_sub_display = spool_type_raw if spool_type_norm else spool_material_sub_display
+      spool_sub_norm_cmp = spool_sub_norm.replace("-", " ").strip()
+      spool_material_full_norm_cmp = spool_material_full_norm.replace("-", " ").strip()
+
+      # Compare main type. If the tray has a variant in its type (e.g., "PLA-S"), require an exact match;
+      # otherwise allow main-part fallback (e.g., "PLA" tray vs "PLA CF" spool).
+      if tray_material_norm and spool_material_full_norm:
+        if tray_material_norm == spool_material_full_norm:
           material_mismatch = False
+        elif tray_material_has_variant:
+          material_mismatch = True
+        else:
+          material_mismatch = bool(tray_material_main and spool_material_main and tray_material_main != spool_material_main)
+      else:
+        material_mismatch = bool(tray_material_main and spool_material_main and tray_material_main != spool_material_main)
 
-      tray_sub_brand = (tray_data.get("tray_sub_brands") or "").replace("Basic","").strip().lower()
-      filament_sub_brand =  tray_data["spool_sub_brand"].replace("Basic", "").strip().lower()
+      # Then compare sub-brand only if tray declares one. Also allow tray sub to match full spool material.
+      sub_brand_mismatch = False
+      if tray_sub_norm:
+        sub_brand_mismatch = tray_sub_norm_cmp != spool_sub_norm_cmp and tray_sub_norm_cmp != spool_material_full_norm_cmp
 
-      if tray_sub_brand:
-        filament_sub_brand = (spool_material + " " + filament_sub_brand).strip()
+      tray_data["tray_sub_brand"] = tray_sub_brands_raw.replace(tray_material, '').replace("Basic", "").strip()
+      tray_data["spool_sub_brand"] = spool_sub_display.replace("Basic", "").strip()
+      mismatch_detected = material_mismatch or sub_brand_mismatch
 
-      sub_brand_mismatch = bool(tray_sub_brand and tray_sub_brand != filament_sub_brand)
-
-      tray_data["tray_sub_brand"] = tray_data.get("tray_sub_brands", "").replace(tray_data.get("tray_type", ""), '').replace("Basic","").strip()
-      tray_data["spool_sub_brand"] = tray_data["spool_sub_brand"].replace("Basic", '').strip()
-      tray_data["mismatch"] = material_mismatch or sub_brand_mismatch
+      # Always log detected mismatches; optionally hide the warning in the UI via config flag.
+      tray_data["mismatch_detected"] = mismatch_detected
+      tray_data["mismatch"] = mismatch_detected and not DISABLE_MISMATCH_WARNING
       tray_data["issue"] = tray_data["mismatch"]
+      if mismatch_detected:
+        _log_filament_mismatch(tray_data, spool)
       tray_data["matched"] = True
 
       if "multi_color_hexes" not in spool["filament"]:

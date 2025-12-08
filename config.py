@@ -19,3 +19,4 @@ SPOOLMAN_BASE_URL = os.getenv('SPOOLMAN_BASE_URL')
 SPOOLMAN_API_URL = f"{SPOOLMAN_BASE_URL}/api/v1"
 AUTO_SPEND = os.getenv('AUTO_SPEND', False)
 SPOOL_SORTING = os.getenv('SPOOL_SORTING', "filament.material:asc,filament.vendor.name:asc,filament.name:asc")
+DISABLE_MISMATCH_WARNING = os.getenv("DISABLE_MISMATCH_WARNING", "false").lower() in ("1", "true", "yes", "on")
