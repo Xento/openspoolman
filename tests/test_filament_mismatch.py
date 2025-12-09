@@ -164,11 +164,11 @@ BAMBULAB_BASE_MAPPINGS = [
     ("PVA", "", "PVA", "", True),
 
     # variant type matches (Support)
-    ("PLA-S", "Support For PLA", "Support For PLA", "Support For PLA", True),
-    ("PLA-S", "Support For PLA", "Support For PLA", "-", True),
-    ("PLA-S", "Support For PLA", "Support For PLA", "", True),
+    ("PLA-S", "Support For PLA", "PLA-S", "Support For PLA", True),
+    ("PLA-S", "Support For PLA", "PLA-S", "-", True),
+    ("PLA-S", "Support For PLA", "PLA-S", "", True),
     
-    ("ABS-S", "Support for ABS", "Support", "Support for ABS", True),
+    ("ABS-S", "Support for ABS", "ABS-S", "Support for ABS", True),
     ("Support", "Support For PA PET", "Support For PA PET", "", True),
     ("Support", "Support For PLA-PETG", "Support For PLA-PETG", "", True),
     ("Support", "Support G", "Support G", "", True),
