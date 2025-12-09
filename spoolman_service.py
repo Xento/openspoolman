@@ -105,6 +105,38 @@ def augmentTrayDataWithSpoolMan(spool_list, tray_data, tray_id):
   tray_data["issue"] = False
   tray_data["color_mismatch"] = False
   tray_data["color_mismatch_message"] = ""
+  tray_data["ams_material_missing"] = False
+  tray_data["ams_material_missing_message"] = ""
+
+  def _clean_basic(val: str) -> str:
+    # Normalization for matching:
+    # - drop anything in parentheses (e.g., "(Recycled)")
+    # - drop the word "basic"
+    # - replace dashes with spaces
+    # - collapse whitespace
+    val = re.sub(r"\([^)]*\)", "", val)
+    return re.sub(r"\s+", " ", re.sub(r"\bbasic\b", "", val.replace("-", " ")).strip())
+
+  has_tray_type_key = "tray_type" in tray_data
+  tray_type_raw = tray_data.get("tray_type") if has_tray_type_key else None
+  tray_type_clean = (tray_type_raw or "").strip()
+  tray_type_unselected = has_tray_type_key and tray_type_clean == ""
+
+  # If the tray_type field is missing entirely, treat it as "no tray info" and drop stale data.
+  if not has_tray_type_key:
+    for field in [
+      "name",
+      "vendor",
+      "spool_material",
+      "spool_sub_brand",
+      "remaining_weight",
+      "last_used",
+      "spool_color",
+      "spool_color_orientation",
+      "tray_sub_brand",
+    ]:
+      tray_data.pop(field, None)
+    return
 
   for spool in spool_list:
     if spool.get("extra") and spool["extra"].get("active_tray") and spool["extra"]["active_tray"] == json.dumps(tray_id):
@@ -132,16 +164,6 @@ def augmentTrayDataWithSpoolMan(spool_list, tray_data, tray_id):
       else:
         tray_data["spool_color"] = normalize_color_hex(spool["filament"].get("color_hex") or "")
         tray_data.pop('spool_color_orientation', None)
-
-      # --- Mismatch detection ---
-      def _clean_basic(val: str) -> str:
-        # Normalization for matching:
-        # - drop anything in parentheses (e.g., "(Recycled)")
-        # - drop the word "basic"
-        # - replace dashes with spaces
-        # - collapse whitespace
-        val = re.sub(r"\([^)]*\)", "", val)
-        return re.sub(r"\s+", " ", re.sub(r"\bbasic\b", "", val.replace("-", " ")).strip())
 
       # Normalize tray main type and keep a clean lower-case version for comparison.
       tray_material = (tray_data.get("tray_type") or "").replace('"', '').strip()
@@ -177,6 +199,19 @@ def augmentTrayDataWithSpoolMan(spool_list, tray_data, tray_id):
         spool_type_norm = ""
 
       spool_sub_display = spool_type_raw if spool_type_norm else spool_material_sub_display
+      tray_data["tray_sub_brand"] = tray_sub_brands_raw.replace(tray_material, '').replace("Basic", "").strip()
+      tray_data["spool_sub_brand"] = spool_sub_display.replace("Basic", "").strip()
+
+      # If an AMS tray is loaded but no material has been selected yet, surface the spool
+      # from Spoolman and show a gentle warning instead of running mismatch checks.
+      if tray_type_unselected:
+        tray_data["ams_material_missing"] = True
+        tray_data["ams_material_missing_message"] = "A spool is assigned, but no material is selected in the AMS."
+        tray_data["matched"] = True
+        tray_data["mismatch"] = False
+        tray_data["mismatch_detected"] = False
+        tray_data["issue"] = True
+        break
 
       spool_material_full_norm_cmp = _clean_basic(spool_material_full_norm)
       spool_type_norm_cmp = _clean_basic(spool_type_norm) if spool_type_norm else ""
@@ -206,9 +241,6 @@ def augmentTrayDataWithSpoolMan(spool_list, tray_data, tray_id):
             variant_ok = True
       mismatch_detected = not (base_match or sub_match or variant_ok)
 
-      tray_data["tray_sub_brand"] = tray_sub_brands_raw.replace(tray_material, '').replace("Basic", "").strip()
-      tray_data["spool_sub_brand"] = spool_sub_display.replace("Basic", "").strip()
-
       # Always log detected mismatches; optionally hide the warning in the UI via config flag.
       tray_data["mismatch_detected"] = mismatch_detected
       tray_data["mismatch"] = mismatch_detected and not DISABLE_MISMATCH_WARNING
@@ -224,6 +256,20 @@ def augmentTrayDataWithSpoolMan(spool_list, tray_data, tray_id):
           tray_data["color_mismatch_message"] = "Colors are not similar."
 
       break
+
+  if tray_type_unselected and tray_data["matched"] is False:
+    for field in [
+      "name",
+      "vendor",
+      "spool_material",
+      "spool_sub_brand",
+      "remaining_weight",
+      "last_used",
+      "spool_color",
+      "spool_color_orientation",
+      "tray_sub_brand",
+    ]:
+      tray_data.pop(field, None)
 
   if tray_data.get("tray_type") and tray_data["tray_type"] != "" and tray_data["matched"] == False:
     tray_data["issue"] = True

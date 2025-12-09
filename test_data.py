@@ -238,8 +238,12 @@ def test_data_active():
     """Return True when the test-data patches or flag are enabled."""
 
     if not (TEST_MODE_FLAG or _PATCH_ACTIVE):
-        pytest.skip("Seeded data is not enabled (set OPENSPOOLMAN_TEST_DATA=1 or apply test overrides).")
-    assert True
+        # During pytest runs, skip to keep the test suite green when seeded data is off.
+        if os.getenv("PYTEST_CURRENT_TEST"):
+            pytest.skip("Seeded data is not enabled (set OPENSPOOLMAN_TEST_DATA=1 or apply test overrides).")
+        # In production imports (e.g., app startup), just report False without raising.
+        return False
+    return True
 
 
 @contextmanager
