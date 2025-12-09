@@ -8,6 +8,7 @@ Similar functionality to https://github.com/spuder/OpenSpool using only your pho
 Everything works locally without cloud access; you can use `scripts/init_bambulab.py` to fetch your `PRINTER_ID`/`PRINTER_CODE` if the printer does not expose them.
 
 Docker: https://ghcr.io/drndos/openspoolman
+Helm: https://github.com/drndos/openspoolman/pkgs/container/openspoolman%2Fhelm%2Fopenspoolman
 
 ### News
 - [v0.2.0](https://github.com/drndos/openspoolman/releases/tag/v0.2.0) - 07.12.2025 — Adds material-aware tray/spool mismatch detection, tray color cues, print reassign/pagination, spool material filters, and SpoolMan URL handling with refreshed responsive layouts.
