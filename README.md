@@ -197,6 +197,7 @@ SpoolMan can print QR-code stickers for every spool; follow the SpoolMan label g
   - `material` = full Bambu material (e.g., `PLA Wood`) and leave `type` empty, **or**
   - `material` = base (e.g., `PLA`) and `type` = the add-on (e.g., `Wood`).
   Both must correspond to what the AMS reports for that tray.
+- You can wrap optional notes in parentheses inside `material` (e.g., `PLA CF (recycled)`); anything in parentheses is ignored during matching.
 - If matching still fails, please file a report using `.github/ISSUE_TEMPLATE/filament-mismatch.md` or temporarily hide the UI warning via `DISABLE_MISMATCH_WARNING=true` (mismatches are still logged to `data/filament_mismatch.json`).
 
 With NFC Tags:
