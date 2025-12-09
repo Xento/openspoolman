@@ -236,7 +236,7 @@ _PATCH_TARGETS = {
 def test_data_active():
     """Return True when the test-data patches or flag are enabled."""
 
-    return TEST_MODE_FLAG or _PATCH_ACTIVE
+    assert TEST_MODE_FLAG or _PATCH_ACTIVE
 
 
 @contextmanager
