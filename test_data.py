@@ -6,6 +6,7 @@ from contextlib import ExitStack, contextmanager
 import importlib
 from pathlib import Path
 from unittest.mock import patch
+import pytest
 
 from config import (
     EXTERNAL_SPOOL_AMS_ID,
@@ -236,7 +237,9 @@ _PATCH_TARGETS = {
 def test_data_active():
     """Return True when the test-data patches or flag are enabled."""
 
-    assert TEST_MODE_FLAG or _PATCH_ACTIVE
+    if not (TEST_MODE_FLAG or _PATCH_ACTIVE):
+        pytest.skip("Seeded data is not enabled (set OPENSPOOLMAN_TEST_DATA=1 or apply test overrides).")
+    assert True
 
 
 @contextmanager
