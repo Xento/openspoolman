@@ -352,8 +352,9 @@ class FilamentUsageTracker:
         print(f"Skipping filament {filament}: no spool mapped for {tray_uid}")
         continue
 
-      print(f"[filament-tracker] Consume spool {spool_id} for filament {filament} with {usage}mm (tray_uid={tray_uid})")
-      consumeSpool(spool_id, use_length=usage)
+      usage_rounded = round(usage, 5)
+      print(f"[filament-tracker] Consume spool {spool_id} for filament {filament} with {usage_rounded}mm (tray_uid={tray_uid})")
+      consumeSpool(spool_id, use_length=usage_rounded)
       if self.print_id:
         update_filament_spool(self.print_id, filament + 1, spool_id)
 
