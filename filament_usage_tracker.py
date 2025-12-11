@@ -1,4 +1,5 @@
 import json
+import math
 import os
 import tempfile
 import xml.etree.ElementTree as ET
@@ -10,7 +11,7 @@ from config import EXTERNAL_SPOOL_AMS_ID, EXTERNAL_SPOOL_ID
 from spoolman_client import consumeSpool
 from spoolman_service import fetchSpools, getAMSFromTray, trayUid
 from tools_3mf import download3mfFromCloud, download3mfFromFTP, download3mfFromLocalFilesystem
-from print_history import update_filament_spool
+from print_history import update_filament_spool, update_filament_grams_used, get_all_filament_usage_for_print
 
 
 CHECKPOINT_DIR = Path(__file__).resolve().parent / "data" / "checkpoint"
@@ -203,6 +204,7 @@ class FilamentUsageTracker:
     self.current_layer = None
     self.print_metadata = None
     self.print_id = None
+    self.cumulative_grams_used = {}  # Track cumulative grams used per filament index
 
   def set_print_metadata(self, metadata: dict | None) -> None:
     self.print_metadata = metadata or {}
@@ -243,6 +245,7 @@ class FilamentUsageTracker:
     clear_checkpoint()
     model_url = print_obj.get("url")
     self.spent_layers = set()
+    self.cumulative_grams_used = {}  # Reset cumulative usage tracking
 
     model_path = self._retrieve_model(model_url)
     if model_path is None:
@@ -327,7 +330,18 @@ class FilamentUsageTracker:
     self.current_layer = None
     self.print_metadata = None
     self.print_id = None
+    self.cumulative_grams_used = {}
     clear_checkpoint()
+
+  def _mm_to_grams(self, length_mm: float, diameter_mm: float, density_g_per_cm3: float) -> float:
+    """
+    Convert filament length in mm to grams.
+    Formula: grams = (π * (diameter/2)^2 * length_mm / 1000) * density
+    """
+    radius_cm = (diameter_mm / 2) / 10  # Convert mm to cm
+    volume_cm3 = math.pi * radius_cm * radius_cm * (length_mm / 10)
+    grams = volume_cm3 * density_g_per_cm3
+    return grams
 
   def _spend_filament_for_layer(self, layer: int) -> None:
     if self.active_model is None:
@@ -338,7 +352,7 @@ class FilamentUsageTracker:
     if layer_usage is None:
       return
 
-    for filament, usage in layer_usage.items():
+    for filament, usage_mm in layer_usage.items():
       mapping_value = self._resolve_tray_mapping(filament)
       if mapping_value is None:
         continue
@@ -352,11 +366,34 @@ class FilamentUsageTracker:
         print(f"Skipping filament {filament}: no spool mapped for {tray_uid}")
         continue
 
-      usage_rounded = round(usage, 5)
-      print(f"[filament-tracker] Consume spool {spool_id} for filament {filament} with {usage_rounded}mm (tray_uid={tray_uid})")
+      # Get spool data to access filament density and diameter
+      spool_data = self._get_spool_data(spool_id)
+      if spool_data is None:
+        print(f"[filament-tracker] Could not get spool data for {spool_id}, skipping grams conversion")
+        continue
+
+      filament_data = spool_data.get("filament", {})
+      diameter_mm = filament_data.get("diameter", 1.75)
+      density_g_per_cm3 = filament_data.get("density", 1.24)
+
+      # Convert mm to grams
+      usage_grams = self._mm_to_grams(usage_mm, diameter_mm, density_g_per_cm3)
+      
+      # Track cumulative usage per filament
+      filament_key = filament + 1  # Convert to 1-indexed for database
+      if filament_key not in self.cumulative_grams_used:
+        self.cumulative_grams_used[filament_key] = 0.0
+      self.cumulative_grams_used[filament_key] += usage_grams
+
+      usage_rounded = round(usage_mm, 5)
+      grams_rounded = round(self.cumulative_grams_used[filament_key], 2)
+      print(f"[filament-tracker] Consume spool {spool_id} for filament {filament} with {usage_rounded}mm ({grams_rounded}g cumulative) (tray_uid={tray_uid})")
+      
       consumeSpool(spool_id, use_length=usage_rounded)
+      
       if self.print_id:
-        update_filament_spool(self.print_id, filament + 1, spool_id)
+        update_filament_spool(self.print_id, filament_key, spool_id)
+        update_filament_grams_used(self.print_id, filament_key, grams_rounded)
 
   def _tray_uid_from_mapping(self, mapping_value: int) -> str | None:
     if mapping_value == EXTERNAL_SPOOL_ID:
@@ -388,6 +425,13 @@ class FilamentUsageTracker:
         return spool.get("id")
     return None
 
+  def _get_spool_data(self, spool_id: int):
+    """Get full spool data including filament information."""
+    for spool in fetchSpools():
+      if spool.get("id") == spool_id:
+        return spool
+    return None
+
   def _load_model(self, model_path: str, gcode_file: str | None) -> None:
     gcode = extract_gcode_from_3mf(model_path, gcode_file)
     if gcode is None:
@@ -407,4 +451,12 @@ class FilamentUsageTracker:
     self.ams_mapping = ams_mapping
     self.current_layer = current_layer
     self.using_ams = ams_mapping is not None
+    
+    # Initialize cumulative usage from database to continue tracking correctly
+    self.cumulative_grams_used = {}
+    if self.print_id:
+      existing_usage = get_all_filament_usage_for_print(self.print_id)
+      for ams_slot, grams_used in existing_usage.items():
+        self.cumulative_grams_used[ams_slot] = grams_used
+        print(f"[filament-tracker] Resumed cumulative usage for filament {ams_slot}: {grams_used}g")
 
