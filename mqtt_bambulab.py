@@ -200,9 +200,7 @@ def processMessage(data):
     if PENDING_PRINT_METADATA and PENDING_PRINT_METADATA["complete"]:
       if TRACK_LAYER_USAGE:
         FILAMENT_TRACKER.set_print_metadata(PENDING_PRINT_METADATA)
-      if TRACK_LAYER_USAGE:
         # Per-layer tracker will handle consumption; skip upfront spend.
-        pass
       else:
         spendFilaments(PENDING_PRINT_METADATA)
 
