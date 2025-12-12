@@ -40,13 +40,22 @@
         <div class="text-start">
           <div class="fw-semibold">Filament type mismatch</div>
           <small>
-            AMS reports <span class="text-primary fw-semibold">{{ tray_data.tray_type }}</span>{% if tray_data.tray_sub_brand %} <span class="text-muted">(starts at {{ tray_data.tray_sub_brand }})</span>{% endif %}, but the assigned spool is {% if tray_data.spool_material %} <span class="text-success fw-semibold">{{ tray_data.spool_material }}</span>{% if tray_data.spool_sub_brand %} <span class="text-muted">({{ tray_data.spool_sub_brand }})</span>{% endif %}{% endif %}.
+            AMS reports <span class="fw-semibold">{{ tray_data.tray_type }}</span>{% if tray_data.tray_sub_brand %} <span class="text-muted">{{ tray_data.tray_sub_brand }}</span>{% endif %}, but the assigned spool is {% if tray_data.spool_material %} <span class="fw-semibold">{{ tray_data.spool_material }}</span>{% if tray_data.spool_sub_brand %} <span>{{ tray_data.spool_sub_brand }}</span>{% endif %}{% endif %}.
           </small>
         </div>
       </div>
     {% endif %}
+    {% if tray_data.ams_material_missing %}
+      <div class="alert alert-warning d-flex align-items-start py-2 mb-3">
+        <i class="bi bi-info-circle-fill text-warning me-2 fs-5"></i>
+        <div class="text-start">
+          <div class="fw-semibold">No AMS material selected</div>
+          <small>{{ tray_data.ams_material_missing_message }}</small>
+        </div>
+      </div>
+    {% endif %}
     <!-- Typ & Hersteller -->
-    {% if tray_data.tray_type and tray_data.spool_material %}
+    {% if tray_data.spool_material %}
       <div class="small text-muted text-center mb-2">
           {{ tray_data.spool_material }}{% if tray_data.spool_sub_brand %} - {{ tray_data.spool_sub_brand }}{% endif %}
           {% if tray_data.vendor %} - {{ tray_data.vendor }}{% endif %}
@@ -58,7 +67,7 @@
     {% endif %}
 
     <div class="row align-items-center text-center text-sm-start">
-      {% if tray_data.tray_type and tray_data.spool_material %}
+      {% if tray_data.spool_material %}
         <!-- Farbname + Badge -->
         <div class="col-12 col-xxl-5 d-flex flex-column align-items-center mb-2 mb-sm-0">
           <!-- Farbname -->

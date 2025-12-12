@@ -175,13 +175,15 @@ SpoolMan can print QR-code stickers for every spool; follow the SpoolMan label g
    - set `SPOOLMAN_BASE_URL` — the URL of your SpoolMan installation without trailing slash.
   - set `AUTO_SPEND` to `True` to enable legacy slicer-estimate tracking (no live layer tracking).
   - set `TRACK_LAYER_USAGE` to `True` to switch to per-layer tracking/consumption **while `AUTO_SPEND` is also `True`**. If `AUTO_SPEND` is `False`, all filament tracking remains disabled regardless of `TRACK_LAYER_USAGE`.
+  - set `AUTO_SPEND` to `True` if you want automatic filament usage tracking (see the AUTO SPEND notes below).
+  - set `DISABLE_MISMATCH_WARNING` to `True` to hide mismatch warnings in the UI (mismatches are still detected and logged to `data/filament_mismatch.json`).
  - By default, the app reads `data/3d_printer_logs.db` for print history; override it through `OPENSPOOLMAN_PRINT_HISTORY_DB` or via the screenshot helper (which targets `data/demo.db` by default).
- 
+
  - Run SpoolMan.
  - Add these extra fields in SpoolMan:
    - **Filaments**
-     - "type","Type","Choice", "Basic,Matte,Silk,Tough,Sparkle,Galaxy,Basic,HF,Translucent,W,G,for PLA,95A,for AMS"
-     - "nozzle_temperature","Nozzle Temperature","Integer Range","°C","190 – 230"
+     - "type","Type","Choice", "AERO,CF,GF,FR,Basic,HF,Translucent,Aero,Dynamic,Galaxy,Glow,Impact,Lite,Marble,Matte,Metal,Silk,Silk+,Sparkle,Tough,Tough+,Wood,Support for ABS,Support for PA PET,Support for PLA,Support for PLA-PETG,G,W,85A,90A,95A,95A HF,for AMS"
+     - "nozzle_temperature","Nozzle Temperature","Integer Range","°C","190 - 230"
      - "filament_id","Filament ID", "Text"
    - **Spools**
      - "tag","tag","Text"
@@ -190,6 +192,15 @@ SpoolMan can print QR-code stickers for every spool; follow the SpoolMan label g
  - The filament id lives in `C:\Users\USERNAME\AppData\Roaming\BambuStudio\user\USERID\filament\base` (same for each printer/nozzle).
  - Open the server base URL in your mobile browser.
  - Optionally copy Bambu Lab RFIDs into the extra tag on spools so they match automatically; read the tag id from logs or the AMS info page.
+
+#### Filament matching rules
+- The spool's `material` must match the AMS tray's `tray_type` (main type).  
+- For Bambu filaments, the AMS reports a sub-brand; this must match the spool's sub-brand. You can model this either as:
+  - `material` = full Bambu material (e.g., `PLA Wood`) and leave `type` empty, **or**
+  - `material` = base (e.g., `PLA`) and `type` = the add-on (e.g., `Wood`).
+  Both must correspond to what the AMS reports for that tray.
+- You can wrap optional notes in parentheses inside `material` (e.g., `PLA CF (recycled)`); anything in parentheses is ignored during matching.
+- If matching still fails, please file a report using `.github/ISSUE_TEMPLATE/filament-mismatch.md` or temporarily hide the UI warning via `DISABLE_MISMATCH_WARNING=true` (mismatches are still logged to `data/filament_mismatch.json`).
 
 With NFC Tags:
  - For non-Bambu filament, select it in SpoolMan, click 'Write,' and tap an NFC tag near your phone (allow NFC).
