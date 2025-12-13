@@ -488,3 +488,7 @@ def print_select_spool():
   except Exception as e:
     traceback.print_exc()
     return render_template('error.html', exception=str(e))
+
+# Register REST API blueprint
+from api_routes import api_bp
+app.register_blueprint(api_bp)
