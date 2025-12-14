@@ -62,6 +62,7 @@ def _serialize_spool(spool: Dict[str, Any]) -> Dict[str, Any]:
       "id": str(spool.get("id")),
       "name": filament.get("name") or spool.get("name") or f"Spool {spool.get('id')}",
       "material": filament.get("material") or "",
+      "vendor": (filament.get("vendor") or {}).get("name"),
       "color": filament.get("multi_color_hexes") or filament.get("color_hex") or "",
       "diameter_mm": filament.get("diameter"),
       "weight_g": spool.get("initial_weight") or filament.get("weight"),
