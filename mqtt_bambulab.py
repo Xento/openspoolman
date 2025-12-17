@@ -1,7 +1,10 @@
+
+
 import json
 import ssl
 import traceback
 from threading import Thread
+from typing import Any, Iterable
 
 import paho.mqtt.client as mqtt
 
@@ -15,7 +18,6 @@ from collections.abc import Mapping
 from logger import append_to_rotating_file
 from print_history import  insert_print, insert_filament_usage, update_filament_spool
 from filament_usage_tracker import FilamentUsageTracker
-
 MQTT_CLIENT = {}  # Global variable storing MQTT Client
 MQTT_CLIENT_CONNECTED = False
 MQTT_KEEPALIVE = 60
@@ -26,6 +28,7 @@ PRINTER_STATE_LAST = {}
 
 PENDING_PRINT_METADATA = {}
 FILAMENT_TRACKER = FilamentUsageTracker()
+LOG_FILE = "/home/app/logs/mqtt.log"
 
 def getPrinterModel():
     global PRINTER_ID
@@ -66,6 +69,74 @@ def getPrinterModel():
         "model": model_name,
         "devicename": device_name
     }
+
+def identify_ams_model_from_module(module: dict[str, Any]) -> str | None:
+    """Guess the AMS variant that a version module represents."""
+
+    product_name = (module.get("product_name") or "").strip().lower()
+    module_name = (module.get("name") or "").strip().lower()
+
+    if "ams lite" in product_name or module_name.startswith("ams_f1"):
+        return "AMS Lite"
+    if "ams 2 pro" in product_name or module_name.startswith("n3f"):
+        return "AMS 2 Pro"
+    if "ams ht" in product_name or module_name.startswith("ams_ht"):
+        return "AMS HT"
+    if module_name == "ams" or module_name.startswith("ams/"):
+        return "AMS"
+
+    return None
+
+
+def identify_ams_models_from_modules(modules: Iterable[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+  """Return per-module metadata, including the detected model when available."""
+
+  results: dict[str, dict[str, Any]] = {}
+  for module in modules or []:
+    name = module.get("name")
+    if not name:
+      continue
+
+    results[name] = {
+      "model": identify_ams_model_from_module(module),
+      "product_name": module.get("product_name"),
+      "serial": module.get("sn"),
+      "hw_ver": module.get("hw_ver"),
+    }
+
+  return results
+
+
+def extract_ams_id_from_module_name(name: str) -> int | None:
+  parts = name.split("/")
+  if len(parts) != 2:
+    return None
+  try:
+    return int(parts[1])
+  except ValueError:
+    return None
+
+
+def identify_ams_models_by_id(modules: Iterable[dict[str, Any]]) -> dict[str, str]:
+  """Return the detected AMS model per numeric AMS ID (module suffix)."""
+
+  results: dict[str, str] = {}
+  for module in modules or []:
+    name = module.get("name")
+    if not name:
+      continue
+
+    ams_id = extract_ams_id_from_module_name(name)
+    if ams_id is None:
+      continue
+
+    model = identify_ams_model_from_module(module)
+    if model:
+      results[str(ams_id)] = model
+      results[ams_id] = model
+
+  return results
+
 
 def num2letter(num):
   return chr(ord("A") + int(num))
@@ -225,6 +296,18 @@ def on_message(client, userdata, msg):
   try:
     data = json.loads(msg.payload.decode())
 
+    info = data.get("info")
+    if info and info.get("command") == "get_version":
+      modules = info.get("module", [])
+      detected = identify_ams_models_from_modules(modules)
+      models_by_id = identify_ams_models_by_id(modules)
+      LAST_AMS_CONFIG["get_version"] = {
+        "info": info,
+        "modules": modules,
+        "detected_models": detected,
+        "models_by_id": models_by_id,
+      }
+
     if "print" in data:
       append_to_rotating_file("/home/app/logs/mqtt.log", msg.payload.decode())
 
@@ -330,6 +413,12 @@ def init_mqtt(daemon: bool = False):
 def getLastAMSConfig():
   global LAST_AMS_CONFIG
   return LAST_AMS_CONFIG
+
+
+def getDetectedAmsModelsById():
+  global LAST_AMS_CONFIG
+  detected = LAST_AMS_CONFIG.get("get_version", {}).get("models_by_id") or {}
+  return dict(detected)
 
 
 def getMqttClient():

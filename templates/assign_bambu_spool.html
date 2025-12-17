@@ -1,0 +1,7 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h1 class="mb-4 text-center">Link Bambu Spool to SpoolMan</h1>
+<p class="text-center text-muted">Bambu tag <code>{{ bambu_tag }}</code> detected in this tray. Pick the matching SpoolMan spool to bind this tag and assign the tray.</p>
+{% with action_bambu_link=True, materials=materials, selected_materials=selected_materials, ams_id=ams_id, tray_id=tray_id, bambu_tag=bambu_tag %}{% include 'fragments/list_spools.html' %}{% endwith %}
+{% endblock %}

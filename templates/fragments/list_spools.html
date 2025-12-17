@@ -1,5 +1,6 @@
 {% set materials = materials or [] %}
 {% set selected_materials = selected_materials or [] %}
+{% set action_bambu_link = action_bambu_link or False %}
 
 <!-- Empty State -->
 {% if spools|length == 0 or not spools %}
@@ -72,6 +73,14 @@
     <a href="{{ url_for('spool_info', spool_id=spool.id) }}" class="spool-action-link">
       <span class="badge bg-primary rounded-pill">
         <i class="bi bi-info-circle"></i> Spool info
+      </span>
+    </a>
+    {% endif %}
+
+    {% if action_bambu_link %}
+    <a href="{{ url_for('assign_bambu_spool', spool_id=spool.id, ams=ams_id, tray=tray_id, tag=bambu_tag) }}" class="spool-action-link">
+      <span class="badge bg-warning text-dark rounded-pill">
+        <i class="bi bi-link-45deg"></i> Link to Spoolman
       </span>
     </a>
     {% endif %}

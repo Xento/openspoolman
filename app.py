@@ -31,7 +31,20 @@ app = Flask(__name__)
 
 @app.context_processor
 def fronted_utilities():
-  return dict(SPOOLMAN_BASE_URL=SPOOLMAN_BASE_URL, AUTO_SPEND=AUTO_SPEND, color_is_dark=color_is_dark, BASE_URL=BASE_URL, EXTERNAL_SPOOL_AMS_ID=EXTERNAL_SPOOL_AMS_ID, EXTERNAL_SPOOL_ID=EXTERNAL_SPOOL_ID, PRINTER_MODEL=mqtt_bambulab.getPrinterModel(), PRINTER_NAME=PRINTER_NAME)
+  printer_model = mqtt_bambulab.getPrinterModel() or {}
+  ams_models_by_id = mqtt_bambulab.getDetectedAmsModelsById()
+
+  return dict(
+    SPOOLMAN_BASE_URL=SPOOLMAN_BASE_URL,
+    AUTO_SPEND=AUTO_SPEND,
+    AMS_MODELS_BY_ID=ams_models_by_id,
+    color_is_dark=color_is_dark,
+    BASE_URL=BASE_URL,
+    EXTERNAL_SPOOL_AMS_ID=EXTERNAL_SPOOL_AMS_ID,
+    EXTERNAL_SPOOL_ID=EXTERNAL_SPOOL_ID,
+    PRINTER_MODEL=printer_model,
+    PRINTER_NAME=PRINTER_NAME,
+  )
 
 @app.route("/issue")
 def issue():
@@ -127,6 +140,73 @@ def fill():
       pass
 
     return render_template('fill.html', spools=spools, ams_id=ams_id, tray_id=tray_id, materials=materials, selected_materials=selected_materials)
+
+@app.route("/assign_bambu_spool")
+def assign_bambu_spool():
+  if not mqtt_bambulab.isMqttClientConnected():
+    return render_template('error.html', exception="MQTT is disconnected. Is the printer online?")
+
+  bambu_tag = request.args.get("tag")
+  ams_id = request.args.get("ams")
+  tray_id = request.args.get("tray")
+  spool_id = request.args.get("spool_id")
+
+  if not all([bambu_tag, ams_id, tray_id]):
+    return render_template('error.html', exception="Missing AMS ID, Tray ID, or Bambu spool tag.")
+
+  if bambu_tag == "00000000000000000000000000000000":
+    return render_template('error.html', exception="No Bambu spool was detected in this tray.")
+
+  if spool_id:
+    if READ_ONLY_MODE:
+      return render_template('error.html', exception="Live read-only mode: linking Bambu spools is disabled.")
+
+    spool_data = spoolman_client.getSpoolById(spool_id)
+    extras = spool_data.get("extra") or {}
+
+    spoolman_client.patchExtraTags(spool_id, extras, {
+      "tag": json.dumps(bambu_tag),
+    })
+
+    mqtt_bambulab.setActiveTray(spool_id, extras, ams_id, tray_id)
+    setActiveSpool(ams_id, tray_id, spool_data)
+
+    return redirect(url_for('home', success_message=f"Linked Bambu spool to SpoolMan spool {spool_id} on AMS {ams_id}, Tray {tray_id}."))
+
+  spools = mqtt_bambulab.fetchSpools()
+  materials = extract_materials(spools)
+  selected_materials = []
+
+  try:
+    last_ams_config = mqtt_bambulab.getLastAMSConfig()
+    default_material = None
+
+    if ams_id == EXTERNAL_SPOOL_AMS_ID:
+      default_material = last_ams_config.get("vt_tray", {}).get("tray_type")
+    else:
+      for ams in last_ams_config.get("ams", []):
+        if str(ams.get("id")) != str(ams_id):
+          continue
+
+        for tray in ams.get("tray", []):
+          if str(tray.get("id")) == str(tray_id):
+            default_material = tray.get("tray_type")
+            break
+
+    if default_material and default_material in materials:
+      selected_materials.append(default_material)
+  except Exception:
+    pass
+
+  return render_template(
+    'assign_bambu_spool.html',
+    spools=spools,
+    ams_id=ams_id,
+    tray_id=tray_id,
+    bambu_tag=bambu_tag,
+    materials=materials,
+    selected_materials=selected_materials,
+  )
 
 @app.route("/spool_info")
 def spool_info():

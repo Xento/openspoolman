@@ -60,6 +60,10 @@
           {{ tray_data.spool_material }}{% if tray_data.spool_sub_brand %} - {{ tray_data.spool_sub_brand }}{% endif %}
           {% if tray_data.vendor %} - {{ tray_data.vendor }}{% endif %}
       </div>
+    {% elif tray_data.unmapped_bambu_tag %}
+      <div class="small text-muted text-center mb-2">
+          Bambu Lab{% if tray_data.bambu_material %} - {{ tray_data.bambu_material }}{% endif %}{% if tray_data.bambu_sub_brand %} - {{ tray_data.bambu_sub_brand }}{% endif %}
+      </div>
     {% else %}
       <div class="small text-muted text-center mb-2 tray-empty">
           Empty
@@ -110,6 +114,21 @@
             {% else %}
               <div class="fw-bold">{{ tray_data.remain }}%</div>
             {% endif %}
+          </div>
+        </div>
+      {% elif tray_data.unmapped_bambu_tag %}
+        {% set ams_model = AMS_MODELS_BY_ID.get(ams_id) %}
+        {% set hide_unmapped_remaining_percent = ams_model == "AMS Lite" %}
+        <div class="col-12">
+          {% if not hide_unmapped_remaining_percent and (tray_data.remain is defined) %}
+            <div class="text-center mb-3">
+              <div class="text-muted small">Remaining</div>
+              <div class="fw-bold">{{ tray_data.remain }}%</div>
+            </div>
+          {% endif %}
+          <div class="d-flex justify-content-center align-items-center" style="min-height: 120px;">
+            <a class="btn btn-warning"
+               href="{{ url_for('assign_bambu_spool', ams=ams_id, tray=tray_id, tag=tray_data.unmapped_bambu_tag) }}">Link to Spoolman</a>
           </div>
         </div>
       {% endif %}
