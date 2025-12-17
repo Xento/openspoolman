@@ -3,6 +3,7 @@ import math
 import os
 import traceback
 import uuid
+from collections import Counter
 
 from flask import Flask, request, render_template, redirect, url_for
 
@@ -45,6 +46,30 @@ def fronted_utilities():
     PRINTER_MODEL=printer_model,
     PRINTER_NAME=PRINTER_NAME,
   )
+
+
+def build_ams_labels(ams_data):
+  models_by_id = mqtt_bambulab.getDetectedAmsModelsById()
+  base_labels = []
+  for ams in ams_data:
+    ams_id = ams.get("id")
+    key = str(ams_id)
+    base_name = models_by_id.get(key) or models_by_id.get(ams_id) or "AMS"
+    base_labels.append(base_name)
+
+  totals = Counter(base_labels)
+  takt = Counter()
+  labels = {}
+
+  for ams, base_name in zip(ams_data, base_labels):
+    takt[base_name] += 1
+    suffix = f" {takt[base_name]}" if totals[base_name] > 1 else ""
+    label = f"{base_name}{suffix}"
+    ams_id = ams.get("id")
+    labels[str(ams_id)] = label
+    labels[ams_id] = label
+
+  return labels
 
 @app.route("/issue")
 def issue():
@@ -267,7 +292,8 @@ def spool_info():
       break
 
     if current_spool:
-      return render_template('spool_info.html', tag_id=tag_id, current_spool=current_spool, ams_data=ams_data, vt_tray_data=vt_tray_data, issue=issue)
+      ams_labels = build_ams_labels(ams_data)
+      return render_template('spool_info.html', tag_id=tag_id, current_spool=current_spool, ams_data=ams_data, vt_tray_data=vt_tray_data, issue=issue, ams_labels=ams_labels)
     else:
       return render_template('error.html', exception="Spool not found")
   except Exception as e:
@@ -383,7 +409,8 @@ def home():
         augmentTrayDataWithSpoolMan(spool_list, tray, trayUid(ams["id"], tray["id"]))
         issue |= tray["issue"]
 
-    return render_template('index.html', success_message=success_message, ams_data=ams_data, vt_tray_data=vt_tray_data, issue=issue)
+    ams_labels = build_ams_labels(ams_data)
+    return render_template('index.html', success_message=success_message, ams_data=ams_data, vt_tray_data=vt_tray_data, issue=issue, ams_labels=ams_labels)
   except Exception as e:
     traceback.print_exc()
     return render_template('error.html', exception=str(e))

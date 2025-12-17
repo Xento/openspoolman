@@ -17,7 +17,9 @@
   <div class="col-lg-6 mb-4 text-center ams-card">
     <div class="card shadow-sm">
       <div class="card-header d-flex justify-content-between align-items-center">
-        <h5 class="mb-0">AMS{% if ams_data|length > 1 %} {{ ams.id|int +1 }} {% endif %}</h5>
+        {% set ams_key = ams.id %}
+        {% set ams_label = ams_labels.get(ams_key|string) or ams_labels.get(ams_key) or "AMS" %}
+        <h5 class="mb-0">{{ ams_label }}</h5>
         {{ humidity_display(ams) }}
       </div>
       <div class="card-body">
