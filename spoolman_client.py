@@ -9,14 +9,14 @@ def patchExtraTags(spool_id, old_extras, new_extras):
   resp = requests.patch(f"{SPOOLMAN_API_URL}/spool/{spool_id}", json={
     "extra": old_extras
   })
-  print(resp.text)
-  print(resp.status_code)
+  #print(resp.text)
+  #print(resp.status_code)
 
 
 def getSpoolById(spool_id):
   response = requests.get(f"{SPOOLMAN_API_URL}/spool/{spool_id}")
-  print(response.status_code)
-  print(response.text)
+  #print(response.status_code)
+  #print(response.text)
   return response.json()
 
 
@@ -43,13 +43,13 @@ def consumeSpool(spool_id, use_weight=None, use_length=None):
   print(f'Consuming {payload} from spool {spool_id}')
 
   response = requests.put(f"{SPOOLMAN_API_URL}/spool/{spool_id}/use", json=payload)
-  print(response.status_code)
-  print(response.text)
+  #print(response.status_code)
+  #print(response.text)
 
 def fetchSettings():
   response = requests.get(f"{SPOOLMAN_API_URL}/setting/")
-  print(response.status_code)
-  print(response.text)
+  #print(response.status_code)
+  #print(response.text)
 
   # JSON in ein Python-Dictionary laden
   data = response.json()

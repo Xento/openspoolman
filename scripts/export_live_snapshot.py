@@ -1,4 +1,5 @@
 import argparse
+import importlib
 import json
 import os
 import sys
@@ -13,10 +14,18 @@ if str(REPO_ROOT) not in sys.path:
 # Align the working directory so relative paths (e.g., SQLite DBs) resolve like running from repo root
 os.chdir(REPO_ROOT)
 
-from mqtt_bambulab import getLastAMSConfig, getPrinterModel, init_mqtt, isMqttClientConnected
-from print_history import get_prints_with_filament
-from spoolman_service import getSettings
-from spoolman_client import fetchSpoolList
+mqtt_bambulab = importlib.import_module("mqtt_bambulab")
+print_history = importlib.import_module("print_history")
+spoolman_service = importlib.import_module("spoolman_service")
+spoolman_client = importlib.import_module("spoolman_client")
+
+getLastAMSConfig = mqtt_bambulab.getLastAMSConfig
+getPrinterModel = mqtt_bambulab.getPrinterModel
+init_mqtt = mqtt_bambulab.init_mqtt
+isMqttClientConnected = mqtt_bambulab.isMqttClientConnected
+get_prints_with_filament = print_history.get_prints_with_filament
+getSettings = spoolman_service.getSettings
+fetchSpoolList = spoolman_client.fetchSpoolList
 
 
 DEFAULT_OUTPUT = Path("data/live_snapshot.json")

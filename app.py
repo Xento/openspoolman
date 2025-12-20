@@ -24,6 +24,12 @@ if test_data.TEST_MODE_FLAG:
 USE_TEST_DATA = test_data.test_data_active()
 READ_ONLY_MODE = (not USE_TEST_DATA) and os.getenv("OPENSPOOLMAN_LIVE_READONLY") == "1"
 
+LAYER_TRACKING_STATUS_DISPLAY = {
+    "RUNNING": ("Printing", "warning"),
+    "COMPLETED": ("Finished", "success"),
+    "ABORTED": ("Cancelled", "danger"),
+}
+
 if not USE_TEST_DATA:
   mqtt_bambulab.init_mqtt()
 
@@ -389,6 +395,18 @@ def print_history():
   spoolman_settings = spoolman_service.getSettings()
 
   try:
+    def _to_float(value):
+      try:
+        return float(value)
+      except (TypeError, ValueError):
+        return None
+
+    def _to_int(value):
+      try:
+        return int(value)
+      except (TypeError, ValueError):
+        return None
+
     page = max(int(request.args.get("page", 1)), 1)
   except ValueError:
     page = 1
@@ -417,11 +435,52 @@ def print_history():
       spoolman_client.consumeSpool(spool_id, filament["grams_used"])
 
   prints, total_prints = print_history_service.get_prints_with_filament(limit=per_page, offset=offset)
+  layer_tracking_map = print_history_service.get_layer_tracking_for_prints([print["id"] for print in prints])
 
   spool_list = mqtt_bambulab.fetchSpools()
 
   for print in prints:
-    print["filament_usage"] = json.loads(print["filament_info"])
+    tracking_row = layer_tracking_map.get(print["id"])
+    if tracking_row:
+      status_key = (tracking_row.get("status") or "").upper()
+      status_label, status_badge = LAYER_TRACKING_STATUS_DISPLAY.get(
+          status_key, ("Unbekannt", "secondary")
+      )
+      total_layers = _to_int(tracking_row.get("total_layers"))
+      layers_printed = _to_int(tracking_row.get("layers_printed")) or 0
+      billed = _to_float(tracking_row.get("filament_grams_billed"))
+      total_grams = _to_float(tracking_row.get("filament_grams_total"))
+
+      progress = None
+      if total_layers:
+        progress = min(100, int(layers_printed / total_layers * 100))
+
+      print["layer_tracking"] = {
+        "status_label": status_label,
+        "status_badge": status_badge,
+        "layers_printed": layers_printed,
+        "total_layers": total_layers,
+        "progress_percent": progress,
+        "filament_grams_billed": billed,
+        "filament_grams_total": total_grams,
+        "predicted_end_time": tracking_row.get("predicted_end_time"),
+        "actual_end_time": tracking_row.get("actual_end_time"),
+      }
+    else:
+      print["layer_tracking"] = None
+
+    filament_usage_data = json.loads(print["filament_info"])
+    filament_usage_sum = sum(
+        _to_float(f.get("grams_used")) or 0 for f in filament_usage_data
+    )
+    tracking_total = (
+        _to_float(print["layer_tracking"]["filament_grams_total"])
+        if print["layer_tracking"]
+        else None
+    )
+    print["display_filament_total"] = tracking_total if tracking_total is not None else filament_usage_sum
+
+    print["filament_usage"] = filament_usage_data
     print["total_cost"] = 0
 
     for filament in print["filament_usage"]:

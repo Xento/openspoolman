@@ -1,4 +1,3 @@
-import os
 import math
 import re
 from config import PRINTER_ID, EXTERNAL_SPOOL_AMS_ID, EXTERNAL_SPOOL_ID, DISABLE_MISMATCH_WARNING
@@ -271,7 +270,7 @@ def augmentTrayDataWithSpoolMan(spool_list, tray_data, tray_id):
     ]:
       tray_data.pop(field, None)
 
-  if tray_data.get("tray_type") and tray_data["tray_type"] != "" and tray_data["matched"] == False:
+  if tray_data.get("tray_type") and tray_data["tray_type"] != "" and not tray_data.get("matched", False):
     tray_data["issue"] = True
 
 def spendFilaments(printdata):
@@ -325,7 +324,7 @@ def spendFilaments(printdata):
         
 
 def setActiveTray(spool_id, spool_extra, ams_id, tray_id):
-  if spool_extra == None:
+  if spool_extra is None:
     spool_extra = {}
 
   if not spool_extra.get("active_tray") or json.loads(spool_extra.get("active_tray")) != trayUid(ams_id, tray_id):

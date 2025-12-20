@@ -11,8 +11,7 @@
             <div class = "printinfo">
                 <!-- Print Information -->
                 <div class="card-body">
-                    <div class="row">
-                      <!-- Block 1 -->
+                  <div class="row">
                       <div class="col-8 mb-3">
                         <div class="label-print-value">
                           <span class="label-print-inline fw-bold">Date: </span>
@@ -21,7 +20,6 @@
                         </div>
                       </div>
                 
-                      <!-- Block 2 -->
                       <div class="col-4 mb-3">
                         <div class="label-print-value">
                           <span class="label-print-inline fw-bold">Type: </span>
@@ -29,8 +27,9 @@
                           <div>{{ print['print_type'] }}</div>
                         </div>
                       </div>
-                
-                      <!-- Block 3 -->
+                    </div>
+
+                    <div class="row">
                       <div class="col-8 mb-3">
                         <div class="label-print-value">
                           <span class="label-print-inline fw-bold">File: </span>
@@ -38,19 +37,77 @@
                           <div>{{ print['file_name'] }}</div>
                         </div>
                       </div>
-                
-                      <!-- Block 4 -->
-                      {% if print['total_cost'] > 0 %}
                       <div class="col-4 mb-3">
-                        <div class="label-print-value">
-                          <span class="label-print-inline fw-bold">Cost: </span>
-                          <div class="label-print-stacked fw-bold">Cost</div>
-                          <div>{{ '%.2f' | format(print['total_cost']) }} {{currencysymbol}}</div>
+                        <div class="d-flex flex-column gap-2">
+                          {% set total_cost = print.get('total_cost', 0) %}
+                          {% if total_cost > 0 %}
+                          <div class="label-print-value">
+                            <span class="label-print-inline fw-bold">Cost: </span>
+                            <div class="label-print-stacked fw-bold">Cost</div>
+                            <div>{{ '%.2f' | format(total_cost) }} {{currencysymbol}}</div>
+                          </div>
+                          {% endif %}
+                          {% if print.get('display_filament_total') is not none %}
+                          <div class="label-print-value">
+                            <span class="label-print-inline fw-bold">Filament: </span>
+                            <div class="label-print-stacked fw-bold">Filament</div>
+                            <div>{{ '%.2f' | format(print['display_filament_total']) }}g</div>
+                          </div>
+                          {% endif %}
                         </div>
                       </div>
-                      {% endif %}
                     </div>
                   </div>
+                  {% if print['layer_tracking'] %}
+                  <div class="row">
+                    <div class="col-12 mb-3">
+                      <div class="layer-tracking border rounded p-3">
+                        <div class="d-flex justify-content-between align-items-center">
+                          <span class="fw-bold">Layer Tracking</span>
+                          <span class="badge bg-{{ print['layer_tracking']['status_badge'] }} fw-semibold">
+                            {{ print['layer_tracking']['status_label'] }}
+                          </span>
+                        </div>
+                        <div class="d-flex flex-wrap gap-3 small mt-3">
+                          <div class="text-nowrap">
+                            <span class="text-muted small d-block">Layers</span>
+                            <strong>{{ print['layer_tracking']['layers_printed'] }}</strong>
+                            <span class="text-muted">/ {{ print['layer_tracking']['total_layers'] or '-' }}</span>
+                          </div>
+                          <div class="text-nowrap">
+                            <span class="text-muted small d-block">Billed</span>
+                            {% if print['layer_tracking']['filament_grams_billed'] is not none %}
+                              {{ '%.2f' | format(print['layer_tracking']['filament_grams_billed']) }}g
+                            {% else %}
+                              - g
+                            {% endif %}
+                          </div>
+                          {% if print['layer_tracking']['filament_grams_total'] is not none %}
+                          <div class="text-nowrap">
+                            <span class="text-muted small d-block">Total</span>
+                            {{ '%.2f' | format(print['layer_tracking']['filament_grams_total']) }}g
+                          </div>
+                          {% endif %}
+                          {% if print['layer_tracking']['progress_percent'] is not none %}
+                          <div class="text-nowrap">
+                            <span class="text-muted small d-block">Progress</span>
+                            {{ print['layer_tracking']['progress_percent'] }}%
+                          </div>
+                          {% endif %}
+                        </div>
+                        <div class="text-muted small mt-2">
+                          {% if print['layer_tracking']['predicted_end_time'] %}
+                            Expected end: {{ print['layer_tracking']['predicted_end_time'] }}
+                          {% endif %}
+                          {% if print['layer_tracking']['actual_end_time'] %}
+                            {% if print['layer_tracking']['predicted_end_time'] %} · {% endif %}
+                            Finished: {{ print['layer_tracking']['actual_end_time'] }}
+                          {% endif %}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  {% endif %}
                 <!-- Filament Usage -->
                 <div class="card">
                     <div class="card-body filament-container">
@@ -81,7 +138,20 @@
 
                                             <div class="spool-details">
                                             <h6>#{{ filament['spool'].id }} – {{ filament['spool'].filament.vendor.name }} – {{ filament['spool'].filament.material }}</h6>
-                                            <small>{{ filament['spool'].filament.name }} – {{ filament['grams_used'] }}g – {{ '%.2f' | format(filament['cost']|float) }} {{currencysymbol}}</small>
+                                            <small class="d-flex flex-column gap-1">
+                                              <span>{{ filament['spool'].filament.name }}</span>
+                                              <span class="text-muted small">
+                                                {% if filament['grams_used'] is not none %}
+                                                  {{ '%.2f' | format(filament['grams_used']) }}g printed
+                                                {% endif %}
+                                                {% if filament['estimated_grams'] is not none %}
+                                                  / {{ '%.2f' | format(filament['estimated_grams']) }}g expected
+                                                {% endif %}
+                                              </span>
+                                              <span class="text-muted small">
+                                                {{ '%.2f' | format(filament['cost']|float) }} {{currencysymbol}}
+                                              </span>
+                                            </small>
                                             </div>
                                         </div>
 
@@ -100,7 +170,12 @@
                                                 </div>
                                                 <div class="spool-details">
                                                     <h6>No spool assigned - {{ filament['filament_type'] }}</h6>
-                                                    <small>{{ filament['grams_used'] }}g</small>
+                                                    <small class="text-muted">
+                                                      {{ '%.2f' | format(filament['grams_used'] or 0) }}g printed
+                                                      {% if filament['estimated_grams'] is not none %}
+                                                        / {{ '%.2f' | format(filament['estimated_grams']) }}g expected
+                                                      {% endif %}
+                                                    </small>
                                                 </div>
                                             </div>
                                         </a>

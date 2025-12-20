@@ -8,8 +8,8 @@ import os
 import re
 import time
 from datetime import datetime
-from config import PRINTER_ID, PRINTER_CODE, PRINTER_IP
-from urllib.parse import urlparse, unquote
+from config import PRINTER_CODE, PRINTER_IP
+from urllib.parse import urlparse
 
 def parse_ftp_listing(line):
     """Parse a line from an FTP LIST command."""
@@ -44,7 +44,7 @@ def get_filament_order(file):
     switch_count = 0 
 
     for line in file:
-        match_filament = re.match(r"^M620 S(\d+)[^;\r\n]*$", line.decode("utf-8").strip())
+        match_filament = re.match(r"^M620 S(\d+)[^;\r\n]*", line.decode("utf-8").strip())
         if match_filament:
             filament = int(match_filament.group(1))
             if filament not in filament_order and int(filament) != 255:
@@ -129,6 +129,7 @@ def getMetaDataFrom3mf(url):
         download3mfFromFTP(url.replace("ftp://", "").replace(".gcode",""), temp_file)
       
       temp_file.close()
+      metadata["model_path"] = url
 
       parsed_url = urlparse(url)
       metadata["file"] = os.path.basename(parsed_url.path)
@@ -221,6 +222,7 @@ def getMetaDataFrom3mf(url):
 
         # Check for the Metadata/slice_info.config file
         gcode_path = "Metadata/plate_"+metadata["plateID"]+".gcode"
+        metadata["gcode_path"] = gcode_path
         if gcode_path in z.namelist():
           with z.open(gcode_path) as gcode_file:
             metadata["filamentOrder"] =  get_filament_order(gcode_file)
