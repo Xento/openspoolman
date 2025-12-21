@@ -90,11 +90,11 @@ def download3mfFromFTP(filename, destFile):
     # 🔹 Enable proper TLS authentication
     c.setopt(c.FTPSSLAUTH, c.FTPAUTH_TLS)
 
-    print("[DEBUG] Starting file download into ./test.3mf...")
+    print("[DEBUG] Starting file download...")
 
     try:
         c.perform()
-        print("[DEBUG] File successfully downloaded into ./test.3mf!")
+        print("[DEBUG] File successfully downloaded!")
     except pycurl.error as e:
         print(f"[ERROR] cURL error: {e}")
 

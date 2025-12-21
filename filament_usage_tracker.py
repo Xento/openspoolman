@@ -354,8 +354,9 @@ class FilamentUsageTracker:
       return
     model_path = metadata.get("model_path", "").replace("local:", "")
     model_url = metadata.get("model_url")
-    if model_path and not Path(model_path).exists():
-      model_path = None
+
+    if model_path and not model_url:
+      model_url = model_path
 
     if not model_path and not model_url:
       print("[filament-tracker] Metadata missing model_path or URL, cannot start local tracking")
