@@ -28,6 +28,7 @@ LAYER_TRACKING_STATUS_DISPLAY = {
     "RUNNING": ("Printing", "warning"),
     "COMPLETED": ("Finished", "success"),
     "ABORTED": ("Cancelled", "danger"),
+    "FAILED": ("Failed", "danger"),
 }
 
 if not USE_TEST_DATA:

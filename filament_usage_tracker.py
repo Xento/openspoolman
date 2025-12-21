@@ -19,7 +19,17 @@ CHECKPOINT_DIR = Path(__file__).resolve().parent / "data" / "checkpoint"
 LAYER_TRACKING_STATUS_RUNNING = "RUNNING"
 LAYER_TRACKING_STATUS_COMPLETED = "COMPLETED"
 LAYER_TRACKING_STATUS_ABORTED = "ABORTED"
-ABORT_INDICATOR_STATES = {"STOP", "ABORT", "ABORTED", "CANCEL", "CANCELLED", "ERROR", "IDLE"}
+LAYER_TRACKING_STATUS_FAILED = "FAILED"
+ABORT_INDICATOR_STATES = {
+    "STOP",
+    "ABORT",
+    "ABORTED",
+    "CANCEL",
+    "CANCELLED",
+    "ERROR",
+    "IDLE",
+    "FAILED",
+}
 
 
 def _checkpoint_dir() -> Path:
@@ -257,20 +267,25 @@ class FilamentUsageTracker:
           self._handle_layer_change(layer)
           self.current_layer = layer
 
-      if self.gcode_state == "FINISH" and previous_state != "FINISH" and self.active_model is not None:
-        self._handle_print_end()
+    if self.gcode_state == "FINISH" and previous_state != "FINISH" and self.active_model is not None:
+      self._handle_print_end()
 
-      elif (
-          previous_state == "RUNNING"
-          and self._is_abort_state(self.gcode_state)
-          and self.active_model is not None
-      ):
-        self._handle_print_abort()
+    elif (
+        previous_state == "RUNNING"
+        and self._is_abort_state(self.gcode_state)
+        and self.active_model is not None
+    ):
+        status = (
+            LAYER_TRACKING_STATUS_FAILED
+            if self.gcode_state == "FAILED"
+            else LAYER_TRACKING_STATUS_ABORTED
+        )
+        self._handle_print_abort(status=status)
 
-      if self.gcode_state == "RUNNING" and previous_state != "RUNNING" and self.active_model is None:
-        task_id = print_obj.get("task_id")
-        subtask_id = print_obj.get("subtask_id")
-        self._attempt_print_resume(task_id, subtask_id)
+    if self.gcode_state == "RUNNING" and previous_state != "RUNNING" and self.active_model is None:
+      task_id = print_obj.get("task_id")
+      subtask_id = print_obj.get("subtask_id")
+      self._attempt_print_resume(task_id, subtask_id)
 
   def _handle_print_start(self, print_obj: dict) -> None:
     print("[filament-tracker] Print start")
@@ -462,7 +477,7 @@ class FilamentUsageTracker:
     self._reset_layer_tracking_state()
     clear_checkpoint()
 
-  def _handle_print_abort(self) -> None:
+  def _handle_print_abort(self, status: str = LAYER_TRACKING_STATUS_ABORTED) -> None:
     if self.active_model is None:
       return
 
@@ -472,7 +487,7 @@ class FilamentUsageTracker:
     self._update_layer_tracking_progress()
     if self.print_id:
       self._set_layer_tracking_status(
-          LAYER_TRACKING_STATUS_ABORTED,
+          status,
           extra_fields={"actual_end_time": self._format_timestamp(datetime.now())},
       )
 
