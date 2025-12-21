@@ -12,6 +12,7 @@ from filament_usage_tracker import FilamentUsageTracker
 import tools_3mf
 import spoolman_client
 import spoolman_service
+from config import TRACK_LAYER_USAGE
 
 
 LOG_ROOT = Path(__file__).resolve().parent / "MQTT"
@@ -90,8 +91,9 @@ def _build_fake_get_meta(model_path: Path):
 @pytest.mark.parametrize("log_path", _iter_log_files(), ids=lambda p: p.name)
 def test_mqtt_log_tray_detection(log_path, monkeypatch, caplog):
   expected = _load_expected(log_path)
-  expected_assignments = expected.get("expected_assignments") or {}
-  expected_assignments = {str(k): str(v) for k, v in expected_assignments.items()}
+  expected_assignments_raw = expected.get("expected_assignments") or {}
+  expected_assignments = {str(k): str(v) for k, v in expected_assignments_raw.items()}
+  expected_assignments_by_index = {int(k): str(v) for k, v in expected_assignments_raw.items()}
 
   model_path = _base_model_from_log(log_path)
   if not model_path.exists():
@@ -111,9 +113,11 @@ def test_mqtt_log_tray_detection(log_path, monkeypatch, caplog):
   mqtt_bambulab.PRINTER_STATE = {}
   mqtt_bambulab.PRINTER_STATE_LAST = {}
   mqtt_bambulab.PENDING_PRINT_METADATA = {}
-  mqtt_bambulab.FILAMENT_TRACKER = FilamentUsageTracker()
 
   assignments = {}
+  last_tracker_mapping: list[int] | None = None
+
+  mqtt_bambulab.FILAMENT_TRACKER = FilamentUsageTracker()
 
   original_map_filament = mqtt_bambulab.map_filament
 
@@ -152,6 +156,9 @@ def test_mqtt_log_tray_detection(log_path, monkeypatch, caplog):
         if metadata:
           for idx, tray in enumerate(metadata.get("ams_mapping", [])):
             assignments[str(idx)] = str(tray)
+        tracker_mapping = mqtt_bambulab.FILAMENT_TRACKER.ams_mapping
+        if tracker_mapping:
+          last_tracker_mapping = list(tracker_mapping)
   finally:
     temp_model_path.unlink(missing_ok=True)
 
@@ -169,6 +176,18 @@ def test_mqtt_log_tray_detection(log_path, monkeypatch, caplog):
     assert not missing and not extra, (
         f"{log_path.name}: assignment mismatch missing={missing} extra={extra} "
         f"vs expected={expected_assignments} actual={assignments}")
+
+  if TRACK_LAYER_USAGE and expected_assignments_by_index:
+    tracker_mapping = last_tracker_mapping or []
+    tracker_mapping_str = [str(value) for value in tracker_mapping]
+    missing_tracker = {
+      str(idx): expected_tray
+      for idx, expected_tray in expected_assignments_by_index.items()
+      if idx >= len(tracker_mapping_str) or tracker_mapping_str[idx] != expected_tray
+    }
+    assert not missing_tracker, (
+        f"{log_path.name}: filament tracker mapping mismatch missing={missing_tracker} "
+        f"tracker_mapping={tracker_mapping_str} expected={expected_assignments}")
 
   caplog.set_level(logging.INFO)
   logging.getLogger(__name__).info(
