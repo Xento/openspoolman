@@ -164,6 +164,8 @@ def processMessage(data):
       for id, filament in PENDING_PRINT_METADATA["filaments"].items():
         parsed_grams = _parse_grams(filament.get("used_g"))
         grams_used = parsed_grams if parsed_grams is not None else 0.0
+        if TRACK_LAYER_USAGE:
+          grams_used = 0.0
         insert_filament_usage(
             print_id,
             filament["type"],
@@ -208,6 +210,8 @@ def processMessage(data):
             for id, filament in PENDING_PRINT_METADATA["filaments"].items():
               parsed_grams = _parse_grams(filament.get("used_g"))
               grams_used = parsed_grams if parsed_grams is not None else 0.0
+              if TRACK_LAYER_USAGE:
+                grams_used = 0.0
               insert_filament_usage(
                   print_id,
                   filament["type"],
