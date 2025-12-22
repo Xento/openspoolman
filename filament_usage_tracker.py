@@ -228,6 +228,7 @@ class FilamentUsageTracker:
     self._layer_tracking_status = None
     self._layer_tracking_start_time = None
     self._pending_usage_mm = {}
+    self._mc_remaining_time_minutes = None
 
   def set_print_metadata(self, metadata: dict | None) -> None:
     metadata = metadata or {}
@@ -255,6 +256,11 @@ class FilamentUsageTracker:
 
     previous_state = self.gcode_state
     self.gcode_state = print_obj.get("gcode_state", self.gcode_state)
+    if "mc_remaining_time" in print_obj:
+      try:
+        self._mc_remaining_time_minutes = float(print_obj["mc_remaining_time"])
+      except (TypeError, ValueError):
+        self._mc_remaining_time_minutes = None
 
     if command == "project_file":
       self._handle_print_start(print_obj)
@@ -602,6 +608,7 @@ class FilamentUsageTracker:
     self._layer_tracking_status = None
     self._layer_tracking_start_time = None
     self._pending_usage_mm = {}
+    self._mc_remaining_time_minutes = None
 
   def _is_abort_state(self, state: str | None) -> bool:
     if not state:
@@ -720,7 +727,13 @@ class FilamentUsageTracker:
       payload["total_layers"] = self._layer_tracking_total_layers
     if self._layer_tracking_predicted_total is not None:
       payload["filament_grams_total"] = round(self._layer_tracking_predicted_total, 2)
-    predicted_end = self._compute_predicted_end_time(layers_printed, self._layer_tracking_total_layers)
+    predicted_end = None
+    if self._mc_remaining_time_minutes is not None and self._mc_remaining_time_minutes > 0:
+      predicted_end = self._format_timestamp(
+          datetime.now() + timedelta(minutes=self._mc_remaining_time_minutes)
+      )
+    else:
+      predicted_end = self._compute_predicted_end_time(layers_printed, self._layer_tracking_total_layers)
     if predicted_end:
       payload["predicted_end_time"] = predicted_end
 
