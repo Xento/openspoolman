@@ -176,6 +176,11 @@ def test_mqtt_log_tray_detection(log_path, monkeypatch, caplog):
         if metadata:
           for idx, tray in enumerate(metadata.get("ams_mapping", [])):
             assignments[str(idx)] = str(tray)
+        print_obj = payload.get("print", {})
+        if print_obj.get("command") == "project_file":
+          ams_mapping = print_obj.get("ams_mapping") or []
+          for idx, tray in enumerate(ams_mapping):
+            assignments[str(idx)] = str(tray)
         tracker_mapping = mqtt_bambulab.FILAMENT_TRACKER.ams_mapping
         if tracker_mapping:
           last_tracker_mapping = list(tracker_mapping)

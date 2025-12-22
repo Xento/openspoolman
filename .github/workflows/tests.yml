@@ -6,8 +6,13 @@ on:
 
 jobs:
   python:
+    name: Python tests (layer-tracking=${{ matrix.layer_tracking }})
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        layer_tracking: [false, true]
     env:
+      TRACK_LAYER_USAGE: ${{ matrix.layer_tracking }}
       OPENSPOOLMAN_TEST_DATA: "1"
     steps:
       - name: Checkout
