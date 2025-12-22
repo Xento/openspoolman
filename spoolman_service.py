@@ -7,7 +7,7 @@ from pathlib import Path
 from print_history import update_filament_spool
 import json
 
-from spoolman_client import consumeSpool, patchExtraTags, fetchSpoolList, fetchSettings
+import spoolman_client
 
 SPOOLS = {}
 SPOOLMAN_SETTINGS = {}
@@ -320,7 +320,7 @@ def spendFilaments(printdata):
           update_filament_spool(printdata["print_id"], ams_tray["id"], spool["id"])
         
       if used_grams != 0:
-        consumeSpool(spool["id"], used_grams)
+        spoolman_client.consumeSpool(spool["id"], used_grams)
         
 
 def setActiveTray(spool_id, spool_extra, ams_id, tray_id):
@@ -328,14 +328,14 @@ def setActiveTray(spool_id, spool_extra, ams_id, tray_id):
     spool_extra = {}
 
   if not spool_extra.get("active_tray") or json.loads(spool_extra.get("active_tray")) != trayUid(ams_id, tray_id):
-    patchExtraTags(spool_id, spool_extra, {
+    spoolman_client.patchExtraTags(spool_id, spool_extra, {
       "active_tray": json.dumps(trayUid(ams_id, tray_id)),
     })
 
     # Remove active tray from inactive spools
     for old_spool in fetchSpools(cached=True):
       if spool_id != old_spool["id"] and old_spool.get("extra") and old_spool["extra"].get("active_tray") and json.loads(old_spool["extra"]["active_tray"]) == trayUid(ams_id, tray_id):
-        patchExtraTags(old_spool["id"], old_spool["extra"], {"active_tray": json.dumps("")})
+        spoolman_client.patchExtraTags(old_spool["id"], old_spool["extra"], {"active_tray": json.dumps("")})
   else:
     print("Skipping set active tray")
 
@@ -343,7 +343,7 @@ def setActiveTray(spool_id, spool_extra, ams_id, tray_id):
 def fetchSpools(cached=False):
   global SPOOLS
   if not cached or not SPOOLS:
-    SPOOLS = fetchSpoolList()
+    SPOOLS = spoolman_client.fetchSpoolList()
     
     for spool in SPOOLS:
       initial_weight = 0
@@ -372,7 +372,7 @@ def fetchSpools(cached=False):
 def getSettings(cached=False):
   global SPOOLMAN_SETTINGS
   if not cached or not SPOOLMAN_SETTINGS:
-    SPOOLMAN_SETTINGS = fetchSettings()
+    SPOOLMAN_SETTINGS = spoolman_client.fetchSettings()
     SPOOLMAN_SETTINGS['currency_symbol'] = get_currency_symbol(SPOOLMAN_SETTINGS["currency"])
 
   return SPOOLMAN_SETTINGS

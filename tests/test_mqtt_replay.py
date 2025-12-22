@@ -83,7 +83,6 @@ def _stub_spoolman(monkeypatch):
   monkeypatch.setattr(spoolman_client, "consumeSpool", lambda *args, **kwargs: None)
   monkeypatch.setattr(spoolman_service, "consumeSpool", lambda *args, **kwargs: None)
   monkeypatch.setattr("filament_usage_tracker.consumeSpool", lambda *args, **kwargs: None)
-  monkeypatch.setattr(spoolman_service, "fetchSpools", lambda *args, **kwargs: copy.deepcopy(MOCK_SPOOLS))
   monkeypatch.setattr(spoolman_service, "setActiveTray", lambda *args, **kwargs: None)
   monkeypatch.setattr(spoolman_service, "spendFilaments", lambda *args, **kwargs: None)
   monkeypatch.setattr(mqtt_bambulab, "fetchSpools", lambda *args, **kwargs: copy.deepcopy(MOCK_SPOOLS))
