@@ -8,7 +8,7 @@ from typing import Any, Iterable
 
 import paho.mqtt.client as mqtt
 
-from config import PRINTER_ID, PRINTER_CODE, PRINTER_IP, AUTO_SPEND, EXTERNAL_SPOOL_AMS_ID, EXTERNAL_SPOOL_ID, TRACK_LAYER_USAGE
+from config import PRINTER_ID, PRINTER_CODE, PRINTER_IP, AUTO_SPEND, EXTERNAL_SPOOL_ID, TRACK_LAYER_USAGE
 from messages import GET_VERSION, PUSH_ALL
 from spoolman_service import spendFilaments, setActiveTray, fetchSpools
 from tools_3mf import getMetaDataFrom3mf
@@ -16,7 +16,7 @@ import time
 import copy
 from collections.abc import Mapping
 from logger import append_to_rotating_file
-from print_history import  insert_print, insert_filament_usage, update_filament_spool
+from print_history import insert_print, insert_filament_usage
 from filament_usage_tracker import FilamentUsageTracker
 MQTT_CLIENT = {}  # Global variable storing MQTT Client
 MQTT_CLIENT_CONNECTED = False
@@ -149,6 +149,13 @@ def update_dict(original: dict, updates: dict) -> dict:
             original[key] = value
     return original
 
+
+def _parse_grams(value):
+  try:
+    return float(value)
+  except (TypeError, ValueError):
+    return None
+
 def map_filament(tray_tar):
   global PENDING_PRINT_METADATA
   # Prüfen, ob ein Filamentwechsel aktiv ist (stg_cur == 4)
@@ -160,22 +167,42 @@ def map_filament(tray_tar):
     # Anzahl der erkannten Wechsel
     change_count = len(PENDING_PRINT_METADATA["filamentChanges"]) - 1  # -1, weil der erste Eintrag kein Wechsel ist
 
-    # Slot in der Wechselreihenfolge bestimmen
-    for tray, usage_count in PENDING_PRINT_METADATA["filamentOrder"].items():
-        if usage_count == change_count:
-            PENDING_PRINT_METADATA["ams_mapping"].append(tray_tar)
-            print(f"✅ Tray {tray_tar} assigned Filament to {tray}")
+    filament_order = PENDING_PRINT_METADATA.get("filamentOrder") or {}
+    ordered_filaments = sorted(filament_order.items(), key=lambda entry: entry[1])
+    assigned_trays = PENDING_PRINT_METADATA.setdefault("assigned_trays", [])
+    filament_assigned = None
+    if tray_tar not in assigned_trays:
+      assigned_trays.append(tray_tar)
+      unique_index = len(assigned_trays) - 1
+      if unique_index < len(ordered_filaments):
+        filament_assigned = ordered_filaments[unique_index][0]
+      else:
+        for filamentId, usage_count in filament_order.items():
+          if usage_count == change_count:
+            filament_assigned = filamentId
+            break
 
-            for filament, tray in enumerate(PENDING_PRINT_METADATA["ams_mapping"]):
-              print(f"  Filament {filament} → Tray {tray}")
+    if filament_assigned is not None:
+      mapping = PENDING_PRINT_METADATA.setdefault("ams_mapping", [])
+      filament_idx = int(filament_assigned)
+      while len(mapping) <= filament_idx:
+        mapping.append(None)
+      mapping[filament_idx] = tray_tar
+      print(f"✅ Tray {tray_tar} assigned to Filament {filament_assigned}")
 
+      for filament, tray in enumerate(mapping):
+        if tray is None:
+          continue
+        print(f"  Filament pos: {filament} → Tray {tray}")
 
-    # Falls alle Slots zugeordnet sind, Ausgabe der Zuordnung
-    if len(PENDING_PRINT_METADATA["ams_mapping"]) == len(PENDING_PRINT_METADATA["filamentOrder"]):
+    target_filaments = set(filament_order.keys())
+    if target_filaments:
+      assigned_filaments = {
+        idx for idx, tray in enumerate(PENDING_PRINT_METADATA.get("ams_mapping", []))
+        if tray is not None
+      }
+      if target_filaments.issubset(assigned_filaments):
         print("\n✅ All trays assigned:")
-        for filament, tray in enumerate(PENDING_PRINT_METADATA["ams_mapping"]):
-            print(f"  Filament {tray} → Tray {tray}")
-
         return True
   
   return False
@@ -189,6 +216,9 @@ def processMessage(data):
     
     if "command" in data["print"] and data["print"]["command"] == "project_file" and "url" in data["print"]:
       PENDING_PRINT_METADATA = getMetaDataFrom3mf(data["print"]["url"])
+      PENDING_PRINT_METADATA["print_type"] = PRINTER_STATE["print"].get("print_type")
+      PENDING_PRINT_METADATA["task_id"] = PRINTER_STATE["print"].get("task_id")
+      PENDING_PRINT_METADATA["subtask_id"] = PRINTER_STATE["print"].get("subtask_id")
       if TRACK_LAYER_USAGE:
         FILAMENT_TRACKER.set_print_metadata(PENDING_PRINT_METADATA)
 
@@ -203,7 +233,18 @@ def processMessage(data):
       PENDING_PRINT_METADATA["complete"] = True
 
       for id, filament in PENDING_PRINT_METADATA["filaments"].items():
-        insert_filament_usage(print_id, filament["type"], filament["color"], filament["used_g"], id)
+        parsed_grams = _parse_grams(filament.get("used_g"))
+        grams_used = parsed_grams if parsed_grams is not None else 0.0
+        if TRACK_LAYER_USAGE:
+          grams_used = 0.0
+        insert_filament_usage(
+            print_id,
+            filament["type"],
+            filament["color"],
+            grams_used,
+            id,
+            estimated_grams=parsed_grams,
+        )
   
     #if ("gcode_state" in data["print"] and data["print"]["gcode_state"] == "RUNNING") and ("print_type" in data["print"] and data["print"]["print_type"] != "local") \
     #  and ("tray_tar" in data["print"] and data["print"]["tray_tar"] != "255") and ("stg_cur" in data["print"] and data["print"]["stg_cur"] == 0 and PRINT_CURRENT_STAGE != 0):
@@ -220,23 +261,49 @@ def processMessage(data):
           "gcode_file" in PRINTER_STATE["print"]
         ):
 
-        PENDING_PRINT_METADATA = getMetaDataFrom3mf(PRINTER_STATE["print"]["gcode_file"])
+        if not PENDING_PRINT_METADATA:
+          PENDING_PRINT_METADATA = getMetaDataFrom3mf(PRINTER_STATE["print"]["gcode_file"])
+        if PENDING_PRINT_METADATA:
+          PENDING_PRINT_METADATA["print_type"] = PRINTER_STATE["print"].get("print_type")
+          PENDING_PRINT_METADATA["task_id"] = PRINTER_STATE["print"].get("task_id")
+          PENDING_PRINT_METADATA["subtask_id"] = PRINTER_STATE["print"].get("subtask_id")
 
-        print_id = insert_print(PENDING_PRINT_METADATA["file"], PRINTER_STATE["print"]["print_type"], PENDING_PRINT_METADATA["image"])
+          if not PENDING_PRINT_METADATA.get("tracking_started"):
+            print_id = insert_print(PENDING_PRINT_METADATA["file"], PRINTER_STATE["print"]["print_type"], PENDING_PRINT_METADATA["image"])
 
-        PENDING_PRINT_METADATA["ams_mapping"] = []
-        PENDING_PRINT_METADATA["filamentChanges"] = []
-        PENDING_PRINT_METADATA["complete"] = False
-        PENDING_PRINT_METADATA["print_id"] = print_id
-        if TRACK_LAYER_USAGE:
-          FILAMENT_TRACKER.set_print_metadata(PENDING_PRINT_METADATA)
+            PENDING_PRINT_METADATA["ams_mapping"] = []
+            PENDING_PRINT_METADATA["filamentChanges"] = []
+            PENDING_PRINT_METADATA["assigned_trays"] = []
+            PENDING_PRINT_METADATA["complete"] = False
+            PENDING_PRINT_METADATA["print_id"] = print_id
+            FILAMENT_TRACKER.start_local_print_from_metadata(PENDING_PRINT_METADATA)
 
-        for id, filament in PENDING_PRINT_METADATA["filaments"].items():
-          insert_filament_usage(print_id, filament["type"], filament["color"], filament["used_g"], id)
+            for id, filament in PENDING_PRINT_METADATA["filaments"].items():
+              parsed_grams = _parse_grams(filament.get("used_g"))
+              grams_used = parsed_grams if parsed_grams is not None else 0.0
+              if TRACK_LAYER_USAGE:
+                grams_used = 0.0
+              insert_filament_usage(
+                  print_id,
+                  filament["type"],
+                  filament["color"],
+                  grams_used,
+                  id,
+                  estimated_grams=parsed_grams,
+              )
+
+            PENDING_PRINT_METADATA["tracking_started"] = True
 
         #TODO 
     
       # When stage changed to "change filament" and PENDING_PRINT_METADATA is set
+      curr_tray_tar = None
+      prev_tray_tar = None
+      if "ams" in PRINTER_STATE["print"] and "tray_tar" in PRINTER_STATE["print"]["ams"]:
+        curr_tray_tar = PRINTER_STATE["print"]["ams"]["tray_tar"]
+      if "ams" in PRINTER_STATE_LAST["print"] and "tray_tar" in PRINTER_STATE_LAST["print"]["ams"]:
+        prev_tray_tar = PRINTER_STATE_LAST["print"]["ams"]["tray_tar"]
+
       if (PENDING_PRINT_METADATA and 
           (
             ("stg_cur" in PRINTER_STATE["print"] and (int(PRINTER_STATE["print"]["stg_cur"]) == 4) and      # change filament stage (beginning of print)
@@ -261,16 +328,30 @@ def processMessage(data):
             (
               int(PRINTER_STATE["print"]["stg_cur"]) == 24 and int(PRINTER_STATE_LAST["print"]["stg_cur"]) == 13
             )
+            or (
+              "stg_cur" in PRINTER_STATE["print"] and int(PRINTER_STATE["print"]["stg_cur"]) == 4 and
+              curr_tray_tar is not None and curr_tray_tar != "255" and
+              (prev_tray_tar is None or prev_tray_tar != curr_tray_tar)
+            )
 
           )
       ):
-        if "ams" in PRINTER_STATE["print"] and map_filament(int(PRINTER_STATE["print"]["ams"]["tray_tar"])):
-            PENDING_PRINT_METADATA["complete"] = True
+        if "ams" in PRINTER_STATE["print"]:
+            mapped = False
+            tray_tar_value = PRINTER_STATE["print"]["ams"].get("tray_tar")
+            if tray_tar_value and tray_tar_value != "255":
+                mapped = map_filament(int(tray_tar_value))
+            FILAMENT_TRACKER.apply_ams_mapping(PENDING_PRINT_METADATA.get("ams_mapping") or [])
+            if mapped:
+                PENDING_PRINT_METADATA["complete"] = True
           
 
     if PENDING_PRINT_METADATA and PENDING_PRINT_METADATA["complete"]:
       if TRACK_LAYER_USAGE:
-        FILAMENT_TRACKER.set_print_metadata(PENDING_PRINT_METADATA)
+        if PENDING_PRINT_METADATA.get("print_type") == "local":
+          FILAMENT_TRACKER.apply_ams_mapping(PENDING_PRINT_METADATA.get("ams_mapping") or [])
+        else:
+          FILAMENT_TRACKER.set_print_metadata(PENDING_PRINT_METADATA)
         # Per-layer tracker will handle consumption; skip upfront spend.
       else:
         spendFilaments(PENDING_PRINT_METADATA)
@@ -315,8 +396,7 @@ def on_message(client, userdata, msg):
 
     if AUTO_SPEND:
         processMessage(data)
-        if TRACK_LAYER_USAGE:
-            FILAMENT_TRACKER.on_message(data)
+        FILAMENT_TRACKER.on_message(data)
       
     # Save external spool tray data
     if "print" in data and "vt_tray" in data["print"]:
@@ -358,8 +438,8 @@ def on_message(client, userdata, msg):
               print("      - No Spool or non Bambulab Spool!")
             elif not found:
               print("      - Not found. Update spool tag!")
-              
-  except Exception as e:
+
+  except Exception:
     traceback.print_exc()
 
 def on_connect(client, userdata, flags, rc):
@@ -398,8 +478,8 @@ def async_subscribe():
           MQTT_CLIENT.connect(PRINTER_IP, 8883, MQTT_KEEPALIVE)
           MQTT_CLIENT.loop_start()
           
-      except Exception as e:
-          print(f"⚠️ connection failed: {e}, new try in 15 seconds...", flush=True)
+      except Exception as exc:
+          print(f"⚠️ connection failed: {exc}, new try in 15 seconds...", flush=True)
 
       time.sleep(15)
 

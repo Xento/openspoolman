@@ -225,7 +225,6 @@ _PATCH_TARGETS = {
     "print_history.update_filament_spool": update_filament_spool,
     "spoolman_service.fetchSpools": fetchSpools,
     "spoolman_service.setActiveTray": setActiveTray,
-    "spoolman_service.consumeSpool": consumeSpool,
     "mqtt_bambulab.fetchSpools": fetchSpools,
     "mqtt_bambulab.getLastAMSConfig": getLastAMSConfig,
     "mqtt_bambulab.isMqttClientConnected": isMqttClientConnected,

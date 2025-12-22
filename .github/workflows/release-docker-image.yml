@@ -27,7 +27,7 @@ jobs:
     name: Lint Python project
     uses: ./.github/workflows/python-lint.yml
     with:
-      python-version: "3.10"
+      python-version: "3.13"
       # Use the same ref as the image build:
       # - release: use the release tag
       # - workflow_dispatch with tag: use that tag
