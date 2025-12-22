@@ -81,7 +81,6 @@ def _base_model_from_log(log_path: Path) -> Path:
 def _stub_spoolman(monkeypatch):
   # Disable any real billing/network calls.
   monkeypatch.setattr(spoolman_client, "consumeSpool", lambda *args, **kwargs: None)
-  monkeypatch.setattr(spoolman_service, "consumeSpool", lambda *args, **kwargs: None)
   monkeypatch.setattr("filament_usage_tracker.consumeSpool", lambda *args, **kwargs: None)
   monkeypatch.setattr(spoolman_service, "setActiveTray", lambda *args, **kwargs: None)
   monkeypatch.setattr(spoolman_service, "spendFilaments", lambda *args, **kwargs: None)
