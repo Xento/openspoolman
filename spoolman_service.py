@@ -8,7 +8,6 @@ from print_history import update_filament_spool
 import json
 
 import spoolman_client
-
 SPOOLS = {}
 SPOOLMAN_SETTINGS = {}
 
