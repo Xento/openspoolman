@@ -89,6 +89,7 @@ def _stub_spoolman(monkeypatch):
   monkeypatch.setattr(mqtt_bambulab, "fetchSpools", lambda *args, **kwargs: copy.deepcopy(MOCK_SPOOLS))
   monkeypatch.setattr(mqtt_bambulab, "setActiveTray", lambda *args, **kwargs: None)
   monkeypatch.setattr(mqtt_bambulab, "spendFilaments", lambda *args, **kwargs: None)
+  monkeypatch.setattr(spoolman_client, "fetchSpoolList", lambda *args, **kwargs: copy.deepcopy(MOCK_SPOOLS))
 
 
 def _stub_history(monkeypatch):
