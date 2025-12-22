@@ -1,3 +1,4 @@
+import copy
 import json
 import logging
 import os
@@ -16,6 +17,26 @@ from config import TRACK_LAYER_USAGE
 
 
 LOG_ROOT = Path(__file__).resolve().parent / "MQTT"
+
+
+MOCK_SPOOLS = [
+  {
+    "id": 3,
+    "filament": {
+      "name": "PLA Sample Filament",
+      "vendor": {"name": "OpenSpoolMan"},
+      "material": "PLA",
+      "color_hex": "FF5733",
+      "extra": {"type": "PLA Basic"},
+    },
+    "initial_weight": 1000,
+    "price": 30,
+    "remaining_weight": 995,
+    "extra": {
+      "active_tray": json.dumps(spoolman_service.trayUid(0, 3)),
+    },
+  },
+]
 
 
 def _iter_log_files():
@@ -62,10 +83,10 @@ def _stub_spoolman(monkeypatch):
   monkeypatch.setattr(spoolman_client, "consumeSpool", lambda *args, **kwargs: None)
   monkeypatch.setattr(spoolman_service, "consumeSpool", lambda *args, **kwargs: None)
   monkeypatch.setattr("filament_usage_tracker.consumeSpool", lambda *args, **kwargs: None)
-  monkeypatch.setattr(spoolman_service, "fetchSpools", lambda *args, **kwargs: [])
+  monkeypatch.setattr(spoolman_service, "fetchSpools", lambda *args, **kwargs: copy.deepcopy(MOCK_SPOOLS))
   monkeypatch.setattr(spoolman_service, "setActiveTray", lambda *args, **kwargs: None)
   monkeypatch.setattr(spoolman_service, "spendFilaments", lambda *args, **kwargs: None)
-  monkeypatch.setattr(mqtt_bambulab, "fetchSpools", lambda *args, **kwargs: [])
+  monkeypatch.setattr(mqtt_bambulab, "fetchSpools", lambda *args, **kwargs: copy.deepcopy(MOCK_SPOOLS))
   monkeypatch.setattr(mqtt_bambulab, "setActiveTray", lambda *args, **kwargs: None)
   monkeypatch.setattr(mqtt_bambulab, "spendFilaments", lambda *args, **kwargs: None)
 
