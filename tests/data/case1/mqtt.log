@@ -1,0 +1,1 @@
+{"print": {"sequence_id": "0", "command": "project_file", "url": "local:tests/data/case1/dummy.3mf", "subtask_name": "job1", "use_ams": true, "ams_mapping": [1,5]}}
