@@ -78,6 +78,13 @@ def build_ams_labels(ams_data):
 
   return labels
 
+
+def _augment_tray(spool_list, tray_data, ams_id, tray_id):
+  augmentTrayDataWithSpoolMan(spool_list, tray_data, ams_id, tray_id)
+  if tray_data.get("unmapped_bambu_tag"):
+    spoolman_service.clear_active_spool_for_tray(ams_id, tray_id)
+    augmentTrayDataWithSpoolMan(spool_list, tray_data, ams_id, tray_id)
+
 @app.route("/issue")
 def issue():
   if not mqtt_bambulab.isMqttClientConnected():
@@ -110,12 +117,12 @@ def issue():
 
   active_spool = None
   for spool in spool_list:
-    if spool.get("extra") and spool["extra"].get("active_tray") and spool["extra"]["active_tray"] == json.dumps(trayUid(ams_id, tray_id)):
+    if spool.get("extra") and spool["extra"].get("active_tray") and spool["extra"].get("active_tray") == json.dumps(trayUid(ams_id, tray_id)):
       active_spool = spool
       break
 
   if tray_data:
-    augmentTrayDataWithSpoolMan(spool_list, tray_data, trayUid(ams_id, tray_id))
+    _augment_tray(spool_list, tray_data, ams_id, tray_id)
 
   #TODO: Determine issue
   #New bambulab spool
@@ -255,12 +262,12 @@ def spool_info():
 
     issue = False
     #TODO: Fix issue when external spool info is reset via bambulab interface
-    augmentTrayDataWithSpoolMan(spool_list, vt_tray_data, trayUid(EXTERNAL_SPOOL_AMS_ID, EXTERNAL_SPOOL_ID))
+    _augment_tray(spool_list, vt_tray_data, EXTERNAL_SPOOL_AMS_ID, EXTERNAL_SPOOL_ID)
     issue |= vt_tray_data.get("issue", False)
 
     for ams in ams_data:
       for tray in ams["tray"]:
-        augmentTrayDataWithSpoolMan(spool_list, tray, trayUid(ams["id"], tray["id"]))
+        _augment_tray(spool_list, tray, ams["id"], tray["id"])
         issue |= tray.get("issue", False)
 
     if not tag_id and not spool_id:
@@ -408,12 +415,12 @@ def home():
     
     issue = False
     #TODO: Fix issue when external spool info is reset via bambulab interface
-    augmentTrayDataWithSpoolMan(spool_list, vt_tray_data, trayUid(EXTERNAL_SPOOL_AMS_ID, EXTERNAL_SPOOL_ID))
+    _augment_tray(spool_list, vt_tray_data, EXTERNAL_SPOOL_AMS_ID, EXTERNAL_SPOOL_ID)
     issue |= vt_tray_data["issue"]
 
     for ams in ams_data:
       for tray in ams["tray"]:
-        augmentTrayDataWithSpoolMan(spool_list, tray, trayUid(ams["id"], tray["id"]))
+        _augment_tray(spool_list, tray, ams["id"], tray["id"])
         issue |= tray["issue"]
 
     ams_labels = build_ams_labels(ams_data)

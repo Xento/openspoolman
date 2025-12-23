@@ -57,11 +57,13 @@
     <!-- Typ & Hersteller -->
     {% if tray_data.spool_material %}
       <div class="small text-muted text-center mb-2">
+          {% if tray_data.spool_id %}#{{ tray_data.spool_id }} {% endif %}
           {{ tray_data.spool_material }}{% if tray_data.spool_sub_brand %} - {{ tray_data.spool_sub_brand }}{% endif %}
           {% if tray_data.vendor %} - {{ tray_data.vendor }}{% endif %}
       </div>
     {% elif tray_data.unmapped_bambu_tag %}
       <div class="small text-muted text-center mb-2">
+          <span class="fw-semibold text-warning">Unknown spool detected</span><br>
           Bambu Lab{% if tray_data.bambu_material %} - {{ tray_data.bambu_material }}{% endif %}{% if tray_data.bambu_sub_brand %} - {{ tray_data.bambu_sub_brand }}{% endif %}
       </div>
     {% else %}

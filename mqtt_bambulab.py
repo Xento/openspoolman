@@ -9,8 +9,8 @@ from typing import Any, Iterable
 import paho.mqtt.client as mqtt
 
 from config import PRINTER_ID, PRINTER_CODE, PRINTER_IP, AUTO_SPEND, EXTERNAL_SPOOL_ID, TRACK_LAYER_USAGE
-from messages import GET_VERSION, PUSH_ALL
-from spoolman_service import spendFilaments, setActiveTray, fetchSpools
+from messages import GET_VERSION, PUSH_ALL, AMS_FILAMENT_SETTING
+from spoolman_service import spendFilaments, setActiveTray, fetchSpools, clear_active_spool_for_tray
 from tools_3mf import getMetaDataFrom3mf
 import time
 import copy
@@ -370,6 +370,23 @@ def publish(client, msg):
   print(f"Failed to send message to topic device/{PRINTER_ID}/request")
   return False
 
+
+def clear_ams_tray_assignment(ams_id, tray_id):
+  if not MQTT_CLIENT:
+    return
+
+  ams_message = copy.deepcopy(AMS_FILAMENT_SETTING)
+  ams_message["print"]["ams_id"] = int(ams_id)
+  ams_message["print"]["tray_id"] = int(tray_id)
+  ams_message["print"]["tray_color"] = ""
+  ams_message["print"]["nozzle_temp_min"] = None
+  ams_message["print"]["nozzle_temp_max"] = None
+  ams_message["print"]["tray_type"] = ""
+  ams_message["print"]["setting_id"] = ""
+  ams_message["print"]["tray_info_idx"] = ""
+
+  publish(MQTT_CLIENT, ams_message)
+
 # Inspired by https://github.com/Donkie/Spoolman/issues/217#issuecomment-2303022970
 def on_message(client, userdata, msg):
   global LAST_AMS_CONFIG, PRINTER_STATE, PRINTER_STATE_LAST, PENDING_PRINT_METADATA, PRINTER_MODEL
@@ -438,6 +455,10 @@ def on_message(client, userdata, msg):
               print("      - No Spool or non Bambulab Spool!")
             elif not found:
               print("      - Not found. Update spool tag!")
+              tray["unmapped_bambu_tag"] = tray_uuid
+              tray["issue"] = True
+              clear_active_spool_for_tray(ams['id'], tray['id'])
+              clear_ams_tray_assignment(ams['id'], tray['id'])
 
   except Exception:
     traceback.print_exc()

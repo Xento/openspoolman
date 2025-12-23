@@ -33,11 +33,11 @@ def _make_spool(material, extra_type, tray_id="tray-1", spool_id=1, spool_extra_
     }
 
 
-def _run_case(tray, spool, tray_id="tray-1"):
+def _run_case(tray, spool, ams_id=0, tray_id="tray-1"):
     spool_list = [spool]
     # avoid file writes during tests
     svc._log_filament_mismatch = lambda *args, **kwargs: None
-    svc.augmentTrayDataWithSpoolMan(spool_list, tray, tray_id)
+    svc.augmentTrayDataWithSpoolMan(spool_list, tray, ams_id, tray_id)
     return tray
 
 
