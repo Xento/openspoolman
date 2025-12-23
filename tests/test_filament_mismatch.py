@@ -14,13 +14,13 @@ def _make_tray(tray_type, tray_sub_brands, tray_id="tray-1"):
     }
 
 
-def _make_spool(material, extra_type, tray_id="tray-1", spool_id=1, spool_extra_type=None):
+def _make_spool(material, extra_type, ams_id=0, tray_id="tray-1", spool_id=1, spool_extra_type=None):
     return {
         "id": spool_id,
         "remaining_weight": 1000,
         # SpoolMan may carry a type in spool.extra; include it when provided.
         "extra": {
-            "active_tray": json.dumps(tray_id),
+            "active_tray": json.dumps(svc.trayUid(ams_id, tray_id)),
             **({"type": spool_extra_type if spool_extra_type is not None else extra_type} if (spool_extra_type is not None or extra_type) else {}),
         },
         "filament": {
