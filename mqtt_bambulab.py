@@ -461,9 +461,6 @@ def on_message(client, userdata, msg):
 
             if not found and tray_uuid == "00000000000000000000000000000000":
               print("      - No Spool or non Bambulab Spool!")
-              if CLEAR_ASSIGNMENT_WHEN_EMPTY:
-                clear_active_spool_for_tray(ams['id'], tray['id'])
-                clear_ams_tray_assignment(ams['id'], tray['id'])
             elif not found:
               print("      - Not found. Update spool tag!")
               tray["unmapped_bambu_tag"] = tray_uuid

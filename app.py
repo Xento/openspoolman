@@ -7,7 +7,15 @@ from collections import Counter
 
 from flask import Flask, request, render_template, redirect, url_for
 
-from config import BASE_URL, AUTO_SPEND, SPOOLMAN_BASE_URL, EXTERNAL_SPOOL_AMS_ID, EXTERNAL_SPOOL_ID, PRINTER_NAME
+from config import (
+    BASE_URL,
+    AUTO_SPEND,
+    SPOOLMAN_BASE_URL,
+    EXTERNAL_SPOOL_AMS_ID,
+    EXTERNAL_SPOOL_ID,
+    PRINTER_NAME,
+    CLEAR_ASSIGNMENT_WHEN_EMPTY,
+)
 from filament import generate_filament_brand_code, generate_filament_temperatures
 from frontend_utils import color_is_dark
 from messages import AMS_FILAMENT_SETTING
@@ -84,6 +92,14 @@ def _augment_tray(spool_list, tray_data, ams_id, tray_id):
   if tray_data.get("unmapped_bambu_tag"):
     spoolman_service.clear_active_spool_for_tray(ams_id, tray_id)
     augmentTrayDataWithSpoolMan(spool_list, tray_data, ams_id, tray_id)
+  empty_condition = (
+      CLEAR_ASSIGNMENT_WHEN_EMPTY
+      and not tray_data.get("spool_material")
+      and not tray_data.get("unmapped_bambu_tag")
+  )
+  if empty_condition:
+    spoolman_service.clear_active_spool_for_tray(ams_id, tray_id)
+    mqtt_bambulab.clear_ams_tray_assignment(ams_id, tray_id)
 
 @app.route("/issue")
 def issue():
