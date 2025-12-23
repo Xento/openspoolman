@@ -469,9 +469,9 @@ def on_message(client, userdata, msg):
               clear_ams_tray_assignment(ams['id'], tray['id'])
           else:
             print(
-                f"    - [{num2letter(ams['id'])}{tray['id']}]]]")
-            print("      - No Spool or non Bambulab Spool!")
-            
+                f"    - [{num2letter(ams['id'])}{tray['id']}]")
+            print("      - No Spool!")
+
   except Exception:
     traceback.print_exc()
 
