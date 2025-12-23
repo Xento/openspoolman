@@ -11,6 +11,7 @@ Docker: https://ghcr.io/drndos/openspoolman
 Helm: https://github.com/drndos/openspoolman/pkgs/container/openspoolman%2Fhelm%2Fopenspoolman
 
 ### News
+- [v0.3.0](https://github.com/drndos/openspoolman/releases/tag/v0.3.0) - 23.12.2025 — more accurate filament accounting, higher-fidelity print history, and better Bambu Lab / AMS integration
 - [v0.2.0](https://github.com/drndos/openspoolman/releases/tag/v0.2.0) - 07.12.2025 — Adds material-aware tray/spool mismatch detection, tray color cues, print reassign/pagination, spool material filters, and SpoolMan URL handling with refreshed responsive layouts.
 - [v0.1.9](https://github.com/drndos/openspoolman/releases/tag/v0.1.9) - 25.05.2025 — Ships post-print spool assignment, multi-platform Docker images, customizable spool sorting, timezone config, and compatibility/uI polish.
 - [v0.1.8](https://github.com/drndos/openspoolman/releases/tag/v0.1.8) - 20.04.2025 — Starts importing each filament’s SpoolMan `filament_id` for accurate matching (requires the `filament_id` custom field).
