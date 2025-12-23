@@ -1,13 +1,24 @@
+
+
 import json
 import ssl
 import traceback
 from threading import Thread
+from typing import Any, Iterable
 
 import paho.mqtt.client as mqtt
 
-from config import PRINTER_ID, PRINTER_CODE, PRINTER_IP, AUTO_SPEND, EXTERNAL_SPOOL_ID, TRACK_LAYER_USAGE
-from messages import GET_VERSION, PUSH_ALL
-from spoolman_service import spendFilaments, setActiveTray, fetchSpools
+from config import (
+    PRINTER_ID,
+    PRINTER_CODE,
+    PRINTER_IP,
+    AUTO_SPEND,
+    EXTERNAL_SPOOL_ID,
+    TRACK_LAYER_USAGE,
+    CLEAR_ASSIGNMENT_WHEN_EMPTY,
+)
+from messages import GET_VERSION, PUSH_ALL, AMS_FILAMENT_SETTING
+from spoolman_service import spendFilaments, setActiveTray, fetchSpools, clear_active_spool_for_tray
 from tools_3mf import getMetaDataFrom3mf
 import time
 import copy
@@ -15,7 +26,6 @@ from collections.abc import Mapping
 from logger import append_to_rotating_file
 from print_history import insert_print, insert_filament_usage
 from filament_usage_tracker import FilamentUsageTracker
-
 MQTT_CLIENT = {}  # Global variable storing MQTT Client
 MQTT_CLIENT_CONNECTED = False
 MQTT_KEEPALIVE = 60
@@ -26,6 +36,7 @@ PRINTER_STATE_LAST = {}
 
 PENDING_PRINT_METADATA = {}
 FILAMENT_TRACKER = FilamentUsageTracker()
+LOG_FILE = "/home/app/logs/mqtt.log"
 
 def getPrinterModel():
     global PRINTER_ID
@@ -66,6 +77,74 @@ def getPrinterModel():
         "model": model_name,
         "devicename": device_name
     }
+
+def identify_ams_model_from_module(module: dict[str, Any]) -> str | None:
+    """Guess the AMS variant that a version module represents."""
+
+    product_name = (module.get("product_name") or "").strip().lower()
+    module_name = (module.get("name") or "").strip().lower()
+
+    if "ams lite" in product_name or module_name.startswith("ams_f1"):
+        return "AMS Lite"
+    if "ams 2 pro" in product_name or module_name.startswith("n3f"):
+        return "AMS 2 Pro"
+    if "ams ht" in product_name or module_name.startswith("ams_ht"):
+        return "AMS HT"
+    if module_name == "ams" or module_name.startswith("ams/"):
+        return "AMS"
+
+    return None
+
+
+def identify_ams_models_from_modules(modules: Iterable[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+  """Return per-module metadata, including the detected model when available."""
+
+  results: dict[str, dict[str, Any]] = {}
+  for module in modules or []:
+    name = module.get("name")
+    if not name:
+      continue
+
+    results[name] = {
+      "model": identify_ams_model_from_module(module),
+      "product_name": module.get("product_name"),
+      "serial": module.get("sn"),
+      "hw_ver": module.get("hw_ver"),
+    }
+
+  return results
+
+
+def extract_ams_id_from_module_name(name: str) -> int | None:
+  parts = name.split("/")
+  if len(parts) != 2:
+    return None
+  try:
+    return int(parts[1])
+  except ValueError:
+    return None
+
+
+def identify_ams_models_by_id(modules: Iterable[dict[str, Any]]) -> dict[str, str]:
+  """Return the detected AMS model per numeric AMS ID (module suffix)."""
+
+  results: dict[str, str] = {}
+  for module in modules or []:
+    name = module.get("name")
+    if not name:
+      continue
+
+    ams_id = extract_ams_id_from_module_name(name)
+    if ams_id is None:
+      continue
+
+    model = identify_ams_model_from_module(module)
+    if model:
+      results[str(ams_id)] = model
+      results[ams_id] = model
+
+  return results
+
 
 def num2letter(num):
   return chr(ord("A") + int(num))
@@ -299,12 +378,41 @@ def publish(client, msg):
   print(f"Failed to send message to topic device/{PRINTER_ID}/request")
   return False
 
+
+def clear_ams_tray_assignment(ams_id, tray_id):
+  if not MQTT_CLIENT:
+    return
+
+  ams_message = copy.deepcopy(AMS_FILAMENT_SETTING)
+  ams_message["print"]["ams_id"] = int(ams_id)
+  ams_message["print"]["tray_id"] = int(tray_id)
+  ams_message["print"]["tray_color"] = ""
+  ams_message["print"]["nozzle_temp_min"] = None
+  ams_message["print"]["nozzle_temp_max"] = None
+  ams_message["print"]["tray_type"] = ""
+  ams_message["print"]["setting_id"] = ""
+  ams_message["print"]["tray_info_idx"] = ""
+
+  publish(MQTT_CLIENT, ams_message)
+
 # Inspired by https://github.com/Donkie/Spoolman/issues/217#issuecomment-2303022970
 def on_message(client, userdata, msg):
   global LAST_AMS_CONFIG, PRINTER_STATE, PRINTER_STATE_LAST, PENDING_PRINT_METADATA, PRINTER_MODEL
   
   try:
     data = json.loads(msg.payload.decode())
+
+    info = data.get("info")
+    if info and info.get("command") == "get_version":
+      modules = info.get("module", [])
+      detected = identify_ams_models_from_modules(modules)
+      models_by_id = identify_ams_models_by_id(modules)
+      LAST_AMS_CONFIG["get_version"] = {
+        "info": info,
+        "modules": modules,
+        "detected_models": detected,
+        "models_by_id": models_by_id,
+      }
 
     if "print" in data:
       append_to_rotating_file("/home/app/logs/mqtt.log", msg.payload.decode())
@@ -353,8 +461,15 @@ def on_message(client, userdata, msg):
 
             if not found and tray_uuid == "00000000000000000000000000000000":
               print("      - No Spool or non Bambulab Spool!")
+              if CLEAR_ASSIGNMENT_WHEN_EMPTY:
+                clear_active_spool_for_tray(ams['id'], tray['id'])
+                clear_ams_tray_assignment(ams['id'], tray['id'])
             elif not found:
               print("      - Not found. Update spool tag!")
+              tray["unmapped_bambu_tag"] = tray_uuid
+              tray["issue"] = True
+              clear_active_spool_for_tray(ams['id'], tray['id'])
+              clear_ams_tray_assignment(ams['id'], tray['id'])
 
   except Exception:
     traceback.print_exc()
@@ -410,6 +525,12 @@ def init_mqtt(daemon: bool = False):
 def getLastAMSConfig():
   global LAST_AMS_CONFIG
   return LAST_AMS_CONFIG
+
+
+def getDetectedAmsModelsById():
+  global LAST_AMS_CONFIG
+  detected = LAST_AMS_CONFIG.get("get_version", {}).get("models_by_id") or {}
+  return dict(detected)
 
 
 def getMqttClient():

@@ -8,8 +8,22 @@ from print_history import update_filament_spool
 import json
 
 import spoolman_client
+
 SPOOLS = {}
 SPOOLMAN_SETTINGS = {}
+
+
+def clear_active_spool_for_tray(ams_id: int, tray_id: int) -> None:
+  """
+  Remove any SpoolMan spool that is currently tagged with the given tray UID.
+  """
+  target = json.dumps(trayUid(ams_id, tray_id))
+  for spool in fetchSpools(cached=True):
+    extras = spool.get("extra") or {}
+    if extras.get("active_tray") == target:
+      spoolman_client.patchExtraTags(spool["id"], extras, {"active_tray": json.dumps("")})
+      spool.setdefault("extra", {})["active_tray"] = json.dumps("")
+      break
 
 COLOR_DISTANCE_TOLERANCE = 80
 
@@ -97,7 +111,7 @@ def _log_filament_mismatch(tray_data: dict, spool: dict) -> None:
   except Exception:
     pass
 
-def augmentTrayDataWithSpoolMan(spool_list, tray_data, tray_id):
+def augmentTrayDataWithSpoolMan(spool_list, tray_data, ams_id, tray_id):
   tray_data["matched"] = False
   tray_data["mismatch"] = False
   tray_data["issue"] = False
@@ -105,6 +119,13 @@ def augmentTrayDataWithSpoolMan(spool_list, tray_data, tray_id):
   tray_data["color_mismatch_message"] = ""
   tray_data["ams_material_missing"] = False
   tray_data["ams_material_missing_message"] = ""
+  tray_data["unmapped_bambu_tag"] = ""
+  tray_data["bambu_material"] = ""
+  tray_data["bambu_color"] = ""
+  tray_data["bambu_vendor"] = ""
+  tray_data["bambu_sub_brand"] = ""
+  tray_sub_brands_raw = ""
+  tray_data["spool_id"] = None
 
   def _clean_basic(val: str) -> str:
     # Normalization for matching:
@@ -134,12 +155,18 @@ def augmentTrayDataWithSpoolMan(spool_list, tray_data, tray_id):
       "tray_sub_brand",
     ]:
       tray_data.pop(field, None)
+    tray_data["spool_id"] = None
     return
 
+  tray_uuid = str(tray_data.get("tray_uuid") or "")
+  tray_uid = trayUid(ams_id, tray_id)
+  target_active_tray = json.dumps(tray_uid)
+
   for spool in spool_list:
-    if spool.get("extra") and spool["extra"].get("active_tray") and spool["extra"]["active_tray"] == json.dumps(tray_id):
+    if spool.get("extra") and spool["extra"].get("active_tray") and spool["extra"]["active_tray"] == target_active_tray:
       tray_data["name"] = spool["filament"]["name"]
       tray_data["vendor"] = spool["filament"]["vendor"]["name"]
+      tray_data["spool_id"] = spool["id"]
       tray_data["spool_material"] = spool["filament"].get("material", "")
       tray_data["spool_sub_brand"] = (spool["filament"].get("extra", {}).get("type") or "").replace('"', '').strip()
       tray_data["remaining_weight"] = spool["remaining_weight"]
@@ -271,6 +298,20 @@ def augmentTrayDataWithSpoolMan(spool_list, tray_data, tray_id):
 
   if tray_data.get("tray_type") and tray_data["tray_type"] != "" and not tray_data.get("matched", False):
     tray_data["issue"] = True
+
+  if not tray_data["matched"] and tray_uuid and tray_uuid != "00000000000000000000000000000000":
+    tray_data["unmapped_bambu_tag"] = tray_uuid
+    tray_data["bambu_material"] = (tray_data.get("tray_type") or "").strip()
+    tray_data["bambu_color"] = normalize_color_hex(tray_data.get("tray_color") or "")
+    tray_data["bambu_vendor"] = "Bambu Lab"
+    tray_data["bambu_sub_brand"] = tray_sub_brands_raw.strip()
+    clear_active_spool_for_tray(ams_id, tray_id)
+  else:
+    tray_data["unmapped_bambu_tag"] = ""
+    tray_data["bambu_material"] = ""
+    tray_data["bambu_color"] = ""
+    tray_data["bambu_vendor"] = ""
+    tray_data["bambu_sub_brand"] = ""
 
 def spendFilaments(printdata):
   if printdata["ams_mapping"]:

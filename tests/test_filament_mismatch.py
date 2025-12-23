@@ -14,13 +14,13 @@ def _make_tray(tray_type, tray_sub_brands, tray_id="tray-1"):
     }
 
 
-def _make_spool(material, extra_type, tray_id="tray-1", spool_id=1, spool_extra_type=None):
+def _make_spool(material, extra_type, ams_id=0, tray_id="tray-1", spool_id=1, spool_extra_type=None):
     return {
         "id": spool_id,
         "remaining_weight": 1000,
         # SpoolMan may carry a type in spool.extra; include it when provided.
         "extra": {
-            "active_tray": json.dumps(tray_id),
+            "active_tray": json.dumps(svc.trayUid(ams_id, tray_id)),
             **({"type": spool_extra_type if spool_extra_type is not None else extra_type} if (spool_extra_type is not None or extra_type) else {}),
         },
         "filament": {
@@ -33,11 +33,11 @@ def _make_spool(material, extra_type, tray_id="tray-1", spool_id=1, spool_extra_
     }
 
 
-def _run_case(tray, spool, tray_id="tray-1"):
+def _run_case(tray, spool, ams_id=0, tray_id="tray-1"):
     spool_list = [spool]
     # avoid file writes during tests
     svc._log_filament_mismatch = lambda *args, **kwargs: None
-    svc.augmentTrayDataWithSpoolMan(spool_list, tray, tray_id)
+    svc.augmentTrayDataWithSpoolMan(spool_list, tray, ams_id, tray_id)
     return tray
 
 

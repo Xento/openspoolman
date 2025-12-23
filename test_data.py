@@ -122,11 +122,11 @@ def getLastAMSConfig():
 
     vt_tray = config.get("vt_tray")
     if vt_tray:
-        augmentTrayDataWithSpoolMan(spool_list, vt_tray, trayUid(EXTERNAL_SPOOL_AMS_ID, EXTERNAL_SPOOL_ID))
+        augmentTrayDataWithSpoolMan(spool_list, vt_tray, EXTERNAL_SPOOL_AMS_ID, EXTERNAL_SPOOL_ID)
 
     for ams in config.get("ams", []):
         for tray in ams.get("tray", []):
-            augmentTrayDataWithSpoolMan(spool_list, tray, trayUid(ams.get("id"), tray.get("id")))
+            augmentTrayDataWithSpoolMan(spool_list, tray, ams.get("id"), tray.get("id"))
     return config
 
 

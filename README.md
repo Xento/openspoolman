@@ -177,6 +177,7 @@ SpoolMan can print QR-code stickers for every spool; follow the SpoolMan label g
   - set `TRACK_LAYER_USAGE` to `True` to switch to per-layer tracking/consumption **while `AUTO_SPEND` is also `True`**. If `AUTO_SPEND` is `False`, all filament tracking remains disabled regardless of `TRACK_LAYER_USAGE`.
   - set `AUTO_SPEND` to `True` if you want automatic filament usage tracking (see the AUTO SPEND notes below).
   - set `DISABLE_MISMATCH_WARNING` to `True` to hide mismatch warnings in the UI (mismatches are still detected and logged to `data/filament_mismatch.json`).
+  - set `CLEAR_ASSIGNMENT_WHEN_EMPTY` to `True` if you want OpenSpoolMan to clear any SpoolMan assignment and reset the AMS tray whenever the printer reports no spool in that slot.
  - By default, the app reads `data/3d_printer_logs.db` for print history; override it through `OPENSPOOLMAN_PRINT_HISTORY_DB` or via the screenshot helper (which targets `data/demo.db` by default).
 
  - Run SpoolMan.
