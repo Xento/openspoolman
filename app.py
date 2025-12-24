@@ -24,7 +24,7 @@ import print_history as print_history_service
 import spoolman_client
 import spoolman_service
 import test_data
-from spoolman_service import augmentTrayDataWithSpoolMan, trayUid
+from spoolman_service import augmentTrayDataWithSpoolMan, trayUid, normalize_color_hex
 
 _TEST_PATCH_CONTEXT = None
 if test_data.TEST_MODE_FLAG:
@@ -100,6 +100,23 @@ def _augment_tray(spool_list, tray_data, ams_id, tray_id):
   if empty_condition:
     spoolman_service.clear_active_spool_for_tray(ams_id, tray_id)
     mqtt_bambulab.clear_ams_tray_assignment(ams_id, tray_id)
+
+
+def _select_spool_color_hex(spool_data):
+  filament = spool_data.get("filament", {})
+  multi = filament.get("multi_color_hexes")
+  candidate = ""
+
+  if multi:
+    if isinstance(multi, (list, tuple)) and multi:
+      candidate = multi[0]
+    elif isinstance(multi, str):
+      candidate = multi.split(",")[0]
+
+  if not candidate:
+    candidate = filament.get("color_hex") or ""
+
+  return normalize_color_hex(candidate)
 
 @app.route("/issue")
 def issue():
@@ -381,11 +398,11 @@ def setActiveSpool(ams_id, tray_id, spool_data):
   ams_message["print"]["sequence_id"] = 0
   ams_message["print"]["ams_id"] = int(ams_id)
   ams_message["print"]["tray_id"] = int(tray_id)
-  
-  if "color_hex" in spool_data["filament"]:
-    ams_message["print"]["tray_color"] = spool_data["filament"]["color_hex"].upper() + "FF"
+  color_hex = _select_spool_color_hex(spool_data)
+  if color_hex:
+    ams_message["print"]["tray_color"] = color_hex.upper() + "FF"
   else:
-    ams_message["print"]["tray_color"] = spool_data["filament"]["multi_color_hexes"].split(',')[0].upper() + "FF"
+    ams_message["print"]["tray_color"] = ""
       
   if "nozzle_temperature" in spool_data["filament"]["extra"]:
     nozzle_temperature_range = spool_data["filament"]["extra"]["nozzle_temperature"].strip("[]").split(",")

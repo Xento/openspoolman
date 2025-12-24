@@ -133,9 +133,15 @@
                                                         {% endfor %}
                                                         </div>
                                                     {% else %}
+                                                        {% set spool_color = filament['spool'].filament.color_hex %}
                                                         <div class="spool-icon vertical small">
-                                                            <div style="background-color:#{{ filament['spool'].filament.color_hex or '000000' }};"
-                                                                 title="Spool color #{{ filament['spool'].filament.color_hex or '000000' }}"></div>
+                                                            {% if spool_color %}
+                                                            <div style="background-color:#{{ spool_color }};"
+                                                                 title="Spool color #{{ spool_color }}"></div>
+                                                            {% else %}
+                                                            <div class="missing-color" style="background-color: var(--bs-secondary, #6c757d);"
+                                                                 title="Color not set"></div>
+                                                            {% endif %}
                                                         </div>
                                                     {% endif %}
                                                 </div>
