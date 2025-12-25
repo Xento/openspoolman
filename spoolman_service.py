@@ -14,6 +14,7 @@ from print_history import update_filament_spool
 import json
 
 import spoolman_client
+from logger import log
 
 SPOOLS = {}
 SPOOLMAN_SETTINGS = {}
@@ -420,7 +421,7 @@ def setActiveTray(spool_id, spool_extra, ams_id, tray_id):
       if spool_id != old_spool["id"] and old_spool.get("extra") and old_spool["extra"].get("active_tray") and json.loads(old_spool["extra"]["active_tray"]) == trayUid(ams_id, tray_id):
         spoolman_client.patchExtraTags(old_spool["id"], old_spool["extra"], {"active_tray": json.dumps("")})
   else:
-    print("Skipping set active tray")
+    log("Skipping set active tray")
 
 # Fetch spools from spoolman
 def fetchSpools(cached=False):

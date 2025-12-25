@@ -23,7 +23,7 @@ from tools_3mf import getMetaDataFrom3mf
 import time
 import copy
 from collections.abc import Mapping
-from logger import append_to_rotating_file
+from logger import append_to_rotating_file, log
 from print_history import insert_print, insert_filament_usage
 from filament_usage_tracker import FilamentUsageTracker
 MQTT_CLIENT = {}  # Global variable storing MQTT Client
@@ -170,7 +170,7 @@ def map_filament(tray_tar):
   #if stg_cur == 4 and tray_tar is not None:
   if PENDING_PRINT_METADATA:
     PENDING_PRINT_METADATA["filamentChanges"].append(tray_tar)  # Jeder Wechsel zählt, auch auf das gleiche Tray
-    print(f'Filamentchange {len(PENDING_PRINT_METADATA["filamentChanges"])}: Tray {tray_tar}')
+    log(f'Filamentchange {len(PENDING_PRINT_METADATA["filamentChanges"])}: Tray {tray_tar}')
 
     # Anzahl der erkannten Wechsel
     change_count = len(PENDING_PRINT_METADATA["filamentChanges"]) - 1  # -1, weil der erste Eintrag kein Wechsel ist
@@ -196,12 +196,12 @@ def map_filament(tray_tar):
       while len(mapping) <= filament_idx:
         mapping.append(None)
       mapping[filament_idx] = tray_tar
-      print(f"✅ Tray {tray_tar} assigned to Filament {filament_assigned}")
+      log(f"✅ Tray {tray_tar} assigned to Filament {filament_assigned}")
 
       for filament, tray in enumerate(mapping):
         if tray is None:
           continue
-        print(f"  Filament pos: {filament} → Tray {tray}")
+        log(f"  Filament pos: {filament} → Tray {tray}")
 
     target_filaments = set(filament_order.keys())
     if target_filaments:
@@ -210,7 +210,7 @@ def map_filament(tray_tar):
         if tray is not None
       }
       if target_filaments.issubset(assigned_filaments):
-        print("\n✅ All trays assigned:")
+        log("\n✅ All trays assigned:")
         return True
   
   return False
@@ -372,10 +372,10 @@ def publish(client, msg):
   result = client.publish(f"device/{PRINTER_ID}/request", json.dumps(msg))
   status = result[0]
   if status == 0:
-    print(f"Sent {msg} to topic device/{PRINTER_ID}/request")
+    log(f"Sent {msg} to topic device/{PRINTER_ID}/request")
     return True
 
-  print(f"Failed to send message to topic device/{PRINTER_ID}/request")
+  log(f"Failed to send message to topic device/{PRINTER_ID}/request")
   return False
 
 
@@ -431,10 +431,10 @@ def on_message(client, userdata, msg):
     if "print" in data and "ams" in data["print"] and "ams" in data["print"]["ams"]:
       LAST_AMS_CONFIG["ams"] = data["print"]["ams"]["ams"]
       for ams in data["print"]["ams"]["ams"]:
-        print(f"AMS [{num2letter(ams['id'])}] (hum: {ams['humidity']}, temp: {ams['temp']}ºC)")
+        log(f"AMS [{num2letter(ams['id'])}] (hum: {ams['humidity']}, temp: {ams['temp']}ºC)")
         for tray in ams["tray"]:
           if "tray_sub_brands" in tray:
-            print(
+            log(
                 f"    - [{num2letter(ams['id'])}{tray['id']}] {tray['tray_sub_brands']} {tray['tray_color']} ({str(tray['remain']).zfill(3)}%) [[ {tray['tray_uuid']} ]]")
 
             found = False
@@ -460,17 +460,17 @@ def on_message(client, userdata, msg):
               # })
 
             if not found and tray_uuid == "00000000000000000000000000000000":
-              print("      - non Bambulab Spool!")
+              log("      - non Bambulab Spool!")
             elif not found:
-              print("      - Not found. Update spool tag!")
+              log("      - Not found. Update spool tag!")
               tray["unmapped_bambu_tag"] = tray_uuid
               tray["issue"] = True
               clear_active_spool_for_tray(ams['id'], tray['id'])
               clear_ams_tray_assignment(ams['id'], tray['id'])
           else:
-            print(
+            log(
                 f"    - [{num2letter(ams['id'])}{tray['id']}]")
-            print("      - No Spool!")
+            log("      - No Spool!")
 
   except Exception:
     traceback.print_exc()
@@ -478,7 +478,7 @@ def on_message(client, userdata, msg):
 def on_connect(client, userdata, flags, rc):
   global MQTT_CLIENT_CONNECTED
   MQTT_CLIENT_CONNECTED = True
-  print("Connected with result code " + str(rc))
+  log("Connected with result code " + str(rc))
   client.subscribe(f"device/{PRINTER_ID}/report")
   publish(client, GET_VERSION)
   publish(client, PUSH_ALL)
@@ -486,7 +486,7 @@ def on_connect(client, userdata, flags, rc):
 def on_disconnect(client, userdata, rc):
   global MQTT_CLIENT_CONNECTED
   MQTT_CLIENT_CONNECTED = False
-  print("Disconnected with result code " + str(rc))
+  log("Disconnected with result code " + str(rc))
   
 def async_subscribe():
   global MQTT_CLIENT
@@ -507,12 +507,12 @@ def async_subscribe():
   while True:
     while not MQTT_CLIENT_CONNECTED:
       try:
-          print("🔄 Trying to connect ...", flush=True)
+          log("🔄 Trying to connect ...", flush=True)
           MQTT_CLIENT.connect(PRINTER_IP, 8883, MQTT_KEEPALIVE)
           MQTT_CLIENT.loop_start()
           
       except Exception as exc:
-          print(f"⚠️ connection failed: {exc}, new try in 15 seconds...", flush=True)
+          log(f"⚠️ connection failed: {exc}, new try in 15 seconds...", flush=True)
 
       time.sleep(15)
 

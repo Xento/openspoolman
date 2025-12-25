@@ -25,6 +25,7 @@ import spoolman_client
 import spoolman_service
 import test_data
 from spoolman_service import augmentTrayDataWithSpoolMan, trayUid, normalize_color_hex
+from logger import log
 
 _TEST_PATCH_CONTEXT = None
 if test_data.TEST_MODE_FLAG:
@@ -431,7 +432,7 @@ def setActiveSpool(ams_id, tray_id, spool_data):
   # ams_message["print"]["tray_sub_brands"] = filament_brand_code["sub_brand_code"]
   ams_message["print"]["tray_sub_brands"] = ""
 
-  print(ams_message)
+  log(ams_message)
   mqtt_bambulab.publish(mqtt_bambulab.getMqttClient(), ams_message)
 
 @app.route("/")

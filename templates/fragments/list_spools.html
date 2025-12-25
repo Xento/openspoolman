@@ -153,7 +153,8 @@
     try {
       JSON.parse(stateInput.value).forEach((material) => selected.add(material));
     } catch (error) {
-      console.warn('Failed to parse selected materials', error);
+      const ts = new Date().toISOString();
+      console.warn(`[${ts}] Failed to parse selected materials`, error);
     }
   }
 
