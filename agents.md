@@ -168,6 +168,7 @@ If matching fails:
 - Keep functions small and testable.
 - Prefer explicit types where they improve clarity (especially for payloads).
 - Validate external payloads defensively (missing keys, type mismatches).
+- When reading runtime state (e.g., `PRINTER_STATE`, MQTT payloads), prefer accessing the original object via `.get(...)` rather than copying into temporary locals unless the value needs transformation; this keeps guard logic close to the source and avoids stale snapshots.
 - Avoid introducing new dependencies without a strong justification.
 - Keep logging structured and helpful; never leak secrets.
 

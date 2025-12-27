@@ -222,7 +222,7 @@ def processMessage(data):
   if "print" in data:    
     update_dict(PRINTER_STATE, data)
     
-    if "command" in data["print"] and data["print"]["command"] == "project_file" and "url" in data["print"]:
+    if data["print"].get("command") == "project_file" and data["print"].get("url"):
       PENDING_PRINT_METADATA = getMetaDataFrom3mf(data["print"]["url"])
       PENDING_PRINT_METADATA["print_type"] = PRINTER_STATE["print"].get("print_type")
       PENDING_PRINT_METADATA["task_id"] = PRINTER_STATE["print"].get("task_id")
@@ -232,7 +232,7 @@ def processMessage(data):
 
       print_id = insert_print(PRINTER_STATE["print"]["subtask_name"], "cloud", PENDING_PRINT_METADATA["image"])
 
-      if "use_ams" in PRINTER_STATE["print"] and PRINTER_STATE["print"]["use_ams"]:
+      if PRINTER_STATE["print"].get("use_ams"):
         PENDING_PRINT_METADATA["ams_mapping"] = PRINTER_STATE["print"]["ams_mapping"]
       else:
         PENDING_PRINT_METADATA["ams_mapping"] = [EXTERNAL_SPOOL_ID]
@@ -264,15 +264,12 @@ def processMessage(data):
     #  and ("tray_tar" in data["print"] and data["print"]["tray_tar"] != "255") and ("stg_cur" in data["print"] and data["print"]["stg_cur"] == 0 and PRINT_CURRENT_STAGE != 0):
     
     #TODO: What happens when printed from external spool, is ams and tray_tar set?
-    if ( "print_type" in PRINTER_STATE["print"] and PRINTER_STATE["print"]["print_type"] == "local" and
-        "print" in PRINTER_STATE_LAST
-      ):
+    if PRINTER_STATE.get("print", {}).get("print_type") == "local" and PRINTER_STATE_LAST.get("print"):
 
       if (
-          "gcode_state" in PRINTER_STATE["print"] and 
-          PRINTER_STATE["print"]["gcode_state"] == "RUNNING" and
-          PRINTER_STATE_LAST["print"]["gcode_state"] == "PREPARE" and 
-          "gcode_file" in PRINTER_STATE["print"]
+          PRINTER_STATE["print"].get("gcode_state") == "RUNNING" and
+          PRINTER_STATE_LAST["print"].get("gcode_state") == "PREPARE" and 
+          PRINTER_STATE["print"].get("gcode_file")
         ):
 
         if not PENDING_PRINT_METADATA:
@@ -317,54 +314,47 @@ def processMessage(data):
         #TODO 
     
       # When stage changed to "change filament" and PENDING_PRINT_METADATA is set
-      curr_tray_tar = None
-      prev_tray_tar = None
-      if "ams" in PRINTER_STATE["print"] and "tray_tar" in PRINTER_STATE["print"]["ams"]:
-        curr_tray_tar = PRINTER_STATE["print"]["ams"]["tray_tar"]
-      if "ams" in PRINTER_STATE_LAST["print"] and "tray_tar" in PRINTER_STATE_LAST["print"]["ams"]:
-        prev_tray_tar = PRINTER_STATE_LAST["print"]["ams"]["tray_tar"]
-
       if (PENDING_PRINT_METADATA and 
           (
-            ("stg_cur" in PRINTER_STATE["print"] and (int(PRINTER_STATE["print"]["stg_cur"]) == 4) and      # change filament stage (beginning of print)
+            (
+              int(PRINTER_STATE["print"].get("stg_cur", -1)) == 4 and      # change filament stage (beginning of print)
               ( 
-                "stg_cur" not in PRINTER_STATE_LAST["print"] or                                           # last stage not known
+                PRINTER_STATE_LAST["print"].get("stg_cur", -1) == -1 or                                           # last stage not known
                 (
-                  PRINTER_STATE_LAST["print"]["stg_cur"] != PRINTER_STATE["print"]["stg_cur"]             # stage has changed and last state was 255 (retract to ams)
-                  and "ams" in PRINTER_STATE_LAST["print"] and int(PRINTER_STATE_LAST["print"]["ams"]["tray_tar"]) == 255
+                  int(PRINTER_STATE_LAST["print"].get("stg_cur")) != int(PRINTER_STATE["print"].get("stg_cur")) and
+                  PRINTER_STATE_LAST["print"].get("ams", {}).get("tray_tar") == "255"             # stage has changed and last state was 255 (retract to ams)
                 )
-                or "ams" not in PRINTER_STATE_LAST["print"]                                               # ams not set in last state
+                or not PRINTER_STATE_LAST["print"].get("ams")                                               # ams not set in last state
               )
             )
             or                                                                                            # filament changes during printing are in mc_print_sub_stage
             (
-              "mc_print_sub_stage" in PRINTER_STATE_LAST["print"] and int(PRINTER_STATE_LAST["print"]["mc_print_sub_stage"]) == 4  # last state was change filament
-              and int(PRINTER_STATE["print"]["mc_print_sub_stage"]) == 2                                                           # current state 
+              int(PRINTER_STATE_LAST["print"].get("mc_print_sub_stage", -1)) == 4  # last state was change filament
+              and int(PRINTER_STATE["print"].get("mc_print_sub_stage", -1)) == 2                                                           # current state 
             )
             or (
-              "ams" in PRINTER_STATE["print"] and int(PRINTER_STATE["print"]["ams"]["tray_tar"]) == 254
+              PRINTER_STATE["print"].get("ams", {}).get("tray_tar") == "254"
             )
             or 
             (
-              int(PRINTER_STATE["print"]["stg_cur"]) == 24 and int(PRINTER_STATE_LAST["print"]["stg_cur"]) == 13
+              int(PRINTER_STATE["print"].get("stg_cur", -1)) == 24 and int(PRINTER_STATE_LAST["print"].get("stg_cur", -1)) == 13
             )
             or (
-              "stg_cur" in PRINTER_STATE["print"] and int(PRINTER_STATE["print"]["stg_cur"]) == 4 and
-              curr_tray_tar is not None and curr_tray_tar != "255" and
-              (prev_tray_tar is None or prev_tray_tar != curr_tray_tar)
+              int(PRINTER_STATE["print"].get("stg_cur", -1)) == 4 and
+              PRINTER_STATE["print"].get("ams", {}).get("tray_tar") not in (None, "255") and
+              (PRINTER_STATE_LAST["print"].get("ams", {}).get("tray_tar") is None or PRINTER_STATE_LAST["print"].get("ams", {}).get("tray_tar") != PRINTER_STATE["print"].get("ams", {}).get("tray_tar"))
             )
 
           )
       ):
-        if "ams" in PRINTER_STATE["print"]:
+        if PRINTER_STATE["print"].get("ams"):
             mapped = False
-            tray_tar_value = PRINTER_STATE["print"]["ams"].get("tray_tar")
+            tray_tar_value = PRINTER_STATE["print"].get("ams").get("tray_tar")
             if tray_tar_value and tray_tar_value != "255":
                 mapped = map_filament(int(tray_tar_value))
             FILAMENT_TRACKER.apply_ams_mapping(PENDING_PRINT_METADATA.get("ams_mapping") or [])
             if mapped:
                 PENDING_PRINT_METADATA["complete"] = True
-          
 
     if PENDING_PRINT_METADATA and PENDING_PRINT_METADATA.get("complete"):
       if TRACK_LAYER_USAGE:
