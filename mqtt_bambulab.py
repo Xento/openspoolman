@@ -242,9 +242,13 @@ def processMessage(data):
 
       for id, filament in PENDING_PRINT_METADATA["filaments"].items():
         parsed_grams = _parse_grams(filament.get("used_g"))
+        parsed_length_m = _parse_grams(filament.get("used_m"))
+        estimated_length_mm = parsed_length_m * 1000 if parsed_length_m is not None else None
         grams_used = parsed_grams if parsed_grams is not None else 0.0
+        length_used = estimated_length_mm if estimated_length_mm is not None else 0.0
         if TRACK_LAYER_USAGE:
           grams_used = 0.0
+          length_used = 0.0
         insert_filament_usage(
             print_id,
             filament["type"],
@@ -252,6 +256,8 @@ def processMessage(data):
             grams_used,
             id,
             estimated_grams=parsed_grams,
+            length_used=length_used,
+            estimated_length=estimated_length_mm,
         )
   
     #if ("gcode_state" in data["print"] and data["print"]["gcode_state"] == "RUNNING") and ("print_type" in data["print"] and data["print"]["print_type"] != "local") \
@@ -288,9 +294,13 @@ def processMessage(data):
 
             for id, filament in PENDING_PRINT_METADATA["filaments"].items():
               parsed_grams = _parse_grams(filament.get("used_g"))
+              parsed_length_m = _parse_grams(filament.get("used_m"))
+              estimated_length_mm = parsed_length_m * 1000 if parsed_length_m is not None else None
               grams_used = parsed_grams if parsed_grams is not None else 0.0
+              length_used = estimated_length_mm if estimated_length_mm is not None else 0.0
               if TRACK_LAYER_USAGE:
                 grams_used = 0.0
+                length_used = 0.0
               insert_filament_usage(
                   print_id,
                   filament["type"],
@@ -298,6 +308,8 @@ def processMessage(data):
                   grams_used,
                   id,
                   estimated_grams=parsed_grams,
+                  length_used=length_used,
+                  estimated_length=estimated_length_mm,
               )
 
             PENDING_PRINT_METADATA["tracking_started"] = True
@@ -354,7 +366,7 @@ def processMessage(data):
                 PENDING_PRINT_METADATA["complete"] = True
           
 
-    if PENDING_PRINT_METADATA and PENDING_PRINT_METADATA["complete"]:
+    if PENDING_PRINT_METADATA and PENDING_PRINT_METADATA.get("complete"):
       if TRACK_LAYER_USAGE:
         if PENDING_PRINT_METADATA.get("print_type") == "local":
           FILAMENT_TRACKER.apply_ams_mapping(PENDING_PRINT_METADATA.get("ams_mapping") or [])

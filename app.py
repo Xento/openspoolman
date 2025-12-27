@@ -573,15 +573,35 @@ def print_history():
   if READ_ONLY_MODE and all([ams_slot, print_id, spool_id]):
     return render_template('error.html', exception="Live read-only mode: updating print-to-spool assignments is disabled.")
 
+  def _consume_for_spool(spool_id_value, grams_value=None, length_value=None):
+    if spool_id_value is None:
+      return
+    if length_value is not None:
+      spoolman_client.consumeSpool(spool_id_value, use_length=length_value)
+    elif grams_value is not None:
+      spoolman_client.consumeSpool(spool_id_value, use_weight=grams_value)
+
   if all([ams_slot, print_id, spool_id]):
     filament = print_history_service.get_filament_for_slot(print_id, ams_slot)
     print_history_service.update_filament_spool(print_id, ams_slot, spool_id)
 
     if(filament["spool_id"] != int(spool_id) and (not old_spool_id or (old_spool_id and filament["spool_id"] == int(old_spool_id)))):
-      if old_spool_id and int(old_spool_id) != -1:
-        spoolman_client.consumeSpool(old_spool_id, filament["grams_used"] * -1)
+      grams_used = _to_float(filament.get("grams_used"))
+      length_used = _to_float(filament.get("length_used"))
+      use_length = length_used is not None and length_used > 0
 
-      spoolman_client.consumeSpool(spool_id, filament["grams_used"])
+      if old_spool_id and int(old_spool_id) != -1:
+        _consume_for_spool(
+            old_spool_id,
+            grams_value=-(grams_used or 0),
+            length_value=-(length_used or 0) if use_length else None,
+        )
+
+      _consume_for_spool(
+          spool_id,
+          grams_value=grams_used,
+          length_value=length_used if use_length else None,
+      )
 
   prints, total_prints = print_history_service.get_prints_with_filament(limit=per_page, offset=offset)
   layer_tracking_map = print_history_service.get_layer_tracking_for_prints([print["id"] for print in prints])

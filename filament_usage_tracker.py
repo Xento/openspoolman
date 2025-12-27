@@ -221,6 +221,7 @@ class FilamentUsageTracker:
     self.print_metadata = None
     self.print_id = None
     self.cumulative_grams_used = {}  # Track cumulative grams used per filament index
+    self.cumulative_length_used = {}  # Track cumulative length (mm) per filament index
     self._layer_tracking_total_layers = None
     self._total_usage_mm_per_filament = {}
     self._layer_tracking_predicted_total = None
@@ -329,6 +330,7 @@ class FilamentUsageTracker:
     clear_checkpoint()
     self.spent_layers = set()
     self.cumulative_grams_used = {}
+    self.cumulative_length_used = {}
 
     if use_ams:
       self.ams_mapping = ams_mapping or []
@@ -481,6 +483,7 @@ class FilamentUsageTracker:
     self.print_metadata = None
     self.print_id = None
     self.cumulative_grams_used = {}
+    self.cumulative_length_used = {}
     self._reset_layer_tracking_state()
     clear_checkpoint()
 
@@ -505,6 +508,7 @@ class FilamentUsageTracker:
     self.print_metadata = None
     self.print_id = None
     self.cumulative_grams_used = {}
+    self.cumulative_length_used = {}
     self._reset_layer_tracking_state()
     clear_checkpoint()
 
@@ -576,11 +580,14 @@ class FilamentUsageTracker:
     density = filament_data.get("density", 1.24)
     usage_grams = self._mm_to_grams(total_mm, diameter_mm, density)
 
+    usage_rounded = round(total_mm, 5)
     filament_key = filament + 1
     previous_grams = self.cumulative_grams_used.get(filament_key, 0.0)
     self.cumulative_grams_used[filament_key] = previous_grams + usage_grams
+    previous_length = self.cumulative_length_used.get(filament_key, 0.0)
+    cumulative_length = previous_length + usage_rounded
+    self.cumulative_length_used[filament_key] = cumulative_length
 
-    usage_rounded = round(total_mm, 5)
     grams_rounded = round(self.cumulative_grams_used[filament_key], 2)
     log(f"[filament-tracker] Consume spool {spool_id} for filament {filament} with {usage_rounded}mm ({grams_rounded}g cumulative) (tray_uid={tray_uid})")
 
@@ -588,7 +595,7 @@ class FilamentUsageTracker:
 
     if self.print_id:
       update_filament_spool(self.print_id, filament_key, spool_id)
-      update_filament_grams_used(self.print_id, filament_key, grams_rounded)
+      update_filament_grams_used(self.print_id, filament_key, grams_rounded, length_used=cumulative_length)
 
     self._filament_spool_id_map[filament] = spool_id
     self._spool_data_cache[spool_id] = spool_data
@@ -610,6 +617,8 @@ class FilamentUsageTracker:
     self._layer_tracking_start_time = None
     self._pending_usage_mm = {}
     self._mc_remaining_time_minutes = None
+    self.cumulative_length_used = {}
+    self.cumulative_grams_used = {}
 
   def _is_abort_state(self, state: str | None) -> bool:
     if not state:
@@ -817,8 +826,14 @@ class FilamentUsageTracker:
     
     # Initialize cumulative usage from database to continue tracking correctly
     self.cumulative_grams_used = {}
+    self.cumulative_length_used = {}
     if self.print_id:
       existing_usage = get_all_filament_usage_for_print(self.print_id)
-      for ams_slot, grams_used in existing_usage.items():
-        self.cumulative_grams_used[ams_slot] = grams_used
-        log(f"[filament-tracker] Resumed cumulative usage for filament {ams_slot}: {grams_used}g")
+      for ams_slot, usage in existing_usage.items():
+        grams_value = usage.get("grams_used") if isinstance(usage, dict) else usage
+        length_value = usage.get("length_used") if isinstance(usage, dict) else None
+        if grams_value is not None:
+          self.cumulative_grams_used[ams_slot] = grams_value
+        if length_value is not None:
+          self.cumulative_length_used[ams_slot] = length_value
+        log(f"[filament-tracker] Resumed cumulative usage for filament {ams_slot}: {grams_value}g, {length_value or 0}mm")

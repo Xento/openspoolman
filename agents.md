@@ -234,7 +234,13 @@ For AUTO_SPEND / tracking:
 
 ---
 
-## 12) When you are unsure
+## 12) AMS tray assignment behavior
+- Cloud prints already contain `ams_mapping` in their `project_file` payload, so OpenSpoolMan can map every logical filament to a tray immediately.
+- Local prints (LAN mode) do not ship `ams_mapping` upfront, so we delay applying AMS mappings until the printer reports a concrete `tray_tar` (typically during stage 4 / filament change). That’s why the MQTT log often shows `tray_tar=255` for seconds and only flips to the real tray once the tray itself is loaded.
+
+---
+
+## 13) When you are unsure
 Prefer these options, in order:
 1. Add instrumentation and tests rather than guessing.
 2. Make the smallest change that improves correctness.
