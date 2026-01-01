@@ -115,12 +115,12 @@
                         {% set length_title = None %}
                         {% set length_value = filament['length_used'] %}
                         {% if length_value is not none and (length_value|float) > 0 %}
-                        {% set length_title = "Length: " + ('%.0f' | format(length_value|float)) + "mm" %}
+                        {% set length_title = "Length: " + '{:,.0f}'.format(length_value|float) + "mm" %}
                         {% endif %}
                         {% set expected_title = None %}
                         {% set expected_length = filament['estimated_length'] %}
                         {% if expected_length is not none and (expected_length|float) > 0 %}
-                        {% set expected_title = "Slicer metadata length: " + ('%.0f' | format(expected_length|float)) + "mm" %}
+                        {% set expected_title = "Slicer metadata length: " + '{:,.0f}'.format(expected_length|float) + "mm" %}
                         {% endif %}
                         <div class="card">
                             <div class="card-body">
@@ -172,7 +172,7 @@
                                                             </span>
                                                             {% if expected_length is not none and (expected_length|float) > 0 %}
                                                             <span class="text-muted small d-inline-block ms-1">
-                                                                (~{{ '%.0f' | format(expected_length|float) }}mm)
+                                                                (~{{ '{:,.0f}'.format(expected_length|float) }}mm)
                                                             </span>
                                                             {% endif %}
                                                         {% endif %}
