@@ -140,9 +140,9 @@ def color_distance(color1, color2):
 
   return math.sqrt(sum((a - b) ** 2 for a, b in zip(lab1, lab2)))
 
-def _log_filament_mismatch(tray_data: dict, spool: dict) -> None:
+def _log_filament_mismatch(tray_data: dict, spool: dict, color_difference: float | None = None) -> None:
   try:
-    data_path = Path("data/filament_mismatch.json")
+    data_path = Path("logs/filament_mismatch.json")
     data_path.parent.mkdir(parents=True, exist_ok=True)
     timestamp = datetime.utcnow().isoformat() + "Z"
     
@@ -151,6 +151,7 @@ def _log_filament_mismatch(tray_data: dict, spool: dict) -> None:
         "timestamp": timestamp,
         "tray": tray_data,
         "spool": spool,
+        "color_difference": color_difference,
       }, f)
   except Exception:
     pass
@@ -282,6 +283,10 @@ def augmentTrayDataWithSpoolMan(spool_list, tray_data, ams_id, tray_id):
         tray_data["issue"] = True
         break
 
+      color_difference = None
+      has_multi_color = "multi_color_hexes" in spool["filament"]
+      if not has_multi_color:
+        color_difference = color_distance(tray_data.get("tray_color"), tray_data["spool_color"])
       spool_material_full_norm_cmp = _clean_basic(spool_material_full_norm)
       spool_type_norm_cmp = _clean_basic(spool_type_norm) if spool_type_norm else ""
 
@@ -315,14 +320,12 @@ def augmentTrayDataWithSpoolMan(spool_list, tray_data, ams_id, tray_id):
       tray_data["mismatch"] = mismatch_detected and not DISABLE_MISMATCH_WARNING
       tray_data["issue"] = tray_data["mismatch"]
       if mismatch_detected:
-        _log_filament_mismatch(tray_data, spool)
+        _log_filament_mismatch(tray_data, spool, color_difference=color_difference)
       tray_data["matched"] = True
 
-      if "multi_color_hexes" not in spool["filament"]:
-        color_difference = color_distance(tray_data.get("tray_color"), tray_data["spool_color"] )
-        if  color_difference is not None and color_difference > COLOR_DISTANCE_TOLERANCE:
-          tray_data["color_mismatch"] = True
-          tray_data["color_mismatch_message"] = "Colors are not similar."
+      if color_difference is not None and color_difference > COLOR_DISTANCE_TOLERANCE:
+        tray_data["color_mismatch"] = True
+        tray_data["color_mismatch_message"] = "Colors are not similar."
 
       break
 
