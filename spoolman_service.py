@@ -1,4 +1,5 @@
 import math
+import os
 import re
 from config import (
     PRINTER_ID,
@@ -20,6 +21,10 @@ SPOOLS = {}
 SPOOLMAN_SETTINGS = {}
 
 
+def _use_test_data() -> bool:
+  return os.getenv("OPENSPOOLMAN_TEST_DATA") == "1"
+
+
 def clear_active_spool_for_tray(ams_id: int, tray_id: int) -> None:
   """
   Remove any SpoolMan spool that is currently tagged with the given tray UID.
@@ -28,7 +33,11 @@ def clear_active_spool_for_tray(ams_id: int, tray_id: int) -> None:
   for spool in fetchSpools(cached=True):
     extras = spool.get("extra") or {}
     if extras.get("active_tray") == target:
-      spoolman_client.patchExtraTags(spool["id"], extras, {"active_tray": json.dumps("")})
+      if _use_test_data():
+        import test_data
+        test_data.patchExtraTags(spool["id"], extras, {"active_tray": json.dumps("")})
+      else:
+        spoolman_client.patchExtraTags(spool["id"], extras, {"active_tray": json.dumps("")})
       spool.setdefault("extra", {})["active_tray"] = json.dumps("")
       break
 
@@ -416,20 +425,34 @@ def setActiveTray(spool_id, spool_extra, ams_id, tray_id):
     spool_extra = {}
 
   if not spool_extra.get("active_tray"):
-    spoolman_client.patchExtraTags(spool_id, spool_extra, {
+    if _use_test_data():
+      import test_data
+      test_data.patchExtraTags(spool_id, spool_extra, {
+        "active_tray": json.dumps(trayUid(ams_id, tray_id)),
+      })
+    else:
+      spoolman_client.patchExtraTags(spool_id, spool_extra, {
       "active_tray": json.dumps(trayUid(ams_id, tray_id)),
     })
 
     # Remove active tray from inactive spools
     for old_spool in fetchSpools(cached=False):
       if spool_id != old_spool["id"] and old_spool.get("extra") and old_spool["extra"].get("active_tray") and json.loads(old_spool["extra"]["active_tray"]) == trayUid(ams_id, tray_id):
-        spoolman_client.patchExtraTags(old_spool["id"], old_spool["extra"], {"active_tray": json.dumps("")})
+        if _use_test_data():
+          import test_data
+          test_data.patchExtraTags(old_spool["id"], old_spool["extra"], {"active_tray": json.dumps("")})
+        else:
+          spoolman_client.patchExtraTags(old_spool["id"], old_spool["extra"], {"active_tray": json.dumps("")})
   else:
     log("Skipping set active tray")
 
 # Fetch spools from spoolman
 def fetchSpools(cached=False):
   global SPOOLS
+  if _use_test_data():
+    import test_data
+    return test_data.fetchSpools()
+
   if not cached or not SPOOLS:
     SPOOLS = spoolman_client.fetchSpoolList()
     
@@ -459,6 +482,10 @@ def fetchSpools(cached=False):
 
 def getSettings(cached=False):
   global SPOOLMAN_SETTINGS
+  if _use_test_data():
+    import test_data
+    return test_data.getSettings()
+
   if not cached or not SPOOLMAN_SETTINGS:
     SPOOLMAN_SETTINGS = spoolman_client.fetchSettings()
     SPOOLMAN_SETTINGS['currency_symbol'] = get_currency_symbol(SPOOLMAN_SETTINGS["currency"])
