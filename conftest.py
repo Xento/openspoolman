@@ -1,6 +1,25 @@
 import pytest
 
 import test_data
+import socket
+
+
+@pytest.fixture
+def unused_tcp_port_factory():
+    """Return a factory that provides unique, currently unused TCP ports."""
+    allocated = set()
+
+    def factory():
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.bind(("", 0))
+            port = s.getsockname()[1]
+        # avoid immediate reuse in the same test run
+        if port in allocated:
+            return factory()
+        allocated.add(port)
+        return port
+
+    return factory
 
 
 def pytest_addoption(parser):

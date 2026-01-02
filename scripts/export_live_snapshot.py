@@ -1,9 +1,11 @@
 import argparse
+import importlib
 import json
 import os
 import sys
 import time
 from pathlib import Path
+from logger import log
 
 # Ensure repository root is importable and the working directory matches the project root
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -13,10 +15,18 @@ if str(REPO_ROOT) not in sys.path:
 # Align the working directory so relative paths (e.g., SQLite DBs) resolve like running from repo root
 os.chdir(REPO_ROOT)
 
-from mqtt_bambulab import getLastAMSConfig, getPrinterModel, init_mqtt, isMqttClientConnected
-from print_history import get_prints_with_filament
-from spoolman_service import getSettings
-from spoolman_client import fetchSpoolList
+mqtt_bambulab = importlib.import_module("mqtt_bambulab")
+print_history = importlib.import_module("print_history")
+spoolman_service = importlib.import_module("spoolman_service")
+spoolman_client = importlib.import_module("spoolman_client")
+
+getLastAMSConfig = mqtt_bambulab.getLastAMSConfig
+getPrinterModel = mqtt_bambulab.getPrinterModel
+init_mqtt = mqtt_bambulab.init_mqtt
+isMqttClientConnected = mqtt_bambulab.isMqttClientConnected
+get_prints_with_filament = print_history.get_prints_with_filament
+getSettings = spoolman_service.getSettings
+fetchSpoolList = spoolman_client.fetchSpoolList
 
 
 DEFAULT_OUTPUT = Path("data/live_snapshot.json")
@@ -49,9 +59,9 @@ def export_snapshot(path: Path, include_prints: bool = True) -> None:
     if wait_for_mqtt_ready():
         last_ams_config = wait_for_ams_data()
         if not (last_ams_config.get("ams") or last_ams_config.get("vt_tray")):
-            print("⚠️ AMS data not received before timeout; continuing without trays")
+            log("⚠️ AMS data not received before timeout; continuing without trays")
     else:
-        print("⚠️ MQTT connection not ready; continuing without AMS tray data")
+        log("⚠️ MQTT connection not ready; continuing without AMS tray data")
 
     spools = fetchSpoolList()
     for spool in spools:
@@ -85,7 +95,7 @@ def export_snapshot(path: Path, include_prints: bool = True) -> None:
     with path.open("w", encoding="utf-8") as f:
         json.dump(snapshot, f, ensure_ascii=False, indent=2)
 
-    print(f"✅ Wrote live snapshot to {path}")
+    log(f"✅ Wrote live snapshot to {path}")
 
 
 def main() -> int:
@@ -95,7 +105,7 @@ def main() -> int:
     args = parser.parse_args()
 
     if os.getenv("OPENSPOOLMAN_TEST_DATA") == "1":
-        print("⚠️ OPENSPOOLMAN_TEST_DATA is set; run against a live instance to snapshot real data")
+        log("⚠️ OPENSPOOLMAN_TEST_DATA is set; run against a live instance to snapshot real data")
         return 1
 
     export_snapshot(args.output, include_prints=not args.skip_prints)

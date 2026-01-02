@@ -40,16 +40,31 @@
         <div class="text-start">
           <div class="fw-semibold">Filament type mismatch</div>
           <small>
-            AMS reports <span class="text-primary fw-semibold">{{ tray_data.tray_type }}</span>{% if tray_data.tray_sub_brand %} <span class="text-muted">(starts at {{ tray_data.tray_sub_brand }})</span>{% endif %}, but the assigned spool is {% if tray_data.spool_material %} <span class="text-success fw-semibold">{{ tray_data.spool_material }}</span>{% if tray_data.spool_sub_brand %} <span class="text-muted">({{ tray_data.spool_sub_brand }})</span>{% endif %}{% endif %}.
+            AMS reports <span class="fw-semibold">{{ tray_data.tray_type }}</span>{% if tray_data.tray_sub_brand %} <span class="text-muted">{{ tray_data.tray_sub_brand }}</span>{% endif %}, but the assigned spool is {% if tray_data.spool_material %} <span class="fw-semibold">{{ tray_data.spool_material }}</span>{% if tray_data.spool_sub_brand %} <span>{{ tray_data.spool_sub_brand }}</span>{% endif %}{% endif %}.
           </small>
         </div>
       </div>
     {% endif %}
+    {% if tray_data.ams_material_missing %}
+      <div class="alert alert-warning d-flex align-items-start py-2 mb-3">
+        <i class="bi bi-info-circle-fill text-warning me-2 fs-5"></i>
+        <div class="text-start">
+          <div class="fw-semibold">No AMS material selected</div>
+          <small>{{ tray_data.ams_material_missing_message }}</small>
+        </div>
+      </div>
+    {% endif %}
     <!-- Typ & Hersteller -->
-    {% if tray_data.tray_type and tray_data.spool_material %}
+    {% if tray_data.spool_material %}
       <div class="small text-muted text-center mb-2">
+          {% if tray_data.spool_id %}#{{ tray_data.spool_id }} {% endif %}
           {{ tray_data.spool_material }}{% if tray_data.spool_sub_brand %} - {{ tray_data.spool_sub_brand }}{% endif %}
           {% if tray_data.vendor %} - {{ tray_data.vendor }}{% endif %}
+      </div>
+    {% elif tray_data.unmapped_bambu_tag %}
+      <div class="small text-muted text-center mb-2">
+          <span class="fw-semibold text-warning">Unknown spool detected</span><br>
+          Bambu Lab{% if tray_data.bambu_material %} - {{ tray_data.bambu_material }}{% endif %}{% if tray_data.bambu_sub_brand %} - {{ tray_data.bambu_sub_brand }}{% endif %}
       </div>
     {% else %}
       <div class="small text-muted text-center mb-2 tray-empty">
@@ -58,7 +73,7 @@
     {% endif %}
 
     <div class="row align-items-center text-center text-sm-start">
-      {% if tray_data.tray_type and tray_data.spool_material %}
+      {% if tray_data.spool_material %}
         <!-- Farbname + Badge -->
         <div class="col-12 col-xxl-5 d-flex flex-column align-items-center mb-2 mb-sm-0">
           <!-- Farbname -->
@@ -78,11 +93,15 @@
             </div>
           {% else %}
             <!-- Single Color Badge -->
-            <span class="badge d-inline-block p-2"
-                  style="background-color: #{{ tray_data.spool_color }};
-                         color: {% if color_is_dark(tray_data.spool_color) %}#FFFFFF{% else %}#000000{% endif %}">
-              #{{ tray_data.tray_color | upper }}
-            </span>
+            {% if tray_data.spool_color %}
+              <span class="badge d-inline-block p-2"
+                    style="background-color: #{{ tray_data.spool_color }};
+                           color: {% if color_is_dark(tray_data.spool_color) %}#FFFFFF{% else %}#000000{% endif %}">
+                #{{ tray_data.spool_color | upper }}
+              </span>
+            {% else %}
+              <span class="badge d-inline-block p-2 badge-missing-color" title="Color not set"></span>
+            {% endif %}
           {% endif %}
         </div>
 
@@ -97,10 +116,25 @@
           <div class="mt-2 d-flex flex-column flex-sm-row">
             <div class="me-sm-1">Remaining:</div>
             {% if AUTO_SPEND and tray_data.matched %}
-              <div class="fw-bold">{{ tray_data.remaining_weight|round }}g</div>
+              <div class="fw-bold">{{ tray_data.remaining_weight|round(1) }}g</div>
             {% else %}
               <div class="fw-bold">{{ tray_data.remain }}%</div>
             {% endif %}
+          </div>
+        </div>
+      {% elif tray_data.unmapped_bambu_tag %}
+        {% set ams_model = AMS_MODELS_BY_ID.get(ams_id) %}
+        {% set hide_unmapped_remaining_percent = ams_model == "AMS Lite" %}
+        <div class="col-12">
+          {% if not hide_unmapped_remaining_percent and (tray_data.remain is defined) %}
+            <div class="text-center mb-3">
+              <div class="text-muted small">Remaining</div>
+              <div class="fw-bold">{{ tray_data.remain }}%</div>
+            </div>
+          {% endif %}
+          <div class="d-flex justify-content-center align-items-center" style="min-height: 120px;">
+            <a class="btn btn-warning"
+               href="{{ url_for('assign_bambu_spool', ams=ams_id, tray=tray_id, tag=tray_data.unmapped_bambu_tag) }}">Link to Spoolman</a>
           </div>
         </div>
       {% endif %}

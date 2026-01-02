@@ -21,6 +21,43 @@
             ],
             "jinja": true,
             "autoStartBrowser": false
+        },
+        {
+            "name": "Debug MQTT Replay",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "pytest",
+            "console": "integratedTerminal",
+            "env": {
+                "MQTT_LOG_PRINTER": "${input:printerName}",
+                "MQTT_LOG_FIRMWARE": "${input:firmwareVersion}",
+                "MQTT_LOG_FILE": "${input:mqttLogFile}"
+            },
+            "args": [
+                "${workspaceFolder}/tests/test_mqtt_replay.py",
+                "--maxfail=1",
+                "--capture=no"
+            ]
+        }
+    ],
+    "inputs": [
+        {
+            "id": "printerName",
+            "type": "promptString",
+            "description": "Printer directory under tests/MQTT (e.g. A1) or empty for all",
+            "default": "A1"
+        },
+        {
+            "id": "firmwareVersion",
+            "type": "promptString",
+            "description": "Firmware folder (e.g. 01.07.00.00)",
+            "default": "01.07.00.00"
+        },
+        {
+            "id": "mqttLogFile",
+            "type": "promptString",
+            "description": "Log file (relative to MQTT/, e.g. A1/01.07.00.00/Testqube_local.log)",
+            "default": "A1/01.07.00.00/Testqube_local.log"
         }
     ]
 }
