@@ -164,6 +164,39 @@ def _parse_grams(value):
   except (TypeError, ValueError):
     return None
 
+def _mask_serial(serial: str | None, keep_chars: int = 3) -> str:
+  if not serial:
+    return ""
+  visible = serial[:keep_chars]
+  if len(serial) <= keep_chars:
+    return visible
+  return f"{visible}..."
+
+def _mask_sn_values(value):
+  if isinstance(value, dict):
+    for key, item in value.items():
+      if key.lower() == "sn" and isinstance(item, str):
+        value[key] = _mask_serial(item)
+      else:
+        _mask_sn_values(item)
+  elif isinstance(value, list):
+    for elem in value:
+      _mask_sn_values(elem)
+
+def _mask_mqtt_payload(payload: str) -> str:
+  try:
+    data = json.loads(payload)
+    _mask_sn_values(data)
+    masked = json.dumps(data, separators=(",", ":"))
+  except ValueError:
+    masked = payload
+
+  masked_serial = _mask_serial(PRINTER_ID)
+  if masked_serial:
+    masked = masked.replace(PRINTER_ID, masked_serial)
+
+  return masked
+
 def map_filament(tray_tar):
   global PENDING_PRINT_METADATA
   # Prüfen, ob ein Filamentwechsel aktiv ist (stg_cur == 4)
@@ -417,7 +450,7 @@ def on_message(client, userdata, msg):
       }
 
     if "print" in data:
-      append_to_rotating_file("/home/app/logs/mqtt.log", msg.payload.decode())
+      append_to_rotating_file("/home/app/logs/mqtt.log", _mask_mqtt_payload(msg.payload.decode()))
 
     #print(data)
 

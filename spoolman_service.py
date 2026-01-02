@@ -415,13 +415,13 @@ def setActiveTray(spool_id, spool_extra, ams_id, tray_id):
   if spool_extra is None:
     spool_extra = {}
 
-  if not spool_extra.get("active_tray") or json.loads(spool_extra.get("active_tray")) != trayUid(ams_id, tray_id):
+  if not spool_extra.get("active_tray"):
     spoolman_client.patchExtraTags(spool_id, spool_extra, {
       "active_tray": json.dumps(trayUid(ams_id, tray_id)),
     })
 
     # Remove active tray from inactive spools
-    for old_spool in fetchSpools(cached=True):
+    for old_spool in fetchSpools(cached=False):
       if spool_id != old_spool["id"] and old_spool.get("extra") and old_spool["extra"].get("active_tray") and json.loads(old_spool["extra"]["active_tray"]) == trayUid(ams_id, tray_id):
         spoolman_client.patchExtraTags(old_spool["id"], old_spool["extra"], {"active_tray": json.dumps("")})
   else:
