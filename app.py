@@ -575,17 +575,17 @@ def print_history():
 
   spool_list = mqtt_bambulab.fetchSpools()
 
-  for print in prints:
-    print["filament_usage"] = json.loads(print["filament_info"])
-    print["total_cost"] = 0
+  for history_entry in prints:
+    history_entry["filament_usage"] = json.loads(history_entry["filament_info"])
+    history_entry["total_cost"] = 0
 
-    for filament in print["filament_usage"]:
+    for filament in history_entry["filament_usage"]:
       if filament["spool_id"]:
         for spool in spool_list:
           if spool['id'] == filament["spool_id"]:
             filament["spool"] =  spool
             filament["cost"] = filament['grams_used'] * filament['spool']['cost_per_gram']
-            print["total_cost"] += filament["cost"]
+            history_entry["total_cost"] += filament["cost"]
             break
   
   total_pages = max(1, math.ceil(total_prints / per_page))
@@ -841,12 +841,12 @@ def print_history():
       )
 
   prints, total_prints = print_history_service.get_prints_with_filament(limit=per_page, offset=offset)
-  layer_tracking_map = print_history_service.get_layer_tracking_for_prints([print["id"] for print in prints])
+  layer_tracking_map = print_history_service.get_layer_tracking_for_prints([entry["id"] for entry in prints])
 
   spool_list = mqtt_bambulab.fetchSpools()
 
-  for print in prints:
-    tracking_row = layer_tracking_map.get(print["id"])
+  for history_entry in prints:
+    tracking_row = layer_tracking_map.get(history_entry["id"])
     if tracking_row:
       status_key = (tracking_row.get("status") or "").upper()
       status_label, status_badge = LAYER_TRACKING_STATUS_DISPLAY.get(
@@ -861,7 +861,7 @@ def print_history():
       if total_layers:
         progress = min(100, int(layers_printed / total_layers * 100))
 
-      print["layer_tracking"] = {
+      history_entry["layer_tracking"] = {
         "status_label": status_label,
         "status_badge": status_badge,
         "layers_printed": layers_printed,
@@ -873,29 +873,29 @@ def print_history():
         "actual_end_time": tracking_row.get("actual_end_time"),
       }
     else:
-      print["layer_tracking"] = None
+      history_entry["layer_tracking"] = None
 
-    filament_usage_data = json.loads(print["filament_info"])
+    filament_usage_data = json.loads(history_entry["filament_info"])
     filament_usage_sum = sum(
         _to_float(f.get("grams_used")) or 0 for f in filament_usage_data
     )
     tracking_total = (
-        _to_float(print["layer_tracking"]["filament_grams_total"])
-        if print["layer_tracking"]
+        _to_float(history_entry["layer_tracking"]["filament_grams_total"])
+        if history_entry["layer_tracking"]
         else None
     )
-    print["display_filament_total"] = tracking_total if tracking_total is not None else filament_usage_sum
+    history_entry["display_filament_total"] = tracking_total if tracking_total is not None else filament_usage_sum
 
-    print["filament_usage"] = filament_usage_data
-    print["total_cost"] = 0
+    history_entry["filament_usage"] = filament_usage_data
+    history_entry["total_cost"] = 0
 
-    for filament in print["filament_usage"]:
+    for filament in history_entry["filament_usage"]:
       if filament["spool_id"]:
         for spool in spool_list:
           if spool['id'] == filament["spool_id"]:
             filament["spool"] =  spool
             filament["cost"] = filament['grams_used'] * filament['spool']['cost_per_gram']
-            print["total_cost"] += filament["cost"]
+            history_entry["total_cost"] += filament["cost"]
             break
   
   total_pages = max(1, math.ceil(total_prints / per_page))

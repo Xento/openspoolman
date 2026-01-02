@@ -43,7 +43,7 @@ def log_with_timestamp(*args, sep=" ", end="\n", file=None, flush=True) -> None:
     Print a message with a leading timestamp, preserving the standard print API.
     """
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    builtins.print(f"[{timestamp}]", *args, sep=sep, end=end, file=file, flush=flush)
+    print(f"[{timestamp}]", *args, sep=sep, end=end, file=file, flush=flush)
 
 
 # Alias for brevity where logging-style prints are used

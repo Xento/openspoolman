@@ -1,5 +1,3 @@
-import builtins
-from functools import partial
 import os
 from pathlib import Path
 from dotenv import load_dotenv
@@ -9,8 +7,6 @@ from dotenv import load_dotenv
 load_dotenv(Path(__file__).resolve().parent / "config.env")
 EXTERNAL_SPOOL_AMS_ID = 255 # don't change
 EXTERNAL_SPOOL_ID = 254 #  don't change
-
-builtins.print = partial(builtins.print, flush=True)
 
 
 def _env_to_bool(name: str, default: bool = False) -> bool:
