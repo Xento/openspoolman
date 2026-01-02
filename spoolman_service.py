@@ -73,7 +73,11 @@ def getAMSFromTray(n):
 
 
 def normalize_color_hex(color_hex):
-  if not color_hex or isinstance(color_hex, list):
+  if not color_hex:
+    return ""
+  if isinstance(color_hex, list):
+    return ""
+  if not isinstance(color_hex, str):
     return ""
 
   color = color_hex.strip().upper()
