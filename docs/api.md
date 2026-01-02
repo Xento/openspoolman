@@ -1,6 +1,6 @@
 # OpenSpoolman JSON API
 
-Alle Endpoints liegen unter `/api` und geben folgendes Schema zurück:
+Alle Endpoints liegen unter `/api/v1` und geben folgendes Schema zurück:
 
 ```json
 // Erfolg
@@ -11,8 +11,7 @@ Alle Endpoints liegen unter `/api` und geben folgendes Schema zurück:
 ```
 
 ## Endpoints
-
-### GET /api/printers
+### GET `/api/v1/printers`
 Liefert die bekannte Druckerinstanz.
 ```json
 {
@@ -23,7 +22,7 @@ Liefert die bekannte Druckerinstanz.
 }
 ```
 
-### GET /api/printers/{printer_id}/ams
+### GET `/api/v1/printers/{printer_id}/ams`
 AMS-/Tray-Status für den Drucker.
 ```json
 {
@@ -46,7 +45,7 @@ AMS-/Tray-Status für den Drucker.
 }
 ```
 
-### GET /api/spools
+### GET `/api/v1/spools`
 Liste aller Spulen aus Spoolman.
 ```json
 {
@@ -67,7 +66,7 @@ Liste aller Spulen aus Spoolman.
 }
 ```
 
-### POST /api/printers/{printer_id}/ams/{tray_index}/assign
+### POST `/api/v1/printers/{printer_id}/ams/{tray_index}/assign`
 Spule einem Tray zuweisen. Optional `ams_id` im Body mitgeben, wenn mehrere AMS existieren.
 
 Request-Body:
@@ -89,7 +88,7 @@ Fehlerbeispiele:
 - 404 `SPOOL_NOT_FOUND`
 - 503 `PRINTER_OFFLINE` wenn MQTT-Verbindung fehlt
 
-### POST /api/printers/{printer_id}/ams/{tray_index}/unassign
+### POST `/api/v1/printers/{printer_id}/ams/{tray_index}/unassign`
 Zuweisung einer Spule von einem Tray entfernen. Optional `spool_id` angeben, sonst wird die aktive Spule anhand `active_tray` gesucht.
 
 Request-Body:

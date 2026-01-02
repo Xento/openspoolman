@@ -13,7 +13,7 @@ def client():
 
 
 def test_get_printers_ok():
-  resp = client().get("/api/printers")
+  resp = client().get("/api/v1/printers")
   assert resp.status_code == 200
   payload = resp.get_json()
   assert payload["success"] is True
@@ -21,7 +21,7 @@ def test_get_printers_ok():
 
 
 def test_get_ams_slots_ok():
-  resp = client().get("/api/printers/PRINTER_1/ams")
+  resp = client().get("/api/v1/printers/PRINTER_1/ams")
   assert resp.status_code == 200
   payload = resp.get_json()
   assert payload["success"] is True
@@ -30,7 +30,7 @@ def test_get_ams_slots_ok():
 
 
 def test_spools_list_ok():
-  resp = client().get("/api/spools")
+  resp = client().get("/api/v1/spools")
   assert resp.status_code == 200
   payload = resp.get_json()
   assert payload["success"] is True
@@ -41,11 +41,11 @@ def test_spools_list_ok():
 def test_assign_and_unassign_roundtrip():
   c = client()
 
-  spools = c.get("/api/spools").get_json()["data"]
+  spools = c.get("/api/v1/spools").get_json()["data"]
   spool_id = spools[0]["id"]
 
   assign_resp = c.post(
-      "/api/printers/PRINTER_1/ams/1/assign",
+      "/api/v1/printers/PRINTER_1/ams/1/assign",
       data=json.dumps({"spool_id": spool_id, "ams_id": 0}),
       content_type="application/json",
   )
@@ -53,7 +53,7 @@ def test_assign_and_unassign_roundtrip():
   assert assign_resp.get_json()["success"] is True
 
   unassign_resp = c.post(
-      "/api/printers/PRINTER_1/ams/1/unassign",
+      "/api/v1/printers/PRINTER_1/ams/1/unassign",
       data=json.dumps({"spool_id": spool_id}),
       content_type="application/json",
   )

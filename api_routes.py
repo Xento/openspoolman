@@ -11,7 +11,8 @@ import spoolman_service
 import test_data
 from config import EXTERNAL_SPOOL_AMS_ID, EXTERNAL_SPOOL_ID, PRINTER_ID, PRINTER_NAME
 
-api_bp = Blueprint("api", __name__, url_prefix="/api")
+API_VERSION = "v1"
+api_bp = Blueprint("api", __name__, url_prefix=f"/api/{API_VERSION}")
 
 READ_ONLY_MODE = (not test_data.test_data_active()) and os.getenv("OPENSPOOLMAN_LIVE_READONLY") == "1"
 ACTIVE_PRINTER_ID = (PRINTER_ID or "").upper() or "PRINTER_1"
