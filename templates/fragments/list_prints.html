@@ -11,8 +11,7 @@
             <div class = "printinfo">
                 <!-- Print Information -->
                 <div class="card-body">
-                    <div class="row">
-                      <!-- Block 1 -->
+                  <div class="row">
                       <div class="col-8 mb-3">
                         <div class="label-print-value">
                           <span class="label-print-inline fw-bold">Date: </span>
@@ -21,7 +20,6 @@
                         </div>
                       </div>
                 
-                      <!-- Block 2 -->
                       <div class="col-4 mb-3">
                         <div class="label-print-value">
                           <span class="label-print-inline fw-bold">Type: </span>
@@ -29,8 +27,9 @@
                           <div>{{ print['print_type'] }}</div>
                         </div>
                       </div>
-                
-                      <!-- Block 3 -->
+                    </div>
+
+                    <div class="row">
                       <div class="col-8 mb-3">
                         <div class="label-print-value">
                           <span class="label-print-inline fw-bold">File: </span>
@@ -38,69 +37,188 @@
                           <div>{{ print['file_name'] }}</div>
                         </div>
                       </div>
-                
-                      <!-- Block 4 -->
-                      {% if print['total_cost'] > 0 %}
                       <div class="col-4 mb-3">
-                        <div class="label-print-value">
-                          <span class="label-print-inline fw-bold">Cost: </span>
-                          <div class="label-print-stacked fw-bold">Cost</div>
-                          <div>{{ '%.2f' | format(print['total_cost']) }} {{currencysymbol}}</div>
+                        <div class="d-flex flex-column gap-2">
+                          {% set total_cost = print.get('total_cost', 0) %}
+                          {% if total_cost > 0 %}
+                          <div class="label-print-value">
+                            <span class="label-print-inline fw-bold">Cost: </span>
+                            <div class="label-print-stacked fw-bold">Cost</div>
+                            <div>{{ '%.2f' | format(total_cost) }} {{currencysymbol}}</div>
+                          </div>
+                          {% endif %}
+                          {% if print.get('display_filament_total') is not none %}
+                          <div class="label-print-value">
+                            <span class="label-print-inline fw-bold">Filament: </span>
+                            <div class="label-print-stacked fw-bold">Filament</div>
+                            <div>{{ '%.2f' | format(print['display_filament_total']) }}g</div>
+                          </div>
+                          {% endif %}
                         </div>
                       </div>
-                      {% endif %}
                     </div>
                   </div>
+                  {% if print['layer_tracking'] %}
+                  <div class="row">
+                    <div class="col-12 mb-3">
+                      <div class="layer-tracking border rounded p-3">
+                        <div class="d-flex justify-content-between align-items-center">
+                          <span class="fw-bold">Print status</span>
+                          <span class="badge bg-{{ print['layer_tracking']['status_badge'] }} fw-semibold">
+                            {{ print['layer_tracking']['status_label'] }}
+                          </span>
+                        </div>
+                        <div class="d-flex flex-wrap gap-3 small mt-3">
+                          <div class="text-nowrap">
+                            <span class="text-muted small d-block">Layers</span>
+                            <strong>{{ print['layer_tracking']['layers_printed'] }}</strong>
+                            <span class="text-muted">/ {{ print['layer_tracking']['total_layers'] or '-' }}</span>
+                          </div>
+                          <div class="text-nowrap">
+                            <span class="text-muted small d-block">Billed</span>
+                            {% if print['layer_tracking']['filament_grams_billed'] is not none %}
+                              {{ '%.2f' | format(print['layer_tracking']['filament_grams_billed']) }}g
+                            {% else %}
+                              - g
+                            {% endif %}
+                          </div>
+                          {% if print['layer_tracking']['filament_grams_total'] is not none %}
+                          <div class="text-nowrap">
+                            <span class="text-muted small d-block">Total</span>
+                            {{ '%.2f' | format(print['layer_tracking']['filament_grams_total']) }}g
+                          </div>
+                          {% endif %}
+                          {% if print['layer_tracking']['progress_percent'] is not none %}
+                          <div class="text-nowrap">
+                            <span class="text-muted small d-block">Progress</span>
+                            {{ print['layer_tracking']['progress_percent'] }}%
+                          </div>
+                          {% endif %}
+                        </div>
+                        <div class="text-muted small mt-2">
+                          {% if print['layer_tracking']['predicted_end_time'] %}
+                            Expected end: {{ print['layer_tracking']['predicted_end_time'] }}
+                          {% endif %}
+                          {% if print['layer_tracking']['actual_end_time'] %}
+                            {% if print['layer_tracking']['predicted_end_time'] %} · {% endif %}
+                            Finished: {{ print['layer_tracking']['actual_end_time'] }}
+                          {% endif %}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  {% endif %}
                 <!-- Filament Usage -->
                 <div class="card">
-                    <div class="card-body filament-container">
-                        {% for filament in print["filament_usage"] %}
+                <div class="card-body filament-container">
+                    {% for filament in print["filament_usage"] %}
+                        {% set length_title = None %}
+                        {% set length_value = filament['length_used'] %}
+                        {% if length_value is not none and (length_value|float) > 0 %}
+                        {% set length_title = "Length: " + '{:,.0f}'.format(length_value|float) + "mm" %}
+                        {% endif %}
+                        {% set expected_title = None %}
+                        {% set expected_length = filament['estimated_length'] %}
+                        {% if expected_length is not none and (expected_length|float) > 0 %}
+                        {% set expected_title = "Slicer metadata length: " + '{:,.0f}'.format(expected_length|float) + "mm" %}
+                        {% endif %}
                         <div class="card">
                             <div class="card-body">
                                 {% if filament['spool'] %}
                                     <a href="{{ url_for('spool_info', spool_id=filament['spool'].id) }}" class="nav-link link-body-emphasis">
                                         <div class="filament-info d-flex justify-content-between align-items-center">
-                                        <div class="d-flex">
-                                            <div class="spool-icon vertical small me-2">
-                                            {% if "multi_color_hexes" in filament['spool'].filament and filament['spool'].filament.multi_color_hexes is iterable and filament['spool'].filament.multi_color_hexes is not string %}
-                                                {% if filament['spool'].filament.multi_color_direction == "coaxial" %}
-                                                <div class="spool-icon horizontal small">
-                                                {% else %}
-                                                <div class="spool-icon vertical small">
-                                                {% endif %}
-                                                {% for color in filament['spool'].filament.multi_color_hexes %}
-                                                    <div style="background-color:#{{ color }}" title="#{{ color }}"></div>
-                                                {% endfor %}
+                                            <div class="d-flex align-items-start">
+                                                <div class="slicer-color-stack me-3">
+                                                    <span class="slicer-color-badge"
+                                                        style="background-color: {{ filament['color'] or '#000000' }};"
+                                                        title="Original Slicer Color"></span>
+                                                    {% if "multi_color_hexes" in filament['spool'].filament and filament['spool'].filament.multi_color_hexes is iterable and filament['spool'].filament.multi_color_hexes is not string %}
+                                                        {% if filament['spool'].filament.multi_color_direction == "coaxial" %}
+                                                            <div class="spool-icon horizontal small">
+                                                        {% else %}
+                                                            <div class="spool-icon vertical small">
+                                                        {% endif %}
+                                                        {% for color in filament['spool'].filament.multi_color_hexes %}
+                                                            <div style="background-color:#{{ color }}" title="#{{ color }}"></div>
+                                                        {% endfor %}
+                                                        </div>
+                                                    {% else %}
+                                                        {% set spool_color = filament['spool'].filament.color_hex %}
+                                                        <div class="spool-icon vertical small">
+                                                            {% if spool_color %}
+                                                            <div style="background-color:#{{ spool_color }};"
+                                                                 title="Spool color #{{ spool_color }}"></div>
+                                                            {% else %}
+                                                            <div class="missing-color" style="background-color: var(--bs-secondary, #6c757d);"
+                                                                 title="Color not set"></div>
+                                                            {% endif %}
+                                                        </div>
+                                                    {% endif %}
                                                 </div>
-                                            {% else %}
-                                                <span class="badge d-inline-block"
-                                                    style="background-color: #{{ filament['spool'].filament.color_hex }}; width: 20px; height: 50px;">
-                                                </span>
-                                            {% endif %}
+
+                                                <div class="spool-details">
+                                                    <h6>#{{ filament['spool'].id }} – {{ filament['spool'].filament.vendor.name }} – {{ filament['spool'].filament.material }}</h6>
+                                                <small class="d-flex flex-column gap-1">
+                                                    <span>{{ filament['spool'].filament.name }}</span>
+                                                    <span class="text-muted small">
+                                                        {% if filament['grams_used'] is not none %}
+                                                            <span {% if length_title %}title="{{ length_title }}"{% endif %}>
+                                                                {{ '%.2f' | format(filament['grams_used']) }}g printed
+                                                            </span>
+                                                        {% endif %}
+                                                        {% if filament['estimated_grams'] is not none %}
+                                                            <span {% if expected_title %}title="{{ expected_title }} (values from slicer metadata)"{% endif %}>
+                                                                / {{ '%.2f' | format(filament['estimated_grams']) }}g expected
+                                                            </span>
+                                                            {% if expected_length is not none and (expected_length|float) > 0 %}
+                                                            <span class="text-muted small d-inline-block ms-1">
+                                                                (~{{ '{:,.0f}'.format(expected_length|float) }}mm)
+                                                            </span>
+                                                            {% endif %}
+                                                        {% endif %}
+                                                    </span>
+                                                    <span class="text-muted small">
+                                                        {{ '%.2f' | format(filament['cost']|float) }} {{currencysymbol}}
+                                                    </span>
+                                                </small>
+                                                </div>
                                             </div>
 
-                                            <div class="spool-details">
-                                            <h6>#{{ filament['spool'].id }} – {{ filament['spool'].filament.vendor.name }} – {{ filament['spool'].filament.material }}</h6>
-                                            <small>{{ filament['spool'].filament.name }} – {{ filament['grams_used'] }}g – {{ '%.2f' | format(filament['cost']|float) }} {{currencysymbol}}</small>
-                                            </div>
-                                        </div>
-
-                                        <!-- Edit Button rechts -->
-                                        <a href="{{ url_for('print_select_spool', ams_slot=filament['ams_slot'], print_id=print['id'], old_spool_id=filament['spool'].id, change_spool=true )}}" class="btn btn-sm btn-outline-primary ms-3">
-                                            <i class="bi bi-pencil"></i>
-                                        </a>
+                                            <!-- Edit Button rechts -->
+                                            <a href="{{ url_for('print_select_spool', ams_slot=filament['ams_slot'], print_id=print['id'], old_spool_id=filament['spool'].id, change_spool=true )}}" class="btn btn-sm btn-outline-primary ms-3">
+                                                <i class="bi bi-pencil"></i>
+                                            </a>
                                         </div>
                                     </a>
                                 {% else %}
                                     <div class="spool-info">
                                         <a href="{{ url_for('print_select_spool', ams_slot=filament['ams_slot'], print_id=print['id']) }}" class="nav-link link-body-emphasis" title="Assign Spool">
                                             <div class="filament-info">
-                                                <div class="spool-icon vertical small">
-                                                    <div style="background-color: {{ filament['color'] }};"></div>
-                                                </div>
-                                                <div class="spool-details">
-                                                    <h6>No spool assigned - {{ filament['filament_type'] }}</h6>
-                                                    <small>{{ filament['grams_used'] }}g</small>
+                                                <div class="d-flex align-items-start">
+                                                    <div class="slicer-color-stack me-3">
+                                                        <span class="slicer-color-badge"
+                                                            style="background-color: {{ filament['color'] or '#000000' }};"
+                                                            title="Original Slicer Color"></span>
+                                                    </div>
+
+                                                    <div class="spool-details">
+                                                        <h6>No spool assigned - {{ filament['filament_type'] }}</h6>
+                                                    <small class="text-muted">
+                                                        <span {% if length_title %}title="{{ length_title }}"{% endif %}>
+                                                            {{ '%.2f' | format(filament['grams_used'] or 0) }}g printed
+                                                        </span>
+                                                        {% if filament['estimated_grams'] is not none %}
+                                                          <span {% if expected_title %}title="{{ expected_title }} (values from slicer metadata)"{% endif %}>
+                                                            / {{ '%.2f' | format(filament['estimated_grams']) }}g expected
+                                                          </span>
+                                                          {% if expected_length is not none and (expected_length|float) > 0 %}
+                                                          <span class="text-muted small d-inline-block ms-1">
+                                                            (~{{ '%.0f' | format(expected_length|float) }}mm)
+                                                          </span>
+                                                          {% endif %}
+                                                        {% endif %}
+                                                    </small>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </a>

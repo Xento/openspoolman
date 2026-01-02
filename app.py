@@ -3,10 +3,19 @@ import math
 import os
 import traceback
 import uuid
+from collections import Counter
 
 from flask import Flask, request, render_template, redirect, url_for
 
-from config import BASE_URL, AUTO_SPEND, SPOOLMAN_BASE_URL, EXTERNAL_SPOOL_AMS_ID, EXTERNAL_SPOOL_ID, PRINTER_NAME
+from config import (
+    BASE_URL,
+    AUTO_SPEND,
+    SPOOLMAN_BASE_URL,
+    EXTERNAL_SPOOL_AMS_ID,
+    EXTERNAL_SPOOL_ID,
+    PRINTER_NAME,
+    CLEAR_ASSIGNMENT_WHEN_EMPTY,
+)
 from filament import generate_filament_brand_code, generate_filament_temperatures
 from frontend_utils import color_is_dark
 from messages import AMS_FILAMENT_SETTING
@@ -15,7 +24,8 @@ import print_history as print_history_service
 import spoolman_client
 import spoolman_service
 import test_data
-from spoolman_service import augmentTrayDataWithSpoolMan, trayUid
+from spoolman_service import augmentTrayDataWithSpoolMan, trayUid, normalize_color_hex
+from logger import log
 
 _TEST_PATCH_CONTEXT = None
 if test_data.TEST_MODE_FLAG:
@@ -24,6 +34,13 @@ if test_data.TEST_MODE_FLAG:
 USE_TEST_DATA = test_data.test_data_active()
 READ_ONLY_MODE = (not USE_TEST_DATA) and os.getenv("OPENSPOOLMAN_LIVE_READONLY") == "1"
 
+LAYER_TRACKING_STATUS_DISPLAY = {
+    "RUNNING": ("Printing", "warning"),
+    "COMPLETED": ("Finished", "success"),
+    "ABORTED": ("Cancelled", "danger"),
+    "FAILED": ("Failed", "danger"),
+}
+
 if not USE_TEST_DATA:
   mqtt_bambulab.init_mqtt()
 
@@ -31,7 +48,76 @@ app = Flask(__name__)
 
 @app.context_processor
 def fronted_utilities():
-  return dict(SPOOLMAN_BASE_URL=SPOOLMAN_BASE_URL, AUTO_SPEND=AUTO_SPEND, color_is_dark=color_is_dark, BASE_URL=BASE_URL, EXTERNAL_SPOOL_AMS_ID=EXTERNAL_SPOOL_AMS_ID, EXTERNAL_SPOOL_ID=EXTERNAL_SPOOL_ID, PRINTER_MODEL=mqtt_bambulab.getPrinterModel(), PRINTER_NAME=PRINTER_NAME)
+  printer_model = mqtt_bambulab.getPrinterModel() or {}
+  ams_models_by_id = mqtt_bambulab.getDetectedAmsModelsById()
+
+  return dict(
+    SPOOLMAN_BASE_URL=SPOOLMAN_BASE_URL,
+    AUTO_SPEND=AUTO_SPEND,
+    AMS_MODELS_BY_ID=ams_models_by_id,
+    color_is_dark=color_is_dark,
+    BASE_URL=BASE_URL,
+    EXTERNAL_SPOOL_AMS_ID=EXTERNAL_SPOOL_AMS_ID,
+    EXTERNAL_SPOOL_ID=EXTERNAL_SPOOL_ID,
+    PRINTER_MODEL=printer_model,
+    PRINTER_NAME=PRINTER_NAME,
+  )
+
+
+def build_ams_labels(ams_data):
+  models_by_id = mqtt_bambulab.getDetectedAmsModelsById()
+  base_labels = []
+  for ams in ams_data:
+    ams_id = ams.get("id")
+    key = str(ams_id)
+    base_name = models_by_id.get(key) or models_by_id.get(ams_id) or "AMS"
+    base_labels.append(base_name)
+
+  totals = Counter(base_labels)
+  takt = Counter()
+  labels = {}
+
+  for ams, base_name in zip(ams_data, base_labels):
+    takt[base_name] += 1
+    suffix = f" {takt[base_name]}" if totals[base_name] > 1 else ""
+    label = f"{base_name}{suffix}"
+    ams_id = ams.get("id")
+    labels[str(ams_id)] = label
+    labels[ams_id] = label
+
+  return labels
+
+
+def _augment_tray(spool_list, tray_data, ams_id, tray_id):
+  augmentTrayDataWithSpoolMan(spool_list, tray_data, ams_id, tray_id)
+  if tray_data.get("unmapped_bambu_tag"):
+    spoolman_service.clear_active_spool_for_tray(ams_id, tray_id)
+    augmentTrayDataWithSpoolMan(spool_list, tray_data, ams_id, tray_id)
+  empty_condition = (
+      CLEAR_ASSIGNMENT_WHEN_EMPTY
+      and not tray_data.get("spool_material")
+      and not tray_data.get("unmapped_bambu_tag")
+  )
+  if empty_condition:
+    spoolman_service.clear_active_spool_for_tray(ams_id, tray_id)
+    mqtt_bambulab.clear_ams_tray_assignment(ams_id, tray_id)
+
+
+def _select_spool_color_hex(spool_data):
+  filament = spool_data.get("filament", {})
+  multi = filament.get("multi_color_hexes")
+  candidate = ""
+
+  if multi:
+    if isinstance(multi, (list, tuple)) and multi:
+      candidate = multi[0]
+    elif isinstance(multi, str):
+      candidate = multi.split(",")[0]
+
+  if not candidate:
+    candidate = filament.get("color_hex") or ""
+
+  return normalize_color_hex(candidate)
 
 @app.route("/issue")
 def issue():
@@ -65,12 +151,12 @@ def issue():
 
   active_spool = None
   for spool in spool_list:
-    if spool.get("extra") and spool["extra"].get("active_tray") and spool["extra"]["active_tray"] == json.dumps(trayUid(ams_id, tray_id)):
+    if spool.get("extra") and spool["extra"].get("active_tray") and spool["extra"].get("active_tray") == json.dumps(trayUid(ams_id, tray_id)):
       active_spool = spool
       break
 
   if tray_data:
-    augmentTrayDataWithSpoolMan(spool_list, tray_data, trayUid(ams_id, tray_id))
+    _augment_tray(spool_list, tray_data, ams_id, tray_id)
 
   #TODO: Determine issue
   #New bambulab spool
@@ -128,6 +214,73 @@ def fill():
 
     return render_template('fill.html', spools=spools, ams_id=ams_id, tray_id=tray_id, materials=materials, selected_materials=selected_materials)
 
+@app.route("/assign_bambu_spool")
+def assign_bambu_spool():
+  if not mqtt_bambulab.isMqttClientConnected():
+    return render_template('error.html', exception="MQTT is disconnected. Is the printer online?")
+
+  bambu_tag = request.args.get("tag")
+  ams_id = request.args.get("ams")
+  tray_id = request.args.get("tray")
+  spool_id = request.args.get("spool_id")
+
+  if not all([bambu_tag, ams_id, tray_id]):
+    return render_template('error.html', exception="Missing AMS ID, Tray ID, or Bambu spool tag.")
+
+  if bambu_tag == "00000000000000000000000000000000":
+    return render_template('error.html', exception="No Bambu spool was detected in this tray.")
+
+  if spool_id:
+    if READ_ONLY_MODE:
+      return render_template('error.html', exception="Live read-only mode: linking Bambu spools is disabled.")
+
+    spool_data = spoolman_client.getSpoolById(spool_id)
+    extras = spool_data.get("extra") or {}
+
+    spoolman_client.patchExtraTags(spool_id, extras, {
+      "tag": json.dumps(bambu_tag),
+    })
+
+    mqtt_bambulab.setActiveTray(spool_id, extras, ams_id, tray_id)
+    setActiveSpool(ams_id, tray_id, spool_data)
+
+    return redirect(url_for('home', success_message=f"Linked Bambu spool to SpoolMan spool {spool_id} on AMS {ams_id}, Tray {tray_id}."))
+
+  spools = mqtt_bambulab.fetchSpools()
+  materials = extract_materials(spools)
+  selected_materials = []
+
+  try:
+    last_ams_config = mqtt_bambulab.getLastAMSConfig()
+    default_material = None
+
+    if ams_id == EXTERNAL_SPOOL_AMS_ID:
+      default_material = last_ams_config.get("vt_tray", {}).get("tray_type")
+    else:
+      for ams in last_ams_config.get("ams", []):
+        if str(ams.get("id")) != str(ams_id):
+          continue
+
+        for tray in ams.get("tray", []):
+          if str(tray.get("id")) == str(tray_id):
+            default_material = tray.get("tray_type")
+            break
+
+    if default_material and default_material in materials:
+      selected_materials.append(default_material)
+  except Exception:
+    pass
+
+  return render_template(
+    'assign_bambu_spool.html',
+    spools=spools,
+    ams_id=ams_id,
+    tray_id=tray_id,
+    bambu_tag=bambu_tag,
+    materials=materials,
+    selected_materials=selected_materials,
+  )
+
 @app.route("/spool_info")
 def spool_info():
   if not mqtt_bambulab.isMqttClientConnected():
@@ -143,12 +296,12 @@ def spool_info():
 
     issue = False
     #TODO: Fix issue when external spool info is reset via bambulab interface
-    augmentTrayDataWithSpoolMan(spool_list, vt_tray_data, trayUid(EXTERNAL_SPOOL_AMS_ID, EXTERNAL_SPOOL_ID))
+    _augment_tray(spool_list, vt_tray_data, EXTERNAL_SPOOL_AMS_ID, EXTERNAL_SPOOL_ID)
     issue |= vt_tray_data.get("issue", False)
 
     for ams in ams_data:
       for tray in ams["tray"]:
-        augmentTrayDataWithSpoolMan(spool_list, tray, trayUid(ams["id"], tray["id"]))
+        _augment_tray(spool_list, tray, ams["id"], tray["id"])
         issue |= tray.get("issue", False)
 
     if not tag_id and not spool_id:
@@ -187,7 +340,8 @@ def spool_info():
       break
 
     if current_spool:
-      return render_template('spool_info.html', tag_id=tag_id, current_spool=current_spool, ams_data=ams_data, vt_tray_data=vt_tray_data, issue=issue)
+      ams_labels = build_ams_labels(ams_data)
+      return render_template('spool_info.html', tag_id=tag_id, current_spool=current_spool, ams_data=ams_data, vt_tray_data=vt_tray_data, issue=issue, ams_labels=ams_labels)
     else:
       return render_template('error.html', exception="Spool not found")
   except Exception as e:
@@ -245,11 +399,11 @@ def setActiveSpool(ams_id, tray_id, spool_data):
   ams_message["print"]["sequence_id"] = 0
   ams_message["print"]["ams_id"] = int(ams_id)
   ams_message["print"]["tray_id"] = int(tray_id)
-  
-  if "color_hex" in spool_data["filament"]:
-    ams_message["print"]["tray_color"] = spool_data["filament"]["color_hex"].upper() + "FF"
+  color_hex = _select_spool_color_hex(spool_data)
+  if color_hex:
+    ams_message["print"]["tray_color"] = color_hex.upper() + "FF"
   else:
-    ams_message["print"]["tray_color"] = spool_data["filament"]["multi_color_hexes"].split(',')[0].upper() + "FF"
+    ams_message["print"]["tray_color"] = ""
       
   if "nozzle_temperature" in spool_data["filament"]["extra"]:
     nozzle_temperature_range = spool_data["filament"]["extra"]["nozzle_temperature"].strip("[]").split(",")
@@ -278,7 +432,7 @@ def setActiveSpool(ams_id, tray_id, spool_data):
   # ams_message["print"]["tray_sub_brands"] = filament_brand_code["sub_brand_code"]
   ams_message["print"]["tray_sub_brands"] = ""
 
-  print(ams_message)
+  log(ams_message)
   mqtt_bambulab.publish(mqtt_bambulab.getMqttClient(), ams_message)
 
 @app.route("/")
@@ -295,15 +449,16 @@ def home():
     
     issue = False
     #TODO: Fix issue when external spool info is reset via bambulab interface
-    augmentTrayDataWithSpoolMan(spool_list, vt_tray_data, trayUid(EXTERNAL_SPOOL_AMS_ID, EXTERNAL_SPOOL_ID))
+    _augment_tray(spool_list, vt_tray_data, EXTERNAL_SPOOL_AMS_ID, EXTERNAL_SPOOL_ID)
     issue |= vt_tray_data["issue"]
 
     for ams in ams_data:
       for tray in ams["tray"]:
-        augmentTrayDataWithSpoolMan(spool_list, tray, trayUid(ams["id"], tray["id"]))
+        _augment_tray(spool_list, tray, ams["id"], tray["id"])
         issue |= tray["issue"]
 
-    return render_template('index.html', success_message=success_message, ams_data=ams_data, vt_tray_data=vt_tray_data, issue=issue)
+    ams_labels = build_ams_labels(ams_data)
+    return render_template('index.html', success_message=success_message, ams_data=ams_data, vt_tray_data=vt_tray_data, issue=issue, ams_labels=ams_labels)
   except Exception as e:
     traceback.print_exc()
     return render_template('error.html', exception=str(e))
@@ -389,6 +544,18 @@ def print_history():
   spoolman_settings = spoolman_service.getSettings()
 
   try:
+    def _to_float(value):
+      try:
+        return float(value)
+      except (TypeError, ValueError):
+        return None
+
+    def _to_int(value):
+      try:
+        return int(value)
+      except (TypeError, ValueError):
+        return None
+
     page = max(int(request.args.get("page", 1)), 1)
   except ValueError:
     page = 1
@@ -406,22 +573,83 @@ def print_history():
   if READ_ONLY_MODE and all([ams_slot, print_id, spool_id]):
     return render_template('error.html', exception="Live read-only mode: updating print-to-spool assignments is disabled.")
 
+  def _consume_for_spool(spool_id_value, grams_value=None, length_value=None):
+    if spool_id_value is None:
+      return
+    if length_value is not None:
+      spoolman_client.consumeSpool(spool_id_value, use_length=length_value)
+    elif grams_value is not None:
+      spoolman_client.consumeSpool(spool_id_value, use_weight=grams_value)
+
   if all([ams_slot, print_id, spool_id]):
     filament = print_history_service.get_filament_for_slot(print_id, ams_slot)
     print_history_service.update_filament_spool(print_id, ams_slot, spool_id)
 
     if(filament["spool_id"] != int(spool_id) and (not old_spool_id or (old_spool_id and filament["spool_id"] == int(old_spool_id)))):
-      if old_spool_id and int(old_spool_id) != -1:
-        spoolman_client.consumeSpool(old_spool_id, filament["grams_used"] * -1)
+      grams_used = _to_float(filament.get("grams_used"))
+      length_used = _to_float(filament.get("length_used"))
+      use_length = length_used is not None and length_used > 0
 
-      spoolman_client.consumeSpool(spool_id, filament["grams_used"])
+      if old_spool_id and int(old_spool_id) != -1:
+        _consume_for_spool(
+            old_spool_id,
+            grams_value=-(grams_used or 0),
+            length_value=-(length_used or 0) if use_length else None,
+        )
+
+      _consume_for_spool(
+          spool_id,
+          grams_value=grams_used,
+          length_value=length_used if use_length else None,
+      )
 
   prints, total_prints = print_history_service.get_prints_with_filament(limit=per_page, offset=offset)
+  layer_tracking_map = print_history_service.get_layer_tracking_for_prints([print["id"] for print in prints])
 
   spool_list = mqtt_bambulab.fetchSpools()
 
   for print in prints:
-    print["filament_usage"] = json.loads(print["filament_info"])
+    tracking_row = layer_tracking_map.get(print["id"])
+    if tracking_row:
+      status_key = (tracking_row.get("status") or "").upper()
+      status_label, status_badge = LAYER_TRACKING_STATUS_DISPLAY.get(
+          status_key, ("Unbekannt", "secondary")
+      )
+      total_layers = _to_int(tracking_row.get("total_layers"))
+      layers_printed = _to_int(tracking_row.get("layers_printed")) or 0
+      billed = _to_float(tracking_row.get("filament_grams_billed"))
+      total_grams = _to_float(tracking_row.get("filament_grams_total"))
+
+      progress = None
+      if total_layers:
+        progress = min(100, int(layers_printed / total_layers * 100))
+
+      print["layer_tracking"] = {
+        "status_label": status_label,
+        "status_badge": status_badge,
+        "layers_printed": layers_printed,
+        "total_layers": total_layers,
+        "progress_percent": progress,
+        "filament_grams_billed": billed,
+        "filament_grams_total": total_grams,
+        "predicted_end_time": tracking_row.get("predicted_end_time"),
+        "actual_end_time": tracking_row.get("actual_end_time"),
+      }
+    else:
+      print["layer_tracking"] = None
+
+    filament_usage_data = json.loads(print["filament_info"])
+    filament_usage_sum = sum(
+        _to_float(f.get("grams_used")) or 0 for f in filament_usage_data
+    )
+    tracking_total = (
+        _to_float(print["layer_tracking"]["filament_grams_total"])
+        if print["layer_tracking"]
+        else None
+    )
+    print["display_filament_total"] = tracking_total if tracking_total is not None else filament_usage_sum
+
+    print["filament_usage"] = filament_usage_data
     print["total_cost"] = 0
 
     for filament in print["filament_usage"]:
