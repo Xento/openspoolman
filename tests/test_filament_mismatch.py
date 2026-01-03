@@ -33,11 +33,15 @@ def _make_spool(material, extra_type, ams_id=0, tray_id="tray-1", spool_id=1, sp
     }
 
 
-def _run_case(tray, spool, ams_id=0, tray_id="tray-1"):
+def _run_case(tray, spool, ams_id=0, tray_id="tray-1", log_stub=None):
     spool_list = [spool]
     # avoid file writes during tests
-    svc._log_filament_mismatch = lambda *args, **kwargs: None
-    svc.augmentTrayDataWithSpoolMan(spool_list, tray, ams_id, tray_id)
+    original_log_fn = svc._log_filament_mismatch
+    svc._log_filament_mismatch = log_stub or (lambda *args, **kwargs: None)
+    try:
+        svc.augmentTrayDataWithSpoolMan(spool_list, tray, ams_id, tray_id)
+    finally:
+        svc._log_filament_mismatch = original_log_fn
     return tray
 
 
@@ -111,6 +115,26 @@ def test_mismatch_warning_can_be_disabled(monkeypatch):
 
     assert result["mismatch_detected"] is True
     assert result["mismatch"] is False  # hidden in UI
+
+
+def test_color_mismatch_logs_distance():
+    tray = _make_tray("PLA", "")
+    tray["tray_color"] = "FFFFFF"
+    spool = _make_spool("PLA", "")
+    spool["filament"]["color_hex"] = "000000"
+
+    captured = {}
+
+    def _capture_log(tray_logged, spool_logged, color_distance=None, reason="material_mismatch"):
+        captured["color_distance"] = color_distance
+        captured["reason"] = reason
+
+    result = _run_case(tray, spool, log_stub=_capture_log)
+
+    assert result["color_mismatch"] is True
+    assert captured["reason"] == "color_mismatch"
+    assert captured["color_distance"] is not None
+    assert captured["color_distance"] > svc.COLOR_DISTANCE_TOLERANCE
 
 
 BAMBULAB_BASE_MAPPINGS = [
