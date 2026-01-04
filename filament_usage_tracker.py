@@ -435,7 +435,7 @@ class FilamentUsageTracker:
           download3mfFromLocalFilesystem(uri.path, model_file)
         else:
           log(f"[filament-tracker] Downloading model via FTP: {model_url}")
-          download3mfFromFTP(model_url.replace("ftp://", "").replace(".gcode", ""), model_file)
+          download3mfFromFTP(model_url.rpartition('/')[-1], model_file) # Pull just filename to clear out any unexpected paths
         return model_file.name
     except Exception as exc:
       log(f"Failed to fetch model: {exc}")
