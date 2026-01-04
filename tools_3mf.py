@@ -7,6 +7,7 @@ import urllib.parse
 import os
 import re
 import time
+import io
 from datetime import datetime
 from config import PRINTER_CODE, PRINTER_IP
 from urllib.parse import urlparse
@@ -72,34 +73,71 @@ def download3mfFromFTP(filename, destFile):
   remote_path = "/cache/" + filename
   local_path = destFile.name  # 🔹 Download into the current directory
   encoded_remote_path = urllib.parse.quote(remote_path)
-  with open(local_path, "wb") as f:
-    c = pycurl.Curl()
-    url = f"ftps://{ftp_host}{encoded_remote_path}"
+  
+  c = pycurl.Curl()
+  url = f"ftps://{ftp_host}{encoded_remote_path}"
 
-    # 🔹 Setup explicit FTPS connection (like FileZilla)
-    c.setopt(c.URL, url)
-    c.setopt(c.USERPWD, f"{ftp_user}:{ftp_pass}")
-    c.setopt(c.WRITEDATA, f)
+  # 🔹 Setup explicit FTPS connection (like FileZilla)
+  c.setopt(c.URL, url)
+  c.setopt(c.USERPWD, f"{ftp_user}:{ftp_pass}")
+  #c.setopt(c.WRITEDATA, f)
     
-    # 🔹 Enable SSL/TLS
-    c.setopt(c.SSL_VERIFYPEER, 0)  # Disable SSL verification
-    c.setopt(c.SSL_VERIFYHOST, 0)
+  # 🔹 Enable SSL/TLS
+  c.setopt(c.SSL_VERIFYPEER, 0)  # Disable SSL verification
+  c.setopt(c.SSL_VERIFYHOST, 0)
     
-    # 🔹 Enable passive mode (like FileZilla)
-    c.setopt(c.FTP_SSL, c.FTPSSL_ALL)
+  # 🔹 Enable passive mode (like FileZilla)
+  c.setopt(c.FTP_SSL, c.FTPSSL_ALL)
     
-    # 🔹 Enable proper TLS authentication
-    c.setopt(c.FTPSSLAUTH, c.FTPAUTH_TLS)
+  # 🔹 Enable proper TLS authentication
+  c.setopt(c.FTPSSLAUTH, c.FTPAUTH_TLS)
 
-    log("[DEBUG] Starting file download...")
+  log(f"[DEBUG] Attempting file download of: {remote_path}") #Log attempted path
 
+  # Setup a retry loop
+  # Try to prevent race condition where trying to access file before it is fully in cache, causing File not found errors
+  max_retries = 3
+  for attempt in range(1, max_retries + 1):
     try:
+      with open(local_path, "wb") as f:
+        c.setopt(c.WRITEDATA, f)
+        log(f"[DEBUG] Attempt {attempt}: Starting download of {filename}...")
+                
+        # Perform the transfer
         c.perform()
+                
         log("[DEBUG] File successfully downloaded!")
-    except pycurl.error as e:
-        log(f"[ERROR] cURL error: {e}")
+        return True # Exit function on success
 
-    c.close()
+    # Error, check its just a file not found error before retry
+    except pycurl.error as e:
+      err_code = e.args[0]
+      if err_code == 78: # File Not Found
+        if attempt < max_retries:
+          log(f"[WARNING] File not found. Printer might still be writing. Retrying in 1s...")
+          time.sleep(1)
+          continue 
+        else:
+          log("[ERROR] File not found after max retries.")
+          log("[DEBUG] Listing found printer files in /cache directory")
+          buffer = io.BytesIO()
+          c.setopt(c.URL, f"ftps://{ftp_host}/cache/")
+          c.setopt(c.WRITEDATA, buffer)
+          c.setopt(c.DIRLISTONLY, True)
+          try:
+              c.perform()
+              log(f"[DEBUG] Directory Listing: {buffer.getvalue().decode('utf-8').splitlines()}")
+          except:
+              log("[ERROR] Could not retrieve directory listing.")
+      # Check if external storage not setup or connected. /cache is denied access
+      if err_code == 9: # Server denied you to change to the given directory
+        log("[DEBUG] Printer denied access to /cache path. Ensure external storage is setup to store print files in printer settings.")
+        break
+      else:
+        log(f"[ERROR] Fatal cURL error {err_code}: {e}")
+        break # Don't retry for non-78 File Not Found errors
+
+  c.close()
 
 def download3mfFromLocalFilesystem(path, destFile):
   with open(path, "rb") as src_file:
@@ -127,7 +165,7 @@ def getMetaDataFrom3mf(url):
       elif url.startswith("local:"):
         download3mfFromLocalFilesystem(url.replace("local:", ""), temp_file)
       else:
-        download3mfFromFTP(url.replace("ftp://", "").replace(".gcode",""), temp_file)
+        download3mfFromFTP(url.rpartition('/')[-1], temp_file) # Pull just filename to clear out any unexpected paths
       
       temp_file.close()
       metadata["model_path"] = url
