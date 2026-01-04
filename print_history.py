@@ -244,13 +244,14 @@ def get_prints_by_spool(spool_id: int):
     Retrieves all print jobs that used a specific spool.
     """
     conn = sqlite3.connect(db_config["db_path"])
+    conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
     cursor.execute('''
         SELECT DISTINCT p.* FROM prints p
         JOIN filament_usage f ON p.id = f.print_id
         WHERE f.spool_id = ?
     ''', (spool_id,))
-    prints = cursor.fetchall()
+    prints = [dict(row) for row in cursor.fetchall()]
     conn.close()
     return prints
 
@@ -264,9 +265,9 @@ def get_filament_for_slot(print_id: int, ams_slot: int):
       WHERE print_id = ? AND ams_slot = ?
   ''', (print_id, ams_slot))
 
-  results = cursor.fetchone()
+  row = cursor.fetchone()
   conn.close()
-  return results
+  return dict(row) if row else None
 
 def _ensure_layer_tracking_entry(print_id: int):
   conn = sqlite3.connect(db_config["db_path"])
