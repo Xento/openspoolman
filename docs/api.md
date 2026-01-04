@@ -29,16 +29,22 @@ AMS-/Tray-Status für den Drucker.
   "success": true,
   "data": {
     "printer_id": "PRINTER_ID",
-    "ams_slots": [
+    "ams": [
       {
-        "index": 1,
-        "ams_id": 0,
-        "spool_id": 123,
-        "spool_name": "PLA White",
-        "material": "PLA",
-        "color": "FFFFFF",
-        "active": true,
-        "is_loaded": true
+        "id": 0,
+        "name": "AMS A",
+        "ams_slots": [
+          {
+            "index": 1,
+            "ams_id": 0,
+            "spool_id": 123,
+            "spool_name": "PLA White",
+            "material": "PLA",
+            "color": "FFFFFF",
+            "active": true,
+            "is_loaded": true
+          }
+        ]
       }
     ]
   }

@@ -165,22 +165,42 @@ def _load_printer_summary() -> Dict[str, Any]:
   }
 
 
-def _load_trays() -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+def _load_trays() -> List[Dict[str, Any]]:
   config = mqtt_bambulab.getLastAMSConfig() or {}
   spools = mqtt_bambulab.fetchSpools()
 
-  trays: List[Dict[str, Any]] = []
+  ams_payload: List[Dict[str, Any]] = []
+
+  try:
+    from app import build_ams_labels  # Local import to avoid circular dependency at module load time
+    labels = build_ams_labels(config.get("ams", []))
+  except Exception:
+    labels = {}
 
   vt_tray = config.get("vt_tray")
   if vt_tray:
-    trays.append(_serialize_tray(vt_tray, spools, EXTERNAL_SPOOL_AMS_ID))
+    ams_payload.append(
+        {
+            "id": EXTERNAL_SPOOL_AMS_ID,
+            "name": "External",
+            "ams_slots": [_serialize_tray(vt_tray, spools, EXTERNAL_SPOOL_AMS_ID)],
+        }
+    )
 
   for ams in config.get("ams", []):
     ams_id = int(ams.get("id", 0))
+    slots: List[Dict[str, Any]] = []
     for tray in ams.get("tray", []):
-      trays.append(_serialize_tray(tray, spools, ams_id))
+      slots.append(_serialize_tray(tray, spools, ams_id))
+    ams_payload.append(
+        {
+            "id": ams_id,
+            "name": labels.get(ams_id) or labels.get(str(ams_id)) or ams.get("name"),
+            "ams_slots": slots,
+        }
+    )
 
-  return trays, config
+  return ams_payload
 
 
 def _resolve_tray_context(tray_index: int) -> Tuple[Optional[int], Optional[int]]:
@@ -215,8 +235,8 @@ def api_get_ams(printer_id: str):
     return json_error("PRINTER_NOT_FOUND", f"Printer '{printer_id}' not found", 404)
 
   try:
-    trays, _ = _load_trays()
-    payload = {"printer_id": ACTIVE_PRINTER_ID, "ams_slots": trays}
+    ams_payload = _load_trays()
+    payload = {"printer_id": ACTIVE_PRINTER_ID, "ams": ams_payload}
     return json_success(payload)
   except Exception as exc:
     traceback.print_exc()
