@@ -74,13 +74,69 @@ def download3mfFromFTP(filename, destFile):
   local_path = destFile.name  # 🔹 Download into the current directory
   encoded_remote_path = urllib.parse.quote(remote_path)
   
-  c = pycurl.Curl()
   url = f"ftps://{ftp_host}{encoded_remote_path}"
 
+  
+
+  log(f"[DEBUG] Attempting file download of: {remote_path}") #Log attempted path
+
+  # Setup a retry loop
+  # Try to prevent race condition where trying to access file before it is fully in cache, causing File not found errors
+  max_retries = 3
+  for attempt in range(1, max_retries + 1):
+    with open(local_path, "wb") as f:
+      c = setupPycurlConnection(ftp_user, ftp_pass)
+      try:
+        c.setopt(c.URL, url)
+        # Set output to file
+        c.setopt(c.WRITEDATA, f)
+        log(f"[DEBUG] Attempt {attempt}: Starting download of {filename}...")
+                
+        # Perform the transfer
+        c.perform()
+                
+        log("[DEBUG] File successfully downloaded!")
+        c.close()
+        return True # Exit function on success
+
+    # Error, check its just a file not found error before retry
+      except pycurl.error as e:
+        err_code = e.args[0]
+        c.close()
+        if err_code == 78: # File Not Found
+          if attempt < max_retries:
+            log(f"[WARNING] File not found. Printer might still be writing. Retrying in 1s...")
+            time.sleep(2)
+            continue 
+          else:
+            log("[ERROR] File not found after max retries.")
+            log("[DEBUG] Listing found printer files in /cache directory")
+            buffer = io.BytesIO()
+            c = setupPycurlConnection(ftp_user, ftp_pass)
+            c.setopt(c.URL, f"ftps://{ftp_host}/cache/")
+            c.setopt(c.WRITEDATA, buffer)
+            c.setopt(c.DIRLISTONLY, True)
+            try:
+                c.perform()
+                log(f"[DEBUG] Directory Listing: {buffer.getvalue().decode('utf-8').splitlines()}")
+            except:
+                log("[ERROR] Could not retrieve directory listing.")
+        # Check if external storage not setup or connected. /cache is denied access
+        if err_code == 9: # Server denied you to change to the given directory
+          log("[DEBUG] Printer denied access to /cache path. Ensure external storage is setup to store print files in printer settings.")
+          break
+        else:
+          log(f"[ERROR] Fatal cURL error {err_code}: {e}")
+          break # Don't retry for non-78 File Not Found errors
+
+def setupPycurlConnection(ftp_user, ftp_pass):
+  # Setup shared options for curl connections
+  c = pycurl.Curl()
+
   # 🔹 Setup explicit FTPS connection (like FileZilla)
-  c.setopt(c.URL, url)
+  
   c.setopt(c.USERPWD, f"{ftp_user}:{ftp_pass}")
-  #c.setopt(c.WRITEDATA, f)
+  
     
   # 🔹 Enable SSL/TLS
   c.setopt(c.SSL_VERIFYPEER, 0)  # Disable SSL verification
@@ -92,52 +148,7 @@ def download3mfFromFTP(filename, destFile):
   # 🔹 Enable proper TLS authentication
   c.setopt(c.FTPSSLAUTH, c.FTPAUTH_TLS)
 
-  log(f"[DEBUG] Attempting file download of: {remote_path}") #Log attempted path
-
-  # Setup a retry loop
-  # Try to prevent race condition where trying to access file before it is fully in cache, causing File not found errors
-  max_retries = 3
-  for attempt in range(1, max_retries + 1):
-    try:
-      with open(local_path, "wb") as f:
-        c.setopt(c.WRITEDATA, f)
-        log(f"[DEBUG] Attempt {attempt}: Starting download of {filename}...")
-                
-        # Perform the transfer
-        c.perform()
-                
-        log("[DEBUG] File successfully downloaded!")
-        return True # Exit function on success
-
-    # Error, check its just a file not found error before retry
-    except pycurl.error as e:
-      err_code = e.args[0]
-      if err_code == 78: # File Not Found
-        if attempt < max_retries:
-          log(f"[WARNING] File not found. Printer might still be writing. Retrying in 1s...")
-          time.sleep(1)
-          continue 
-        else:
-          log("[ERROR] File not found after max retries.")
-          log("[DEBUG] Listing found printer files in /cache directory")
-          buffer = io.BytesIO()
-          c.setopt(c.URL, f"ftps://{ftp_host}/cache/")
-          c.setopt(c.WRITEDATA, buffer)
-          c.setopt(c.DIRLISTONLY, True)
-          try:
-              c.perform()
-              log(f"[DEBUG] Directory Listing: {buffer.getvalue().decode('utf-8').splitlines()}")
-          except:
-              log("[ERROR] Could not retrieve directory listing.")
-      # Check if external storage not setup or connected. /cache is denied access
-      if err_code == 9: # Server denied you to change to the given directory
-        log("[DEBUG] Printer denied access to /cache path. Ensure external storage is setup to store print files in printer settings.")
-        break
-      else:
-        log(f"[ERROR] Fatal cURL error {err_code}: {e}")
-        break # Don't retry for non-78 File Not Found errors
-
-  c.close()
+  return c
 
 def download3mfFromLocalFilesystem(path, destFile):
   with open(path, "rb") as src_file:
