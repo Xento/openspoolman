@@ -69,15 +69,7 @@ def download3mfFromFTP(filename, destFile):
   ftp_host = PRINTER_IP
   ftp_user = "bblp"
   ftp_pass = PRINTER_CODE
-  parsed = urlparse(filename)
-  if parsed.scheme in ("ftp", "ftps"):
-    remote_path = parsed.path or "/"
-  else:
-    remote_path = filename
-
-  if not remote_path.startswith("/"):
-    remote_path = "/cache/" + remote_path
-
+  remote_path = "/cache/" + filename
   local_path = destFile.name  # 🔹 Download into the current directory
   encoded_remote_path = urllib.parse.quote(remote_path)
   with open(local_path, "wb") as f:
@@ -101,20 +93,11 @@ def download3mfFromFTP(filename, destFile):
 
     log("[DEBUG] Starting file download...")
 
-    max_attempts = 3
-    for attempt in range(1, max_attempts + 1):
-      try:
-        f.seek(0)
-        f.truncate()
+    try:
         c.perform()
         log("[DEBUG] File successfully downloaded!")
-        break
-      except pycurl.error as e:
-        log(f"[ERROR] cURL error on attempt {attempt}/{max_attempts}: {e}")
-        if attempt < max_attempts:
-          time.sleep(10)
-        else:
-          log("[ERROR] Giving up after repeated cURL failures.")
+    except pycurl.error as e:
+        log(f"[ERROR] cURL error: {e}")
 
     c.close()
 
@@ -143,10 +126,6 @@ def getMetaDataFrom3mf(url):
         download3mfFromCloud(url, temp_file)
       elif url.startswith("local:"):
         download3mfFromLocalFilesystem(url.replace("local:", ""), temp_file)
-      elif url.startswith("file://"):
-        # Handle file:// URLs from MQTT by fetching the path over FTP.
-        file_path = urlparse(url).path
-        download3mfFromFTP(file_path, temp_file)
       else:
         download3mfFromFTP(url.replace("ftp://", "").replace(".gcode",""), temp_file)
       
