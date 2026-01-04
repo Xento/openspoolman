@@ -104,7 +104,7 @@ Use `docker compose port openspoolman 8001` to see mapped host port if needed.
 ### Data sources
 - Print history DB default: `data/3d_printer_logs.db`
 - Override via: `OPENSPOOLMAN_PRINT_HISTORY_DB`
-- Mismatch log output: `data/filament_mismatch.json`
+- Mismatch log output: `logs/filament_mismatch.json` (now includes the detected color distance when a color mismatch occurs)
 
 ### Important operational note
 If you change `OPENSPOOLMAN_BASE_URL`, NFC tags must be reconfigured.
@@ -216,7 +216,7 @@ When debugging:
   - `PRINTER_IP` reachable from the OpenSpoolMan host/container
   - `PRINTER_ACCESS_CODE` correct
 - Inspect mismatch log:
-  - `data/filament_mismatch.json`
+  - `logs/filament_mismatch.json`
 - Confirm print history DB path:
   - `data/3d_printer_logs.db` or `OPENSPOOLMAN_PRINT_HISTORY_DB`
 

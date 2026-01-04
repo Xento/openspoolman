@@ -110,8 +110,18 @@
                   {% endif %}
                 <!-- Filament Usage -->
                 <div class="card">
-                    <div class="card-body filament-container">
-                        {% for filament in print["filament_usage"] %}
+                <div class="card-body filament-container">
+                    {% for filament in print["filament_usage"] %}
+                        {% set length_title = None %}
+                        {% set length_value = filament['length_used'] %}
+                        {% if length_value is not none and (length_value|float) > 0 %}
+                        {% set length_title = "Length: " + '{:,.0f}'.format(length_value|float) + "mm" %}
+                        {% endif %}
+                        {% set expected_title = None %}
+                        {% set expected_length = filament['estimated_length'] %}
+                        {% if expected_length is not none and (expected_length|float) > 0 %}
+                        {% set expected_title = "Slicer metadata length: " + '{:,.0f}'.format(expected_length|float) + "mm" %}
+                        {% endif %}
                         <div class="card">
                             <div class="card-body">
                                 {% if filament['spool'] %}
@@ -148,20 +158,29 @@
 
                                                 <div class="spool-details">
                                                     <h6>#{{ filament['spool'].id }} – {{ filament['spool'].filament.vendor.name }} – {{ filament['spool'].filament.material }}</h6>
-                                                    <small class="d-flex flex-column gap-1">
-                                                        <span>{{ filament['spool'].filament.name }}</span>
-                                                        <span class="text-muted small">
-                                                            {% if filament['grams_used'] is not none %}
+                                                <small class="d-flex flex-column gap-1">
+                                                    <span>{{ filament['spool'].filament.name }}</span>
+                                                    <span class="text-muted small">
+                                                        {% if filament['grams_used'] is not none %}
+                                                            <span {% if length_title %}title="{{ length_title }}"{% endif %}>
                                                                 {{ '%.2f' | format(filament['grams_used']) }}g printed
-                                                            {% endif %}
-                                                            {% if filament['estimated_grams'] is not none %}
+                                                            </span>
+                                                        {% endif %}
+                                                        {% if filament['estimated_grams'] is not none %}
+                                                            <span {% if expected_title %}title="{{ expected_title }} (values from slicer metadata)"{% endif %}>
                                                                 / {{ '%.2f' | format(filament['estimated_grams']) }}g expected
+                                                            </span>
+                                                            {% if expected_length is not none and (expected_length|float) > 0 %}
+                                                            <span class="text-muted small d-inline-block ms-1">
+                                                                (~{{ '{:,.0f}'.format(expected_length|float) }}mm)
+                                                            </span>
                                                             {% endif %}
-                                                        </span>
-                                                        <span class="text-muted small">
-                                                            {{ '%.2f' | format(filament['cost']|float) }} {{currencysymbol}}
-                                                        </span>
-                                                    </small>
+                                                        {% endif %}
+                                                    </span>
+                                                    <span class="text-muted small">
+                                                        {{ '%.2f' | format(filament['cost']|float) }} {{currencysymbol}}
+                                                    </span>
+                                                </small>
                                                 </div>
                                             </div>
 
@@ -184,12 +203,21 @@
 
                                                     <div class="spool-details">
                                                         <h6>No spool assigned - {{ filament['filament_type'] }}</h6>
-                                                        <small class="text-muted">
+                                                    <small class="text-muted">
+                                                        <span {% if length_title %}title="{{ length_title }}"{% endif %}>
                                                             {{ '%.2f' | format(filament['grams_used'] or 0) }}g printed
-                                                            {% if filament['estimated_grams'] is not none %}
-                                                              / {{ '%.2f' | format(filament['estimated_grams']) }}g expected
-                                                            {% endif %}
-                                                        </small>
+                                                        </span>
+                                                        {% if filament['estimated_grams'] is not none %}
+                                                          <span {% if expected_title %}title="{{ expected_title }} (values from slicer metadata)"{% endif %}>
+                                                            / {{ '%.2f' | format(filament['estimated_grams']) }}g expected
+                                                          </span>
+                                                          {% if expected_length is not none and (expected_length|float) > 0 %}
+                                                          <span class="text-muted small d-inline-block ms-1">
+                                                            (~{{ '%.0f' | format(expected_length|float) }}mm)
+                                                          </span>
+                                                          {% endif %}
+                                                        {% endif %}
+                                                    </small>
                                                     </div>
                                                 </div>
                                             </div>

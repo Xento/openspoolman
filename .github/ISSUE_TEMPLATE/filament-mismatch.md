@@ -16,7 +16,7 @@ A clear, short description of the mismatch (what you expected vs. what you saw).
 - `DISABLE_MISMATCH_WARNING` set?: ☐ Yes ☐ No
 
 ## Data to attach
-- `data/filament_mismatch.json` (attach file or paste content)
+- `logs/filament_mismatch.json` (attach file or paste content; includes the color difference when relevant)
 -  screenshot of the mismatch message in the UI
 
 ## Additional context

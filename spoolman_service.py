@@ -73,7 +73,11 @@ def getAMSFromTray(n):
 
 
 def normalize_color_hex(color_hex):
-  if not color_hex or isinstance(color_hex, list):
+  if not color_hex:
+    return ""
+  if isinstance(color_hex, list):
+    return ""
+  if not isinstance(color_hex, str):
     return ""
 
   color = color_hex.strip().upper()
@@ -140,18 +144,35 @@ def color_distance(color1, color2):
 
   return math.sqrt(sum((a - b) ** 2 for a, b in zip(lab1, lab2)))
 
-def _log_filament_mismatch(tray_data: dict, spool: dict) -> None:
+def _log_filament_mismatch(tray_data: dict, spool: dict, color_distance=None, reason="material_mismatch") -> None:
   try:
-    data_path = Path("data/filament_mismatch.json")
+    data_path = Path("logs/filament_mismatch.json")
     data_path.parent.mkdir(parents=True, exist_ok=True)
     timestamp = datetime.utcnow().isoformat() + "Z"
-    
-    with data_path.open("w", encoding="utf-8") as f:
-      json.dump({
-        "timestamp": timestamp,
-        "tray": tray_data,
-        "spool": spool,
-      }, f)
+
+    log_entry = {
+      "timestamp": timestamp,
+      "reason": reason,
+      "tray": tray_data,
+      "spool": spool,
+    }
+
+    if color_distance is not None:
+      log_entry["color_distance"] = color_distance
+
+    entries = []
+    if data_path.exists():
+      try:
+        existing = json.loads(data_path.read_text(encoding="utf-8"))
+        if isinstance(existing, list):
+          entries = existing
+        elif isinstance(existing, dict):
+          entries = [existing]
+      except json.JSONDecodeError:
+        entries = []
+
+    entries.append(log_entry)
+    data_path.write_text(json.dumps(entries, indent=2), encoding="utf-8")
   except Exception:
     pass
 
@@ -323,6 +344,7 @@ def augmentTrayDataWithSpoolMan(spool_list, tray_data, ams_id, tray_id):
         if  color_difference is not None and color_difference > COLOR_DISTANCE_TOLERANCE:
           tray_data["color_mismatch"] = True
           tray_data["color_mismatch_message"] = "Colors are not similar."
+          _log_filament_mismatch(tray_data, spool, color_distance=color_difference, reason="color_mismatch")
 
       break
 
@@ -417,8 +439,8 @@ def setActiveTray(spool_id, spool_extra, ams_id, tray_id):
     })
 
     # Remove active tray from inactive spools
-    for old_spool in fetchSpools(cached=True):
-      if spool_id != old_spool["id"] and old_spool.get("extra") and old_spool["extra"].get("active_tray") and json.loads(old_spool["extra"]["active_tray"]) == trayUid(ams_id, tray_id):
+    for old_spool in fetchSpools(cached=False):
+      if int(spool_id) != old_spool["id"] and old_spool.get("extra") and old_spool["extra"].get("active_tray") and json.loads(old_spool["extra"]["active_tray"]) == trayUid(ams_id, tray_id):
         spoolman_client.patchExtraTags(old_spool["id"], old_spool["extra"], {"active_tray": json.dumps("")})
   else:
     log("Skipping set active tray")
