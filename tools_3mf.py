@@ -82,7 +82,7 @@ def download3mfFromFTP(filename, destFile):
 
   # Setup a retry loop
   # Try to prevent race condition where trying to access file before it is fully in cache, causing File not found errors
-  max_retries = 3
+  max_retries = 6
   for attempt in range(1, max_retries + 1):
     with open(local_path, "wb") as f:
       c = setupPycurlConnection(ftp_user, ftp_pass)
@@ -103,13 +103,14 @@ def download3mfFromFTP(filename, destFile):
       except pycurl.error as e:
         err_code = e.args[0]
         c.close()
-        if err_code == 78: # File Not Found
+        # Retry on transient FTP issues: file not found (78) or bad PASV/EPSV responses (13/425).
+        if err_code in (78, 13):
           if attempt < max_retries:
-            log(f"[WARNING] File not found. Printer might still be writing. Retrying in 1s...")
-            time.sleep(2)
-            continue 
-          else:
-            log("[ERROR] File not found after max retries.")
+            log(f"[WARNING] Transient FTP error (code {err_code}). Retrying in 5s...")
+            time.sleep(5)
+            continue
+          log("[ERROR] Giving up after max retries for transient FTP errors.")
+          if err_code == 78:
             log("[DEBUG] Listing found printer files in /cache directory")
             buffer = io.BytesIO()
             c = setupPycurlConnection(ftp_user, ftp_pass)
@@ -119,15 +120,15 @@ def download3mfFromFTP(filename, destFile):
             try:
                 c.perform()
                 log(f"[DEBUG] Directory Listing: {buffer.getvalue().decode('utf-8').splitlines()}")
-            except:
+            except Exception:
                 log("[ERROR] Could not retrieve directory listing.")
         # Check if external storage not setup or connected. /cache is denied access
-        if err_code == 9: # Server denied you to change to the given directory
+        elif err_code == 9: # Server denied you to change to the given directory
           log("[DEBUG] Printer denied access to /cache path. Ensure external storage is setup to store print files in printer settings.")
           break
         else:
           log(f"[ERROR] Fatal cURL error {err_code}: {e}")
-          break # Don't retry for non-78 File Not Found errors
+          break # Don't retry for other fatal errors
 
 def setupPycurlConnection(ftp_user, ftp_pass):
   # Setup shared options for curl connections
