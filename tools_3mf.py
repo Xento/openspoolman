@@ -72,7 +72,7 @@ def download3mfFromFTP(filename, destFile):
   ftp_pass = PRINTER_CODE
   local_path = destFile.name  # 🔹 Download into the current directory
   base_name = os.path.basename(filename)
-  remote_paths = [f"/{base_name}", f"/sdcard/{base_name}", f"/cache/{base_name}"]
+  remote_paths = [f"/cache/{base_name}", f"/{base_name}", f"/sdcard/{base_name}"]
 
   max_retries = 6
   last_err_code = None
