@@ -350,7 +350,7 @@ class FilamentUsageTracker:
     else:
       self.using_ams = False
       self.ams_mapping = None
-      log("[filament-tracker] Not using AMS, defaulting to external spool")
+      log("[filament-tracker] AMS mapping unavailable, defaulting to external spool")
 
     self._load_model(model_path, gcode_file_name)
 
