@@ -107,8 +107,12 @@ def normalize_ams_mapping_entry(value):
     return None
   if value_int == EXTERNAL_SPOOL_ID:
     return {"ams_id": EXTERNAL_SPOOL_AMS_ID, "slot_id": EXTERNAL_SPOOL_ID}
-  if value_int >= 128:
+  if 128 <= value_int < 256:
     return {"ams_id": value_int, "slot_id": 0}
+  if value_int >= 256:
+    ams_id = getAMSFromTray(value_int)
+    tray_id = value_int - ams_id * 4
+    return {"ams_id": ams_id, "slot_id": tray_id}
 
   ams_id = getAMSFromTray(value_int)
   tray_id = value_int - ams_id * 4
