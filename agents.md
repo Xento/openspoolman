@@ -238,6 +238,7 @@ For AUTO_SPEND / tracking:
 ## 12) AMS tray assignment behavior
 - Cloud prints already contain `ams_mapping` in their `project_file` payload, so OpenSpoolMan can map every logical filament to a tray immediately.
 - When available, prefer `ams_mapping2` for filament mapping. It is an array of objects like `{"ams_id":0,"slot_id":3}` (or `{"ams_id":128,"slot_id":0}`), which works for multiple AMS units.
+- When `ams_mapping2` is missing, derive it from `ams_mapping`: use `ams_id = value // 4`, `slot_id = value % 4` for standard AMS slots; if the value is `>= 128` (e.g., AMS HT single-slot), treat it as `ams_id = value` and `slot_id = 0`. External spool uses `ams_id=255`, `slot_id=254`.
 - Local prints (LAN mode) do not ship `ams_mapping` upfront, so we delay applying AMS mappings until the printer reports a concrete `tray_tar` (typically during stage 4 / filament change). That’s why the MQTT log often shows `tray_tar=255` for seconds and only flips to the real tray once the tray itself is loaded.
 
 ---

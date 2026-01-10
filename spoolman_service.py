@@ -72,6 +72,70 @@ def getAMSFromTray(n):
     return n // 4
 
 
+def parse_tray_uid(value):
+  if not value:
+    return None
+  parts = str(value).split("_")
+  if len(parts) < 3:
+    return None
+  try:
+    return int(parts[-2]), int(parts[-1])
+  except ValueError:
+    return None
+
+
+def normalize_ams_mapping_entry(value):
+  if value is None:
+    return None
+  if isinstance(value, dict):
+    ams_id = value.get("ams_id")
+    slot_id = value.get("slot_id")
+    if ams_id is None or slot_id is None:
+      return None
+    return {"ams_id": int(ams_id), "slot_id": int(slot_id)}
+  if isinstance(value, str):
+    parsed = parse_tray_uid(value)
+    if parsed:
+      ams_id, slot_id = parsed
+      return {"ams_id": ams_id, "slot_id": slot_id}
+  try:
+    value_int = int(value)
+  except (TypeError, ValueError):
+    return None
+
+  if value_int < 0:
+    return None
+  if value_int == EXTERNAL_SPOOL_ID:
+    return {"ams_id": EXTERNAL_SPOOL_AMS_ID, "slot_id": EXTERNAL_SPOOL_ID}
+  if value_int >= 128:
+    return {"ams_id": value_int, "slot_id": 0}
+
+  ams_id = getAMSFromTray(value_int)
+  tray_id = value_int - ams_id * 4
+  return {"ams_id": ams_id, "slot_id": tray_id}
+
+
+def normalize_ams_mapping2(ams_mapping2, ams_mapping):
+  normalized = []
+  if isinstance(ams_mapping2, list) and ams_mapping2:
+    for item in ams_mapping2:
+      entry = normalize_ams_mapping_entry(item)
+      normalized.append(entry)
+    return normalized
+  if isinstance(ams_mapping, list):
+    for item in ams_mapping:
+      entry = normalize_ams_mapping_entry(item)
+      normalized.append(entry)
+  return normalized
+
+
+def tray_uid_from_mapping_entry(mapping_entry):
+  entry = normalize_ams_mapping_entry(mapping_entry)
+  if not entry:
+    return None
+  return trayUid(entry["ams_id"], entry["slot_id"])
+
+
 def normalize_color_hex(color_hex):
   if not color_hex:
     return ""
@@ -380,36 +444,27 @@ def augmentTrayDataWithSpoolMan(spool_list, tray_data, ams_id, tray_id):
     tray_data["bambu_sub_brand"] = ""
 
 def spendFilaments(printdata):
-  if printdata["ams_mapping"]:
-    ams_mapping = printdata["ams_mapping"]
-  else:
-    ams_mapping = [EXTERNAL_SPOOL_ID]
-
-  """
-  "ams_mapping": [
-            1,
-            0,
-            -1,
-            -1,
-            -1,
-            1,
-            0
-        ],
-  """
-  tray_id = EXTERNAL_SPOOL_ID
-  ams_id = EXTERNAL_SPOOL_AMS_ID
+  ams_mapping2 = normalize_ams_mapping2(
+    printdata.get("ams_mapping2"),
+    printdata.get("ams_mapping"),
+  )
+  if not ams_mapping2:
+    ams_mapping2 = [normalize_ams_mapping_entry(EXTERNAL_SPOOL_ID)]
   
   ams_usage = []
   for filamentId, filament in printdata["filaments"].items():
-    if ams_mapping[0] != EXTERNAL_SPOOL_ID:
-      tray_id = ams_mapping[filamentId - 1]   # get tray_id from ams_mapping for filament
-      ams_id = getAMSFromTray(tray_id)        # caclulate ams_id from tray_id
-      tray_id = tray_id - ams_id * 4          # correct tray_id for ams
-    
-    #if ams_usage.get(trayUid(ams_id, tray_id)):
-    #    ams_usage[trayUid(ams_id, tray_id)]["usedGrams"] += float(filament["used_g"])
-    #else:
-    ams_usage.append({"trayUid": trayUid(ams_id, tray_id), "id": filamentId, "usedGrams":float(filament["used_g"])})
+    mapping_entry = None
+    if filamentId - 1 < len(ams_mapping2):
+      mapping_entry = ams_mapping2[filamentId - 1]
+    tray_uid = tray_uid_from_mapping_entry(mapping_entry)
+    if not tray_uid:
+      tray_uid = trayUid(EXTERNAL_SPOOL_AMS_ID, EXTERNAL_SPOOL_ID)
+
+    ams_usage.append({
+      "trayUid": tray_uid,
+      "id": filamentId,
+      "usedGrams": float(filament["used_g"]),
+    })
 
   for spool in fetchSpools():
     #TODO: What if there is a mismatch between AMS and SpoolMan?

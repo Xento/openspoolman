@@ -1,5 +1,5 @@
 {
   "expected_assignments": {
-    "0": "3"
+    "0": {"ams_id": 0, "slot_id": 3}
   }
 }

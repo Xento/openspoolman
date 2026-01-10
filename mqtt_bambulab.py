@@ -18,7 +18,15 @@ from config import (
     CLEAR_ASSIGNMENT_WHEN_EMPTY,
 )
 from messages import GET_VERSION, PUSH_ALL, AMS_FILAMENT_SETTING
-from spoolman_service import spendFilaments, setActiveTray, fetchSpools, clear_active_spool_for_tray
+from spoolman_service import (
+    spendFilaments,
+    setActiveTray,
+    fetchSpools,
+    clear_active_spool_for_tray,
+    normalize_ams_mapping2,
+    normalize_ams_mapping_entry,
+    tray_uid_from_mapping_entry,
+)
 from tools_3mf import getMetaDataFrom3mf
 import time
 import copy
@@ -224,17 +232,22 @@ def map_filament(tray_tar):
             break
 
     if filament_assigned is not None:
+      mapping_entry = normalize_ams_mapping_entry(tray_tar)
+      tray_uid = tray_uid_from_mapping_entry(mapping_entry)
       mapping = PENDING_PRINT_METADATA.setdefault("ams_mapping", [])
+      mapping2 = PENDING_PRINT_METADATA.setdefault("ams_mapping2", [])
       filament_idx = int(filament_assigned)
       while len(mapping) <= filament_idx:
         mapping.append(None)
-      mapping[filament_idx] = tray_tar
-      log(f"✅ Tray {tray_tar} assigned to Filament {filament_assigned}")
+        mapping2.append(None)
+      mapping[filament_idx] = mapping_entry
+      mapping2[filament_idx] = mapping_entry
+      log(f"✅ Tray {tray_uid or tray_tar} assigned to Filament {filament_assigned}")
 
       for filament, tray in enumerate(mapping):
         if tray is None:
           continue
-        log(f"  Filament pos: {filament} → Tray {tray}")
+        log(f"  Filament pos: {filament} → Tray {tray_uid_from_mapping_entry(tray) or tray}")
 
     target_filaments = set(filament_order.keys())
     if target_filaments:
@@ -266,9 +279,15 @@ def processMessage(data):
       print_id = insert_print(PRINTER_STATE["print"]["subtask_name"], "cloud", PENDING_PRINT_METADATA["image"])
 
       if PRINTER_STATE["print"].get("use_ams"):
-        PENDING_PRINT_METADATA["ams_mapping"] = PRINTER_STATE["print"]["ams_mapping"]
+        normalized = normalize_ams_mapping2(
+          PRINTER_STATE["print"].get("ams_mapping2"),
+          PRINTER_STATE["print"].get("ams_mapping"),
+        )
       else:
-        PENDING_PRINT_METADATA["ams_mapping"] = [EXTERNAL_SPOOL_ID]
+        normalized = [normalize_ams_mapping_entry(EXTERNAL_SPOOL_ID)]
+
+      PENDING_PRINT_METADATA["ams_mapping"] = normalized
+      PENDING_PRINT_METADATA["ams_mapping2"] = normalized
 
       PENDING_PRINT_METADATA["print_id"] = print_id
       PENDING_PRINT_METADATA["complete"] = True
@@ -316,6 +335,7 @@ def processMessage(data):
             print_id = insert_print(PENDING_PRINT_METADATA["file"], PRINTER_STATE["print"]["print_type"], PENDING_PRINT_METADATA["image"])
 
             PENDING_PRINT_METADATA["ams_mapping"] = []
+            PENDING_PRINT_METADATA["ams_mapping2"] = []
             PENDING_PRINT_METADATA["filamentChanges"] = []
             PENDING_PRINT_METADATA["assigned_trays"] = []
             PENDING_PRINT_METADATA["complete"] = False

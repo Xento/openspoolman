@@ -135,7 +135,7 @@ def test_mqtt_log_tray_detection(log_path, monkeypatch, caplog):
   mqtt_bambulab.PENDING_PRINT_METADATA = {}
 
   assignments = {}
-  last_tracker_mapping: list[int] | None = None
+  last_tracker_mapping: list | None = None
 
   mqtt_bambulab.FILAMENT_TRACKER = FilamentUsageTracker()
 
@@ -145,6 +145,8 @@ def test_mqtt_log_tray_detection(log_path, monkeypatch, caplog):
     result = original_map_filament(tray_tar)
     metadata = mqtt_bambulab.PENDING_PRINT_METADATA or {}
     for idx, tray in enumerate(metadata.get("ams_mapping", [])):
+      if tray is None:
+        continue
       assignments[str(idx)] = str(tray)
     return result
   
@@ -175,11 +177,18 @@ def test_mqtt_log_tray_detection(log_path, monkeypatch, caplog):
         metadata = mqtt_bambulab.PENDING_PRINT_METADATA
         if metadata:
           for idx, tray in enumerate(metadata.get("ams_mapping", [])):
+            if tray is None:
+              continue
             assignments[str(idx)] = str(tray)
         print_obj = payload.get("print", {})
         if print_obj.get("command") == "project_file":
-          ams_mapping = print_obj.get("ams_mapping") or []
+          ams_mapping = spoolman_service.normalize_ams_mapping2(
+            print_obj.get("ams_mapping2"),
+            print_obj.get("ams_mapping"),
+          )
           for idx, tray in enumerate(ams_mapping):
+            if tray is None:
+              continue
             assignments[str(idx)] = str(tray)
         tracker_mapping = mqtt_bambulab.FILAMENT_TRACKER.ams_mapping
         if tracker_mapping:

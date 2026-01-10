@@ -10,7 +10,12 @@ from urllib.parse import urlparse
 
 from config import EXTERNAL_SPOOL_AMS_ID, EXTERNAL_SPOOL_ID, TRACK_LAYER_USAGE
 from spoolman_client import consumeSpool
-from spoolman_service import fetchSpools, getAMSFromTray, trayUid
+from spoolman_service import (
+    fetchSpools,
+    normalize_ams_mapping2,
+    normalize_ams_mapping_entry,
+    tray_uid_from_mapping_entry,
+)
 from tools_3mf import download3mfFromCloud, download3mfFromFTP, download3mfFromLocalFilesystem
 from print_history import update_filament_spool, update_filament_grams_used, get_all_filament_usage_for_print, update_layer_tracking
 from logger import log
@@ -306,7 +311,13 @@ class FilamentUsageTracker:
       return
 
     use_ams = bool(print_obj.get("use_ams", False))
-    ams_mapping = print_obj.get("ams_mapping", []) if use_ams else None
+    if use_ams:
+      ams_mapping = normalize_ams_mapping2(
+        print_obj.get("ams_mapping2"),
+        print_obj.get("ams_mapping"),
+      )
+    else:
+      ams_mapping = [normalize_ams_mapping_entry(EXTERNAL_SPOOL_ID)]
     gcode_file_name = print_obj.get("param")
     self._start_layer_tracking_for_model(
       model_path=model_path,
@@ -322,7 +333,7 @@ class FilamentUsageTracker:
       model_path: str,
       gcode_file_name: str | None,
       use_ams: bool,
-      ams_mapping: list[int] | None,
+      ams_mapping: list | None,
       task_id,
       subtask_id,
   ) -> None:
@@ -389,7 +400,10 @@ class FilamentUsageTracker:
     log("[filament-tracker] Starting local print from cached metadata")
     self.set_print_metadata(metadata)
 
-    ams_mapping = metadata.get("ams_mapping") or []
+    ams_mapping = normalize_ams_mapping2(
+      metadata.get("ams_mapping2"),
+      metadata.get("ams_mapping"),
+    )
     fake_print = {
       "param": metadata.get("gcode_path"),
       "use_ams": bool(ams_mapping),
@@ -402,17 +416,19 @@ class FilamentUsageTracker:
 
     self._handle_print_start(fake_print)
 
-  def apply_ams_mapping(self, ams_mapping: list[int] | None) -> None:
-    if not ams_mapping:
+  def apply_ams_mapping(self, ams_mapping: list | None) -> None:
+    normalized = normalize_ams_mapping2(None, ams_mapping)
+    if not normalized:
       return
-    if self.ams_mapping == ams_mapping and self.using_ams:
+    if self.ams_mapping == normalized and self.using_ams:
       return
 
-    log(f"[filament-tracker] Applying AMS mapping: {ams_mapping}")
-    self.ams_mapping = ams_mapping
+    log(f"[filament-tracker] Applying AMS mapping: {normalized}")
+    self.ams_mapping = normalized
     self.using_ams = True
     if self.print_metadata is not None:
-      self.print_metadata["ams_mapping"] = ams_mapping
+      self.print_metadata["ams_mapping"] = normalized
+      self.print_metadata["ams_mapping2"] = normalized
 
     self._bind_initial_spools()
     self._flush_all_pending_usage()
@@ -767,15 +783,14 @@ class FilamentUsageTracker:
     if target_print_id is None:
       self._layer_tracking_status = status
 
-  def _tray_uid_from_mapping(self, mapping_value: int) -> str | None:
-    if mapping_value == EXTERNAL_SPOOL_ID:
-      return trayUid(EXTERNAL_SPOOL_AMS_ID, EXTERNAL_SPOOL_ID)
+  def _tray_uid_from_mapping(self, mapping_value) -> str | None:
+    if mapping_value is None:
+      return None
+    if isinstance(mapping_value, str):
+      return mapping_value
+    return tray_uid_from_mapping_entry(mapping_value)
 
-    ams_id = getAMSFromTray(mapping_value)
-    tray_id = mapping_value - ams_id * 4
-    return trayUid(ams_id, tray_id)
-
-  def _resolve_tray_mapping(self, filament_index: int) -> int | None:
+  def _resolve_tray_mapping(self, filament_index: int):
     if self.using_ams:
       if self.ams_mapping is None or filament_index >= len(self.ams_mapping):
         log(f"No AMS mapping for filament {filament_index}")
@@ -820,9 +835,9 @@ class FilamentUsageTracker:
     model_path, gcode_file_name, current_layer, ams_mapping = result
     self._load_model(model_path, gcode_file_name)
     self.spent_layers = set(range(current_layer + 1))
-    self.ams_mapping = ams_mapping
+    self.ams_mapping = normalize_ams_mapping2(None, ams_mapping)
     self.current_layer = current_layer
-    self.using_ams = ams_mapping is not None
+    self.using_ams = bool(self.ams_mapping)
     
     # Initialize cumulative usage from database to continue tracking correctly
     self.cumulative_grams_used = {}
