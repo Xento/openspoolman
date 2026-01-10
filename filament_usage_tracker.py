@@ -310,13 +310,13 @@ class FilamentUsageTracker:
       log("Failed to retrieve model. Print will not be tracked.")
       return
 
-    use_ams = bool(print_obj.get("use_ams", False))
-    if use_ams:
-      ams_mapping = normalize_ams_mapping2(
-        print_obj.get("ams_mapping2"),
-        print_obj.get("ams_mapping"),
-      )
-    else:
+    ams_mapping = normalize_ams_mapping2(
+      print_obj.get("ams_mapping2"),
+      print_obj.get("ams_mapping"),
+    )
+    use_ams_flag = print_obj.get("use_ams")
+    use_ams = bool(use_ams_flag) if use_ams_flag is not None else bool(ams_mapping)
+    if not use_ams:
       ams_mapping = [normalize_ams_mapping_entry(EXTERNAL_SPOOL_ID)]
     gcode_file_name = print_obj.get("param")
     self._start_layer_tracking_for_model(

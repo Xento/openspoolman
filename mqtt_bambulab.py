@@ -279,12 +279,13 @@ def processMessage(data):
 
       print_id = insert_print(PRINTER_STATE["print"]["subtask_name"], "cloud", PENDING_PRINT_METADATA["image"])
 
-      if PRINTER_STATE["print"].get("use_ams"):
-        normalized = normalize_ams_mapping2(
-          PRINTER_STATE["print"].get("ams_mapping2"),
-          PRINTER_STATE["print"].get("ams_mapping"),
-        )
-      else:
+      normalized = normalize_ams_mapping2(
+        PRINTER_STATE["print"].get("ams_mapping2"),
+        PRINTER_STATE["print"].get("ams_mapping"),
+      )
+      use_ams_flag = PRINTER_STATE["print"].get("use_ams")
+      use_ams = bool(use_ams_flag) if use_ams_flag is not None else bool(normalized)
+      if not use_ams:
         normalized = [normalize_ams_mapping_entry(EXTERNAL_SPOOL_ID)]
 
       PENDING_PRINT_METADATA["ams_mapping"] = normalized
