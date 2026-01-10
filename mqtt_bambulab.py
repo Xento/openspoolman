@@ -270,6 +270,7 @@ def processMessage(data):
     
     if data["print"].get("command") == "project_file" and data["print"].get("url"):
       PENDING_PRINT_METADATA = getMetaDataFrom3mf(data["print"]["url"])
+      PENDING_PRINT_METADATA["metadata_loaded"] = True
       PENDING_PRINT_METADATA["print_type"] = PRINTER_STATE["print"].get("print_type")
       PENDING_PRINT_METADATA["task_id"] = PRINTER_STATE["print"].get("task_id")
       PENDING_PRINT_METADATA["subtask_id"] = PRINTER_STATE["print"].get("subtask_id")
@@ -324,8 +325,10 @@ def processMessage(data):
           PRINTER_STATE["print"].get("gcode_file")
         ):
 
-        if not PENDING_PRINT_METADATA:
+        if not PENDING_PRINT_METADATA or not PENDING_PRINT_METADATA.get("metadata_loaded"):
           PENDING_PRINT_METADATA = getMetaDataFrom3mf(PRINTER_STATE["print"]["gcode_file"])
+          if PENDING_PRINT_METADATA:
+            PENDING_PRINT_METADATA["metadata_loaded"] = True
         if PENDING_PRINT_METADATA:
           PENDING_PRINT_METADATA["print_type"] = PRINTER_STATE["print"].get("print_type")
           PENDING_PRINT_METADATA["task_id"] = PRINTER_STATE["print"].get("task_id")
@@ -410,16 +413,22 @@ def processMessage(data):
                 PENDING_PRINT_METADATA["complete"] = True
 
     if PENDING_PRINT_METADATA and PENDING_PRINT_METADATA.get("complete"):
-      if TRACK_LAYER_USAGE:
-        if PENDING_PRINT_METADATA.get("print_type") == "local":
-          FILAMENT_TRACKER.apply_ams_mapping(PENDING_PRINT_METADATA.get("ams_mapping") or [])
+      if not PENDING_PRINT_METADATA.get("complete_handled"):
+        if TRACK_LAYER_USAGE:
+          if PENDING_PRINT_METADATA.get("print_type") == "local":
+            FILAMENT_TRACKER.apply_ams_mapping(PENDING_PRINT_METADATA.get("ams_mapping") or [])
+          else:
+            FILAMENT_TRACKER.set_print_metadata(PENDING_PRINT_METADATA)
+          # Per-layer tracker will handle consumption; skip upfront spend.
         else:
-          FILAMENT_TRACKER.set_print_metadata(PENDING_PRINT_METADATA)
-        # Per-layer tracker will handle consumption; skip upfront spend.
-      else:
-        spendFilaments(PENDING_PRINT_METADATA)
+          spendFilaments(PENDING_PRINT_METADATA)
+        PENDING_PRINT_METADATA["complete_handled"] = True
 
-      PENDING_PRINT_METADATA = {}
+      should_clear = True
+      if PENDING_PRINT_METADATA.get("print_type") == "local" and not PENDING_PRINT_METADATA.get("tracking_started"):
+        should_clear = False
+      if should_clear:
+        PENDING_PRINT_METADATA = {}
   
     PRINTER_STATE_LAST = copy.deepcopy(PRINTER_STATE)
 
