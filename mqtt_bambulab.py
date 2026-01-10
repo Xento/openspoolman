@@ -178,7 +178,7 @@ def _mask_serial(serial: str | None, keep_chars: int = 3) -> str:
   visible = serial[:keep_chars]
   if len(serial) <= keep_chars:
     return visible
-  return f"{visible}..."
+  return f"{visible}...[redacted]"
 
 def _mask_sn_values(value):
   if isinstance(value, dict):
