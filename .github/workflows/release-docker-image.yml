@@ -115,9 +115,11 @@ jobs:
             fi
 
             echo "TAGS=$TAGS" >> "$GITHUB_ENV"
-          elif [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
-            # Dev image for pushes to main (and equivalent contexts)
-            echo "TAGS=ghcr.io/${{ env.REPO_NAME }}:dev" >> "$GITHUB_ENV"
+          else
+            # Branch image when no version/tag is provided
+            BRANCH_RAW="${{ github.ref_name }}"
+            BRANCH_TAG=$(echo "$BRANCH_RAW" | tr '[:upper:]' '[:lower:]' | sed 's#[^a-z0-9_.-]#-#g')
+            echo "TAGS=ghcr.io/${{ env.REPO_NAME }}:branch_${BRANCH_TAG}" >> "$GITHUB_ENV"
           fi
 
       - name: Build and push
