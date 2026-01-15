@@ -4,5 +4,6 @@
     "1": {"ams_id": 0, "slot_id": 0},
     "2": {"ams_id": 0, "slot_id": 2},
     "3": {"ams_id": 0, "slot_id": 1}
-  }
+  },
+  "expected_print_type": "cloud"
 }

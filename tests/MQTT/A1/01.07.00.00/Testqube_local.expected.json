@@ -1,5 +1,7 @@
 {
   "expected_assignments": {
     "0": {"ams_id": 0, "slot_id": 3}
-  }
+  },
+  "expected_model": "Würfel.3mf",
+  "expected_print_type": "local"
 }

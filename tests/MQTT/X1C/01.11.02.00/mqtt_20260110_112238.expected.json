@@ -1,0 +1,27 @@
+{
+  "expected_assignments": {
+    "0": {
+      "ams_id": 0,
+      "slot_id": 1
+    },
+    "1": {
+      "ams_id": 128,
+      "slot_id": 0
+    },
+    "2": {
+      "ams_id": 0,
+      "slot_id": 3
+    },
+    "3": {
+      "ams_id": 0,
+      "slot_id": 0
+    },
+    "4": {
+      "ams_id": 0,
+      "slot_id": 2
+    }
+  },
+  "expected_model": "Zephyros-Fullsize_370mm-Version_Multicolor_v1.0.stl.gcode.3mf",
+  "expected_print_type": "local",
+  "skip_model_download": true
+}

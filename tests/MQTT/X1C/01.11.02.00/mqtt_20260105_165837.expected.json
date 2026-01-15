@@ -1,0 +1,10 @@
+{
+  "expected_assignments": {
+    "0": {
+      "ams_id": 128,
+      "slot_id": 0
+    }
+  },
+  "expected_print_type": "cloud",
+  "skip_model_download": true
+}

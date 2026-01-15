@@ -1,5 +1,6 @@
 {
   "expected_assignments": {
     "0": {"ams_id": 0, "slot_id": 3}
-  }
+  },
+  "expected_print_type": "cloud"
 }
