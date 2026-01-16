@@ -70,65 +70,88 @@ def download3mfFromFTP(filename, destFile):
   ftp_host = PRINTER_IP
   ftp_user = "bblp"
   ftp_pass = PRINTER_CODE
-  remote_path = "/cache/" + filename
   local_path = destFile.name  # 🔹 Download into the current directory
-  encoded_remote_path = urllib.parse.quote(remote_path)
-  
-  url = f"ftps://{ftp_host}{encoded_remote_path}"
+  base_name = os.path.basename(filename)
+  remote_paths = [f"/cache/{base_name}", f"/{base_name}", f"/sdcard/{base_name}"]
 
-  
-
-  log(f"[DEBUG] Attempting file download of: {remote_path}") #Log attempted path
-
-  # Setup a retry loop
-  # Try to prevent race condition where trying to access file before it is fully in cache, causing File not found errors
   max_retries = 6
-  for attempt in range(1, max_retries + 1):
-    with open(local_path, "wb") as f:
-      c = setupPycurlConnection(ftp_user, ftp_pass)
-      try:
-        c.setopt(c.URL, url)
-        # Set output to file
-        c.setopt(c.WRITEDATA, f)
-        log(f"[DEBUG] Attempt {attempt}: Starting download of {filename}...")
-                
-        # Perform the transfer
-        c.perform()
-                
-        log("[DEBUG] File successfully downloaded!")
-        c.close()
-        return True # Exit function on success
+  last_err_code = None
+  path_count = len(remote_paths)
+  # pycurl error codes we react to:
+  # 7: could not connect, 28: timeout, 35: SSL connect error,
+  # 52: empty reply, 55: send error, 56: recv error.
+  # 78: remote file not found, 13: bad PASV/EPSV response, 9: access denied.
+  reconnect_codes = {7, 28, 35, 52, 55, 56}
+  c = setupPycurlConnection(ftp_user, ftp_pass)
+  try:
+    for attempt in range(1, max_retries + 1):
+      path_index = (attempt - 1) % path_count
+      remote_path = remote_paths[path_index]
+      if not remote_path.startswith("/"):
+        remote_path = "/" + remote_path
+      encoded_remote_path = urllib.parse.quote(remote_path)
+      url = f"ftps://{ftp_host}{encoded_remote_path}"
 
-    # Error, check its just a file not found error before retry
-      except pycurl.error as e:
-        err_code = e.args[0]
-        c.close()
-        # Retry on transient FTP issues: file not found (78) or bad PASV/EPSV responses (13/425).
-        if err_code in (78, 13):
-          if attempt < max_retries:
-            log(f"[WARNING] Transient FTP error (code {err_code}). Retrying in 5s...")
-            time.sleep(5)
-            continue
-          log("[ERROR] Giving up after max retries for transient FTP errors.")
-          if err_code == 78:
-            log("[DEBUG] Listing found printer files in /cache directory")
-            buffer = io.BytesIO()
-            c = setupPycurlConnection(ftp_user, ftp_pass)
-            c.setopt(c.URL, f"ftps://{ftp_host}/cache/")
-            c.setopt(c.WRITEDATA, buffer)
-            c.setopt(c.DIRLISTONLY, True)
+      log(f"[DEBUG] Attempting file download ({path_index + 1}/{path_count}): {remote_path}") # Log attempted path
+
+      with open(local_path, "wb") as f:
+        try:
+          c.setopt(c.URL, url)
+          c.setopt(c.WRITEDATA, f)
+          log(f"[DEBUG] Attempt {attempt}: Starting download of {remote_path}...")
+          c.perform()
+          log("[DEBUG] File successfully downloaded!")
+          return True
+        except pycurl.error as e:
+          last_err_code = e.args[0]
+          if last_err_code in reconnect_codes:
+            log(f"[WARNING] FTP connection error (code {last_err_code}). Reconnecting...")
             try:
-                c.perform()
-                log(f"[DEBUG] Directory Listing: {buffer.getvalue().decode('utf-8').splitlines()}")
+              c.close()
             except Exception:
-                log("[ERROR] Could not retrieve directory listing.")
-        # Check if external storage not setup or connected. /cache is denied access
-        elif err_code == 9: # Server denied you to change to the given directory
-          log("[DEBUG] Printer denied access to /cache path. Ensure external storage is setup to store print files in printer settings.")
-          break
-        else:
-          log(f"[ERROR] Fatal cURL error {err_code}: {e}")
-          break # Don't retry for other fatal errors
+              pass
+            c = setupPycurlConnection(ftp_user, ftp_pass)
+
+          if last_err_code in (78, 13):
+            if attempt < max_retries:
+              log(f"[WARNING] Transient FTP error (code {last_err_code}). Retrying in 5s...")
+              time.sleep(5)
+              continue
+            log("[ERROR] Giving up after max retries for transient FTP errors.")
+            break
+          if last_err_code == 9:
+            log("[DEBUG] Printer denied access to /cache path. Ensure external storage is setup to store print files in printer settings.")
+            return False
+          log(f"[ERROR] Fatal cURL error {last_err_code}: {e}")
+          return False
+  finally:
+    if c is not None:
+      try:
+        c.close()
+      except Exception:
+        pass
+
+  if last_err_code == 78:
+    log("[ERROR] File not found after max retries.")
+    list_conn = setupPycurlConnection(ftp_user, ftp_pass)
+    try:
+      for list_path in ("/", "/sdcard/", "/cache/"):
+        log(f"[DEBUG] Listing found printer files in {list_path} directory")
+        buffer = io.BytesIO()
+        list_conn.setopt(list_conn.URL, f"ftps://{ftp_host}{list_path}")
+        list_conn.setopt(list_conn.WRITEDATA, buffer)
+        list_conn.setopt(list_conn.DIRLISTONLY, True)
+        try:
+          list_conn.perform()
+          log(f"[DEBUG] Directory Listing ({list_path}): {buffer.getvalue().decode('utf-8').splitlines()}")
+        except Exception:
+          log(f"[ERROR] Could not retrieve directory listing for {list_path}.")
+    finally:
+      try:
+        list_conn.close()
+      except Exception:
+        pass
+  return False
 
 def setupPycurlConnection(ftp_user, ftp_pass):
   # Setup shared options for curl connections
@@ -176,6 +199,10 @@ def getMetaDataFrom3mf(url):
         download3mfFromCloud(url, temp_file)
       elif url.startswith("local:"):
         download3mfFromLocalFilesystem(url.replace("local:", ""), temp_file)
+      elif url.startswith(("file://", "ftp://", "ftps://")):
+        file_path = urlparse(url).path
+        filename = os.path.basename(file_path)
+        download3mfFromFTP(filename, temp_file)
       else:
         download3mfFromFTP(url.rpartition('/')[-1], temp_file) # Pull just filename to clear out any unexpected paths
       
