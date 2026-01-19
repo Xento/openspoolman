@@ -308,6 +308,10 @@ class FilamentUsageTracker:
 
     if model_path is None:
       log("Failed to retrieve model. Print will not be tracked.")
+      if self.print_id:
+        self._set_layer_tracking_status(LAYER_TRACKING_STATUS_ABORTED)
+      self._reset_layer_tracking_state()
+      clear_checkpoint()
       return
 
     ams_mapping = normalize_ams_mapping2(
@@ -353,6 +357,13 @@ class FilamentUsageTracker:
       log("[filament-tracker] AMS mapping unavailable / pending, defaulting to external spool for now")
 
     self._load_model(model_path, gcode_file_name)
+    if not self.active_model:
+      log("[filament-tracker] Model could not be loaded; aborting tracking for this print")
+      if self.print_id:
+        self._set_layer_tracking_status(LAYER_TRACKING_STATUS_ABORTED)
+      self._reset_layer_tracking_state()
+      clear_checkpoint()
+      return
 
     if self.active_model:
       self._layer_tracking_total_layers = self._infer_total_layers()
@@ -446,12 +457,21 @@ class FilamentUsageTracker:
         if uri.scheme in ("https", "http"):
           log(f"[filament-tracker] Downloading model via HTTP(S): {model_url}")
           download3mfFromCloud(model_url, model_file)
+          success = True
         elif uri.scheme == "local":
           log(f"[filament-tracker] Loading model from local path: {uri.path}")
           download3mfFromLocalFilesystem(uri.path, model_file)
+          success = True
         else:
           log(f"[filament-tracker] Downloading model via FTP: {model_url}")
-          download3mfFromFTP(model_url.rpartition('/')[-1], model_file) # Pull just filename to clear out any unexpected paths
+          success = download3mfFromFTP(model_url.rpartition('/')[-1], model_file) # Pull just filename to clear out any unexpected paths
+        model_file.flush()
+        if not success:
+          log("[filament-tracker] Model download reported failure")
+          return None
+        if os.path.getsize(model_file.name) == 0:
+          log("[filament-tracker] Model download resulted in empty file")
+          return None
         return model_file.name
     except Exception as exc:
       log(f"Failed to fetch model: {exc}")

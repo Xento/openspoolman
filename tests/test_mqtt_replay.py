@@ -124,7 +124,16 @@ def _build_fake_metadata():
         model_name = os.path.basename(parsed.path)
     return {
       "image": "test.png",
-      "filaments": {},
+      "filaments": {
+        1: {
+          "type": "PLA",
+          "color": "#000000",
+          "used_g": "0",
+          "used_m": "0",
+          "tray_info_idx": "FAKE",
+        }
+      },
+      "usage": {1: "0"},
       "file": model_name,
       "model_path": model_url,
       "model_url": model_url,

@@ -154,7 +154,7 @@ If matching fails:
 ## 8) Change workflow for agents (how to work in this repo)
 
 ### 8.1 Before coding
-1. Read `README.md` sections: installation, environment configuration, matching rules, AUTO_SPEND notes.
+1. Read `README.md` sections: installation, environment configuration, matching rules, AUTO_SPEND notes. (Python 3.13 is supported here; earlier versions may lack newer stdlib arguments such as `delete_on_close` on `NamedTemporaryFile`.)
 2. Identify the minimal module(s) involved:
    - Printer connectivity: `mqtt_bambulab.py`
    - SpoolMan calls: `spoolman_client.py` / `spoolman_service.py`

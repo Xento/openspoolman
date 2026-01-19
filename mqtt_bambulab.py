@@ -270,6 +270,10 @@ def processMessage(data):
     
     if data["print"].get("command") == "project_file" and data["print"].get("url"):
       PENDING_PRINT_METADATA = getMetaDataFrom3mf(data["print"]["url"])
+      if not PENDING_PRINT_METADATA or not PENDING_PRINT_METADATA.get("filaments"):
+        log("[filament-tracker] No metadata/filaments found in 3MF; skipping tracking for this job")
+        PENDING_PRINT_METADATA = {}
+        return
       PENDING_PRINT_METADATA["metadata_loaded"] = True
       PENDING_PRINT_METADATA["print_type"] = PRINTER_STATE["print"].get("print_type")
       PENDING_PRINT_METADATA["task_id"] = PRINTER_STATE["print"].get("task_id")
@@ -328,9 +332,9 @@ def processMessage(data):
 
         if not PENDING_PRINT_METADATA or not PENDING_PRINT_METADATA.get("metadata_loaded"):
           PENDING_PRINT_METADATA = getMetaDataFrom3mf(PRINTER_STATE["print"]["gcode_file"])
-          if PENDING_PRINT_METADATA:
+          if PENDING_PRINT_METADATA and PENDING_PRINT_METADATA.get("filaments"):
             PENDING_PRINT_METADATA["metadata_loaded"] = True
-        if PENDING_PRINT_METADATA:
+        if PENDING_PRINT_METADATA and PENDING_PRINT_METADATA.get("filaments"):
           PENDING_PRINT_METADATA["print_type"] = PRINTER_STATE["print"].get("print_type")
           PENDING_PRINT_METADATA["task_id"] = PRINTER_STATE["print"].get("task_id")
           PENDING_PRINT_METADATA["subtask_id"] = PRINTER_STATE["print"].get("subtask_id")
