@@ -65,6 +65,43 @@ def download3mfFromCloud(url, destFile):
   response.raise_for_status()
   destFile.write(response.content)
 
+def ensure_ftp_connection(ftp_host, ftp_user, ftp_pass, reconnect_codes, connect_retries):
+  c = setupPycurlConnection(ftp_user, ftp_pass)
+  for attempt in range(1, connect_retries + 1):
+    buffer = io.BytesIO()
+    try:
+      c.setopt(c.URL, f"ftps://{ftp_host}/")
+      c.setopt(c.WRITEDATA, buffer)
+      c.setopt(c.DIRLISTONLY, True)
+      log(f"[DEBUG] FTP connection check ({attempt}/{connect_retries})...")
+      c.perform()
+      return c
+    except pycurl.error as e:
+      err_code = e.args[0]
+      if err_code in reconnect_codes and attempt < connect_retries:
+        log(f"[WARNING] FTP connection failed (code {err_code}). Retrying in 5s...")
+        time.sleep(5)
+        try:
+          c.close()
+        except Exception:
+          pass
+        c = setupPycurlConnection(ftp_user, ftp_pass)
+        continue
+      if err_code in reconnect_codes:
+        log(f"[ERROR] Could not establish FTP connection after {connect_retries} attempts.")
+      else:
+        log(f"[ERROR] Fatal cURL error {err_code}: {e}")
+      try:
+        c.close()
+      except Exception:
+        pass
+      return None
+  try:
+    c.close()
+  except Exception:
+    pass
+  return None
+
 def download3mfFromFTP(filename, destFile):
   log("Downloading 3MF file from FTP...")
   ftp_host = PRINTER_IP
@@ -82,7 +119,10 @@ def download3mfFromFTP(filename, destFile):
   # 52: empty reply, 55: send error, 56: recv error.
   # 78: remote file not found, 13: bad PASV/EPSV response, 9: access denied.
   reconnect_codes = {7, 28, 35, 52, 55, 56}
-  c = setupPycurlConnection(ftp_user, ftp_pass)
+  connect_retries = 3
+  c = ensure_ftp_connection(ftp_host, ftp_user, ftp_pass, reconnect_codes, connect_retries)
+  if c is None:
+    return False
   try:
     for attempt in range(1, max_retries + 1):
       path_index = (attempt - 1) % path_count
@@ -98,6 +138,7 @@ def download3mfFromFTP(filename, destFile):
         try:
           c.setopt(c.URL, url)
           c.setopt(c.WRITEDATA, f)
+          c.setopt(c.DIRLISTONLY, False)
           log(f"[DEBUG] Attempt {attempt}: Starting download of {remote_path}...")
           c.perform()
           log("[DEBUG] File successfully downloaded!")
@@ -120,8 +161,8 @@ def download3mfFromFTP(filename, destFile):
             log("[ERROR] Giving up after max retries for transient FTP errors.")
             break
           if last_err_code == 9:
-            log("[DEBUG] Printer denied access to /cache path. Ensure external storage is setup to store print files in printer settings.")
-            return False
+            log("[WARNING] Printer denied access to the current path. Trying next location...")
+            continue
           log(f"[ERROR] Fatal cURL error {last_err_code}: {e}")
           return False
   finally:
