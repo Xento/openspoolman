@@ -5,6 +5,7 @@ import ssl
 import traceback
 from threading import Thread
 from typing import Any, Iterable
+from urllib.parse import urlparse
 
 import paho.mqtt.client as mqtt
 
@@ -45,6 +46,46 @@ PRINTER_STATE_LAST = {}
 PENDING_PRINT_METADATA = {}
 FILAMENT_TRACKER = FilamentUsageTracker()
 LOG_FILE = "/home/app/logs/mqtt.log"
+
+def _is_local_project_file(print_obj: dict | None) -> bool:
+  if not print_obj:
+    return False
+  if print_obj.get("print_type") == "local":
+    return True
+  url = print_obj.get("url") or ""
+  if not url:
+    return False
+  scheme = urlparse(url).scheme
+  return scheme in ("file", "local", "ftp", "ftps")
+
+def _load_project_metadata(url: str) -> dict | None:
+  metadata = getMetaDataFrom3mf(url)
+  if not metadata or not metadata.get("filaments"):
+    log("[filament-tracker] No metadata/filaments found in 3MF; skipping tracking for this job")
+    return None
+  metadata["metadata_loaded"] = True
+  return metadata
+
+def _insert_filament_usage_entries(print_id, filaments: dict) -> None:
+  for id, filament in filaments.items():
+    parsed_grams = _parse_grams(filament.get("used_g"))
+    parsed_length_m = _parse_grams(filament.get("used_m"))
+    estimated_length_mm = parsed_length_m * 1000 if parsed_length_m is not None else None
+    grams_used = parsed_grams if parsed_grams is not None else 0.0
+    length_used = estimated_length_mm if estimated_length_mm is not None else 0.0
+    if TRACK_LAYER_USAGE:
+      grams_used = 0.0
+      length_used = 0.0
+    insert_filament_usage(
+        print_id,
+        filament["type"],
+        filament["color"],
+        grams_used,
+        id,
+        estimated_grams=parsed_grams,
+        length_used=length_used,
+        estimated_length=estimated_length_mm,
+    )
 
 def getPrinterModel():
     global PRINTER_ID
@@ -268,13 +309,36 @@ def processMessage(data):
   if "print" in data:    
     update_dict(PRINTER_STATE, data)
     
+    # Handle project_file events (3MF metadata load) separately for local vs cloud jobs.
     if data["print"].get("command") == "project_file" and data["print"].get("url"):
-      PENDING_PRINT_METADATA = getMetaDataFrom3mf(data["print"]["url"])
-      if not PENDING_PRINT_METADATA or not PENDING_PRINT_METADATA.get("filaments"):
-        log("[filament-tracker] No metadata/filaments found in 3MF; skipping tracking for this job")
+      # Local project_file: stash metadata for the local flow and wait for RUNNING.
+      if _is_local_project_file(data["print"]):
+        metadata = _load_project_metadata(data["print"]["url"])
+        if metadata is None:
+          PENDING_PRINT_METADATA = {}
+          PRINTER_STATE_LAST = copy.deepcopy(PRINTER_STATE)
+          return
+        PENDING_PRINT_METADATA = metadata
+        PENDING_PRINT_METADATA["print_type"] = "local"
+        PENDING_PRINT_METADATA["task_id"] = PRINTER_STATE["print"].get("task_id")
+        PENDING_PRINT_METADATA["subtask_id"] = PRINTER_STATE["print"].get("subtask_id")
+
+        normalized = normalize_ams_mapping2(
+          PRINTER_STATE["print"].get("ams_mapping2"),
+          PRINTER_STATE["print"].get("ams_mapping"),
+        )
+        if normalized:
+          PENDING_PRINT_METADATA["ams_mapping"] = normalized
+          PENDING_PRINT_METADATA["ams_mapping2"] = normalized
+        PRINTER_STATE_LAST = copy.deepcopy(PRINTER_STATE)
+        return
+
+      # Cloud project_file: fully initialize tracking and upfront usage records.
+      metadata = _load_project_metadata(data["print"]["url"])
+      if metadata is None:
         PENDING_PRINT_METADATA = {}
         return
-      PENDING_PRINT_METADATA["metadata_loaded"] = True
+      PENDING_PRINT_METADATA = metadata
       PENDING_PRINT_METADATA["print_type"] = PRINTER_STATE["print"].get("print_type")
       PENDING_PRINT_METADATA["task_id"] = PRINTER_STATE["print"].get("task_id")
       PENDING_PRINT_METADATA["subtask_id"] = PRINTER_STATE["print"].get("subtask_id")
@@ -298,38 +362,28 @@ def processMessage(data):
       PENDING_PRINT_METADATA["print_id"] = print_id
       PENDING_PRINT_METADATA["complete"] = True
 
-      for id, filament in PENDING_PRINT_METADATA["filaments"].items():
-        parsed_grams = _parse_grams(filament.get("used_g"))
-        parsed_length_m = _parse_grams(filament.get("used_m"))
-        estimated_length_mm = parsed_length_m * 1000 if parsed_length_m is not None else None
-        grams_used = parsed_grams if parsed_grams is not None else 0.0
-        length_used = estimated_length_mm if estimated_length_mm is not None else 0.0
-        if TRACK_LAYER_USAGE:
-          grams_used = 0.0
-          length_used = 0.0
-        insert_filament_usage(
-            print_id,
-            filament["type"],
-            filament["color"],
-            grams_used,
-            id,
-            estimated_grams=parsed_grams,
-            length_used=length_used,
-            estimated_length=estimated_length_mm,
-        )
+      _insert_filament_usage_entries(print_id, PENDING_PRINT_METADATA["filaments"])
   
     #if ("gcode_state" in data["print"] and data["print"]["gcode_state"] == "RUNNING") and ("print_type" in data["print"] and data["print"]["print_type"] != "local") \
     #  and ("tray_tar" in data["print"] and data["print"]["tray_tar"] != "255") and ("stg_cur" in data["print"] and data["print"]["stg_cur"] == 0 and PRINT_CURRENT_STAGE != 0):
     
     #TODO: What happens when printed from external spool, is ams and tray_tar set?
+    # Local print flow: start tracking once the job is RUNNING and metadata is available.
     if PRINTER_STATE.get("print", {}).get("print_type") == "local" and PRINTER_STATE_LAST.get("print"):
-
       if (
           PRINTER_STATE["print"].get("gcode_state") == "RUNNING" and
-          PRINTER_STATE_LAST["print"].get("gcode_state") == "PREPARE" and 
-          PRINTER_STATE["print"].get("gcode_file")
+          PRINTER_STATE["print"].get("gcode_file") and
+          (
+            PRINTER_STATE_LAST["print"].get("gcode_state") == "PREPARE" or
+            (
+              PENDING_PRINT_METADATA
+              and PENDING_PRINT_METADATA.get("metadata_loaded")
+              and not PENDING_PRINT_METADATA.get("tracking_started")
+            )
+          )
         ):
 
+        # Ensure metadata is loaded from the 3MF before starting tracking.
         if not PENDING_PRINT_METADATA or not PENDING_PRINT_METADATA.get("metadata_loaded"):
           PENDING_PRINT_METADATA = getMetaDataFrom3mf(PRINTER_STATE["print"]["gcode_file"])
           if PENDING_PRINT_METADATA and PENDING_PRINT_METADATA.get("filaments"):
@@ -339,41 +393,60 @@ def processMessage(data):
           PENDING_PRINT_METADATA["task_id"] = PRINTER_STATE["print"].get("task_id")
           PENDING_PRINT_METADATA["subtask_id"] = PRINTER_STATE["print"].get("subtask_id")
 
+          # Start tracking once per job, using AMS mapping when available.
           if not PENDING_PRINT_METADATA.get("tracking_started"):
-            print_id = insert_print(PENDING_PRINT_METADATA["file"], PRINTER_STATE["print"]["print_type"], PENDING_PRINT_METADATA["image"])
+            if FILAMENT_TRACKER.active_model is not None:
+              PENDING_PRINT_METADATA["tracking_started"] = True
+            else:
+              print_id = PENDING_PRINT_METADATA.get("print_id")
+              if not print_id:
+                print_id = insert_print(PENDING_PRINT_METADATA["file"], PRINTER_STATE["print"]["print_type"], PENDING_PRINT_METADATA["image"])
 
-            PENDING_PRINT_METADATA["ams_mapping"] = []
-            PENDING_PRINT_METADATA["ams_mapping2"] = []
-            PENDING_PRINT_METADATA["filamentChanges"] = []
-            PENDING_PRINT_METADATA["assigned_trays"] = []
-            PENDING_PRINT_METADATA["complete"] = False
-            PENDING_PRINT_METADATA["print_id"] = print_id
-            FILAMENT_TRACKER.start_local_print_from_metadata(PENDING_PRINT_METADATA)
-
-            for id, filament in PENDING_PRINT_METADATA["filaments"].items():
-              parsed_grams = _parse_grams(filament.get("used_g"))
-              parsed_length_m = _parse_grams(filament.get("used_m"))
-              estimated_length_mm = parsed_length_m * 1000 if parsed_length_m is not None else None
-              grams_used = parsed_grams if parsed_grams is not None else 0.0
-              length_used = estimated_length_mm if estimated_length_mm is not None else 0.0
-              if TRACK_LAYER_USAGE:
-                grams_used = 0.0
-                length_used = 0.0
-              insert_filament_usage(
-                  print_id,
-                  filament["type"],
-                  filament["color"],
-                  grams_used,
-                  id,
-                  estimated_grams=parsed_grams,
-                  length_used=length_used,
-                  estimated_length=estimated_length_mm,
+              normalized = normalize_ams_mapping2(
+                PRINTER_STATE["print"].get("ams_mapping2"),
+                PRINTER_STATE["print"].get("ams_mapping"),
               )
+              use_ams_flag = PRINTER_STATE["print"].get("use_ams")
+              has_mapping = any(entry is not None for entry in normalized)
+              use_ams = bool(use_ams_flag) if use_ams_flag is not None else has_mapping
+              if use_ams and normalized:
+                PENDING_PRINT_METADATA["ams_mapping"] = normalized
+                PENDING_PRINT_METADATA["ams_mapping2"] = normalized
+              else:
+                PENDING_PRINT_METADATA.setdefault("ams_mapping", [])
+                PENDING_PRINT_METADATA.setdefault("ams_mapping2", [])
 
-            PENDING_PRINT_METADATA["tracking_started"] = True
+              PENDING_PRINT_METADATA["filamentChanges"] = []
+              PENDING_PRINT_METADATA["assigned_trays"] = []
+
+              filament_order = PENDING_PRINT_METADATA.get("filamentOrder") or {}
+              target_filaments = set()
+              for filament_id in filament_order.keys():
+                try:
+                  target_filaments.add(int(filament_id))
+                except (TypeError, ValueError):
+                  continue
+              assigned_filaments = {
+                idx for idx, tray in enumerate(PENDING_PRINT_METADATA.get("ams_mapping") or [])
+                if tray is not None
+              }
+              if target_filaments:
+                mapping_complete = target_filaments.issubset(assigned_filaments)
+              else:
+                mapping_complete = any(
+                  tray is not None for tray in (PENDING_PRINT_METADATA.get("ams_mapping") or [])
+                )
+              PENDING_PRINT_METADATA["complete"] = mapping_complete
+              PENDING_PRINT_METADATA["print_id"] = print_id
+              FILAMENT_TRACKER.start_local_print_from_metadata(PENDING_PRINT_METADATA)
+
+              _insert_filament_usage_entries(print_id, PENDING_PRINT_METADATA["filaments"])
+
+              PENDING_PRINT_METADATA["tracking_started"] = True
 
         #TODO 
     
+      # Update AMS mapping once the printer reports concrete tray assignments.
       # When stage changed to "change filament" and PENDING_PRINT_METADATA is set
       if (PENDING_PRINT_METADATA and 
           (
@@ -417,6 +490,7 @@ def processMessage(data):
             if mapped:
                 PENDING_PRINT_METADATA["complete"] = True
 
+    # Finalize or spend once metadata is complete.
     if PENDING_PRINT_METADATA and PENDING_PRINT_METADATA.get("complete"):
       if not PENDING_PRINT_METADATA.get("complete_handled"):
         if TRACK_LAYER_USAGE:

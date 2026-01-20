@@ -3,6 +3,8 @@ import sqlite3
 from datetime import datetime
 from pathlib import Path
 
+from logger import log
+
 DEFAULT_DB_NAME = "3d_printer_logs.db"
 DB_ENV_VAR = "OPENSPOOLMAN_PRINT_HISTORY_DB"
 
@@ -132,6 +134,7 @@ def insert_print(file_name: str, print_type: str, image_file: str = None, print_
     print_id = cursor.lastrowid
     conn.commit()
     conn.close()
+    log(f"[print-history] Inserted print {print_id} ({print_type}) file={file_name}")
     return print_id
 
 def insert_filament_usage(
@@ -155,6 +158,7 @@ def insert_filament_usage(
     ''', (print_id, filament_type, color, grams_used, ams_slot, estimated_grams, length_used, estimated_length))
     conn.commit()
     conn.close()
+    log(f"[print-history] Inserted filament usage print={print_id} ams_slot={ams_slot} type={filament_type} grams={grams_used}")
 
 def update_filament_spool(print_id: int, filament_id: int, spool_id: int) -> None:
     """
@@ -163,12 +167,23 @@ def update_filament_spool(print_id: int, filament_id: int, spool_id: int) -> Non
     conn = sqlite3.connect(db_config["db_path"])
     cursor = conn.cursor()
     cursor.execute('''
+        SELECT spool_id
+        FROM filament_usage
+        WHERE ams_slot = ? AND print_id = ?
+    ''', (filament_id, print_id))
+    existing_row = cursor.fetchone()
+    existing_spool = existing_row[0] if existing_row else None
+    cursor.execute('''
         UPDATE filament_usage
         SET spool_id = ?
         WHERE ams_slot = ? AND print_id = ?
     ''', (spool_id, filament_id, print_id))
     conn.commit()
     conn.close()
+    if existing_row is None:
+        log(f"[print-history] No filament_usage row for print={print_id} ams_slot={filament_id} (spool {spool_id} not linked)")
+    elif existing_spool != spool_id:
+        log(f"[print-history] Linked spool {spool_id} to print={print_id} ams_slot={filament_id} (was {existing_spool})")
 
 def update_filament_grams_used(print_id: int, filament_id: int, grams_used: float, length_used: float | None = None) -> None:
     """
