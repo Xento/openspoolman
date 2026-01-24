@@ -3,6 +3,7 @@ import sqlite3
 from datetime import datetime
 from pathlib import Path
 
+import spoolman_client
 from logger import log
 
 DEFAULT_DB_NAME = "3d_printer_logs.db"
@@ -136,6 +137,27 @@ def insert_print(file_name: str, print_type: str, image_file: str = None, print_
     conn.close()
     log(f"[print-history] Inserted print {print_id} ({print_type}) file={file_name}")
     return print_id
+
+
+def _filament_metadata_from_spool(spool_id: int) -> tuple[str, str]:
+    try:
+        spool = spoolman_client.getSpoolById(spool_id)
+    except Exception:
+        spool = None
+    filament = (spool or {}).get("filament") or {}
+    filament_type = (
+        filament.get("material")
+        or filament.get("filament_type")
+        or filament.get("type")
+        or filament.get("name")
+        or "unknown"
+    )
+    color_value = filament.get("color") or filament.get("colors") or ""
+    if isinstance(color_value, (list, tuple)):
+        color = color_value[0] if color_value else ""
+    else:
+        color = color_value or ""
+    return filament_type, color
 
 def insert_filament_usage(
     print_id: int,

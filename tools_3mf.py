@@ -321,7 +321,8 @@ def getMetaDataFrom3mf(url):
       elif url.startswith("local:"):
         download3mfFromLocalFilesystem(url.replace("local:", ""), temp_file)
       elif url.startswith(("file://", "ftp://", "ftps://")):
-        file_path = urlparse(url).path
+        parsed_url = urlparse(url)
+        file_path = parsed_url.path or parsed_url.netloc
         filename = os.path.basename(file_path)
         download3mfFromFTP(filename, temp_file)
       else:
@@ -331,7 +332,8 @@ def getMetaDataFrom3mf(url):
       metadata["model_path"] = url
 
       parsed_url = urlparse(url)
-      metadata["file"] = os.path.basename(parsed_url.path)
+      file_path = parsed_url.path or parsed_url.netloc
+      metadata["file"] = os.path.basename(file_path)
 
       log(f"3MF file downloaded and saved as {temp_file_name}.")
 

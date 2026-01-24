@@ -32,6 +32,26 @@ def clear_active_spool_for_tray(ams_id: int, tray_id: int) -> None:
       spool.setdefault("extra", {})["active_tray"] = json.dumps("")
       break
 
+
+def get_spool_id_for_tray_uid(tray_uid: str) -> int | None:
+  if not tray_uid:
+    return None
+
+  for spool in fetchSpools(cached=True):
+    extras = spool.get("extra") or {}
+    active = extras.get("active_tray")
+    if not active:
+      continue
+    try:
+      active_value = json.loads(active)
+    except Exception:
+      active_value = active
+    if active_value == tray_uid:
+      return spool.get("id")
+
+  return None
+
+
 currency_symbols = {
     "AED": "د.إ", "AFN": "؋", "ALL": "Lek", "AMD": "դր.", "ANG": "ƒ", "AOA": "Kz", 
     "ARS": "$", "AUD": "$", "AWG": "Afl.", "AZN": "₼", "BAM": "KM", "BBD": "$", 
