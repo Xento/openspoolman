@@ -1,0 +1,8 @@
+{
+  "expected_assignments": {
+    "0": {"ams_id": 0, "slot_id": 2}
+  },
+  "expected_model": "Skadis_plier_holder.gcode.3mf",
+  "expected_print_type": "local",
+  "skip_model_download": true
+}

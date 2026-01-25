@@ -5,8 +5,6 @@ import os
 import shutil
 import tempfile
 from pathlib import Path
-from urllib.parse import urlparse
-
 import pytest
 
 import mqtt_bambulab
@@ -114,7 +112,8 @@ def _build_fake_get_meta(model_path: Path):
       raise FileNotFoundError(f"Test 3MF not found: {model_path}")
     metadata = original_get_meta(f"local:{model_path}")
     if _url:
-      metadata["file"] = os.path.basename(_url)
+      _, filename = tools_3mf.filename_from_url(_url)
+      metadata["file"] = filename or _url
       metadata.setdefault("model_url", _url)
     return metadata
   return _fake
@@ -123,11 +122,8 @@ def _build_fake_get_meta(model_path: Path):
 def _build_fake_metadata():
   def _fake(url: str):
     model_url = url or ""
-    model_name = "unknown.3mf"
-    if url:
-      parsed = urlparse(url)
-      if parsed.path:
-        model_name = os.path.basename(parsed.path)
+    _, filename = tools_3mf.filename_from_url(url)
+    model_name = filename or "unknown.3mf"
     return {
       "image": "test.png",
       "filaments": {
@@ -154,12 +150,8 @@ def _is_model_url(value: str) -> bool:
 
 
 def _model_name_from_url(url: str | None) -> str | None:
-  if not url:
-    return None
-  parsed = urlparse(url)
-  if not parsed.path:
-    return None
-  return os.path.basename(parsed.path)
+  _, filename = tools_3mf.filename_from_url(url)
+  return filename
 
 
 def test_print_mode_classification():
@@ -208,13 +200,14 @@ def test_mqtt_log_tray_detection(log_path, track_layer_usage, tmp_path, monkeypa
   if not skip_3mf_download:
     model_path = _base_model_from_log(log_path)
     if not model_path.exists():
-      pytest.skip(f"Missing test model: {model_path}")
-
-    temp_file = tempfile.NamedTemporaryFile(suffix=".3mf", delete=False)
-    temp_file.close()
-    temp_model_path = Path(temp_file.name)
-    shutil.copy2(model_path, temp_model_path)
-  else:
+      # Only verify the file name/model URL when no local 3MF is available.
+      skip_3mf_download = True
+    else:
+      temp_file = tempfile.NamedTemporaryFile(suffix=".3mf", delete=False)
+      temp_file.close()
+      temp_model_path = Path(temp_file.name)
+      shutil.copy2(model_path, temp_model_path)
+  if skip_3mf_download:
     # Provide a stub 3MF path so the filament tracker can initialize AMS mapping.
     temp_file = tempfile.NamedTemporaryFile(suffix=".3mf", delete=False)
     temp_file.close()
