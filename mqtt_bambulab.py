@@ -412,10 +412,15 @@ def processMessage(data):
         print_id = insert_print(print_name, print_type, PENDING_PRINT_METADATA["image"])
         PENDING_PRINT_METADATA["print_id"] = print_id
         ACTIVE_PRINT_ID = print_id
+        if not PENDING_PRINT_METADATA.get("filament_usage_inserted") and PENDING_PRINT_METADATA.get("filaments"):
+          _insert_filament_usage_entries(print_id, PENDING_PRINT_METADATA["filaments"])
+          PENDING_PRINT_METADATA["filament_usage_inserted"] = True
         _link_spools_to_print(print_id, normalized)
         PENDING_PRINT_METADATA["complete"] = True
 
-        _insert_filament_usage_entries(print_id, PENDING_PRINT_METADATA["filaments"])
+        if not PENDING_PRINT_METADATA.get("filament_usage_inserted") and PENDING_PRINT_METADATA.get("filaments"):
+          _insert_filament_usage_entries(print_id, PENDING_PRINT_METADATA["filaments"])
+          PENDING_PRINT_METADATA["filament_usage_inserted"] = True
         if TRACK_LAYER_USAGE:
           FILAMENT_TRACKER.set_print_metadata(PENDING_PRINT_METADATA)
         return
@@ -501,6 +506,9 @@ def processMessage(data):
               )
               PENDING_PRINT_METADATA["print_id"] = print_id
               ACTIVE_PRINT_ID = print_id
+              if not PENDING_PRINT_METADATA.get("filament_usage_inserted") and PENDING_PRINT_METADATA.get("filaments"):
+                _insert_filament_usage_entries(print_id, PENDING_PRINT_METADATA["filaments"])
+                PENDING_PRINT_METADATA["filament_usage_inserted"] = True
               _link_spools_to_print(print_id, PENDING_PRINT_METADATA.get("ams_mapping"))
 
           # Start tracking once per job, using AMS mapping when available.
@@ -559,7 +567,9 @@ def processMessage(data):
               _link_spools_to_print(print_id, PENDING_PRINT_METADATA.get("ams_mapping"))
               FILAMENT_TRACKER.start_local_print_from_metadata(PENDING_PRINT_METADATA)
 
-              _insert_filament_usage_entries(print_id, PENDING_PRINT_METADATA["filaments"])
+              if not PENDING_PRINT_METADATA.get("filament_usage_inserted") and PENDING_PRINT_METADATA.get("filaments"):
+                _insert_filament_usage_entries(print_id, PENDING_PRINT_METADATA["filaments"])
+                PENDING_PRINT_METADATA["filament_usage_inserted"] = True
 
               PENDING_PRINT_METADATA["tracking_started"] = True
 
