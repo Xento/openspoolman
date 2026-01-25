@@ -43,6 +43,7 @@ LAST_AMS_CONFIG = {}  # Global variable storing last AMS configuration
 
 PRINTER_STATE = {}
 PRINTER_STATE_LAST = {}
+ACTIVE_PRINT_ID = None
 
 PENDING_PRINT_METADATA = {}
 FILAMENT_TRACKER = FilamentUsageTracker()
@@ -71,8 +72,6 @@ def _classify_project_source(
     return "lan_only" if has_ams_mapping else "local"
   if incoming_type:
     return incoming_type
-  if has_ams_mapping:
-    return "lan_only"
   return "local"
 
 def _insert_filament_usage_entries(print_id, filaments: dict) -> None:
@@ -349,7 +348,7 @@ def map_filament(tray_tar):
   return False
   
 def processMessage(data):
-  global LAST_AMS_CONFIG, PRINTER_STATE, PRINTER_STATE_LAST, PENDING_PRINT_METADATA
+  global LAST_AMS_CONFIG, PRINTER_STATE, PRINTER_STATE_LAST, PENDING_PRINT_METADATA, ACTIVE_PRINT_ID
 
    # Prepare AMS spending estimation
   if "print" in data:    
@@ -357,14 +356,9 @@ def processMessage(data):
     
     # Handle project_file events (3MF metadata load) uniformly regardless of origin.
     if data["print"].get("command") == "project_file" and data["print"].get("url"):
+      ACTIVE_PRINT_ID = None
       url = data["print"].get("url")
       incoming_type = PRINTER_STATE["print"].get("print_type")
-      scheme = (urlparse(url).scheme or "").lower()
-      log(
-        f"[filament-tracker] project_file url={url!r} scheme={scheme or 'none'} "
-        f"classified={source_type}"
-      )
-
       metadata = _load_project_metadata(url)
       if metadata is None:
         log(
@@ -376,10 +370,6 @@ def processMessage(data):
         return
 
       PENDING_PRINT_METADATA = metadata
-      PENDING_PRINT_METADATA["task_id"] = PRINTER_STATE["print"].get("task_id")
-      PENDING_PRINT_METADATA["subtask_id"] = PRINTER_STATE["print"].get("subtask_id")
-      PENDING_PRINT_METADATA["print_type"] = source_type
-
       # check if ams_mapping is available
       normalized = normalize_ams_mapping2(
         PRINTER_STATE["print"].get("ams_mapping2"),
@@ -387,6 +377,14 @@ def processMessage(data):
       )
       has_ams_mapping = any(entry is not None for entry in normalized)
       source_type = _classify_project_source(url, incoming_type, has_ams_mapping)
+      scheme = (urlparse(url).scheme or "").lower()
+      log(
+        f"[filament-tracker] project_file url={url!r} scheme={scheme or 'none'} "
+        f"classified={source_type}"
+      )
+      PENDING_PRINT_METADATA["task_id"] = PRINTER_STATE["print"].get("task_id")
+      PENDING_PRINT_METADATA["subtask_id"] = PRINTER_STATE["print"].get("subtask_id")
+      PENDING_PRINT_METADATA["print_type"] = source_type
       use_ams_flag = PRINTER_STATE["print"].get("use_ams")
       use_ams = bool(use_ams_flag) if use_ams_flag is not None else bool(normalized)
 
@@ -394,7 +392,7 @@ def processMessage(data):
       if not use_ams:
         normalized = [normalize_ams_mapping_entry(EXTERNAL_SPOOL_ID)]
 
-      start_immediately = source_type in ("cloud", "lan_only")
+      start_immediately = source_type == "cloud"
 
       if normalized:
         PENDING_PRINT_METADATA["ams_mapping"] = normalized
@@ -413,6 +411,7 @@ def processMessage(data):
         print_type = PENDING_PRINT_METADATA["print_type"]
         print_id = insert_print(print_name, print_type, PENDING_PRINT_METADATA["image"])
         PENDING_PRINT_METADATA["print_id"] = print_id
+        ACTIVE_PRINT_ID = print_id
         _link_spools_to_print(print_id, normalized)
         PENDING_PRINT_METADATA["complete"] = True
 
@@ -467,16 +466,27 @@ def processMessage(data):
 
         # Ensure metadata is loaded from the 3MF before starting tracking.
         if not PENDING_PRINT_METADATA or not PENDING_PRINT_METADATA.get("metadata_loaded"):
+          existing_metadata = PENDING_PRINT_METADATA or {}
+          existing_print_id = existing_metadata.get("print_id")
+          existing_print_type = existing_metadata.get("print_type")
           PENDING_PRINT_METADATA = getMetaDataFrom3mf(PRINTER_STATE["print"]["gcode_file"])
           if PENDING_PRINT_METADATA and PENDING_PRINT_METADATA.get("filaments"):
             PENDING_PRINT_METADATA["metadata_loaded"] = True
+            if existing_print_id and not PENDING_PRINT_METADATA.get("print_id"):
+              PENDING_PRINT_METADATA["print_id"] = existing_print_id
+            if existing_print_type and not PENDING_PRINT_METADATA.get("print_type"):
+              PENDING_PRINT_METADATA["print_type"] = existing_print_type
         if PENDING_PRINT_METADATA and PENDING_PRINT_METADATA.get("filaments"):
-          PENDING_PRINT_METADATA["print_type"] = print_type or "local"
+          if not PENDING_PRINT_METADATA.get("print_type"):
+            PENDING_PRINT_METADATA["print_type"] = print_type or "local"
           PENDING_PRINT_METADATA["task_id"] = PRINTER_STATE["print"].get("task_id")
           PENDING_PRINT_METADATA["subtask_id"] = PRINTER_STATE["print"].get("subtask_id")
 
           if gcode_state == "RUNNING":
             print_id = PENDING_PRINT_METADATA.get("print_id")
+            if not print_id and ACTIVE_PRINT_ID:
+              print_id = ACTIVE_PRINT_ID
+              PENDING_PRINT_METADATA["print_id"] = print_id
             if not print_id:
               print_name = (
                 PENDING_PRINT_METADATA.get("file")
@@ -490,6 +500,7 @@ def processMessage(data):
                 PENDING_PRINT_METADATA.get("image"),
               )
               PENDING_PRINT_METADATA["print_id"] = print_id
+              ACTIVE_PRINT_ID = print_id
               _link_spools_to_print(print_id, PENDING_PRINT_METADATA.get("ams_mapping"))
 
           # Start tracking once per job, using AMS mapping when available.
@@ -498,12 +509,16 @@ def processMessage(data):
               PENDING_PRINT_METADATA["tracking_started"] = True
             else:
               print_id = PENDING_PRINT_METADATA.get("print_id")
+              if not print_id and ACTIVE_PRINT_ID:
+                print_id = ACTIVE_PRINT_ID
+                PENDING_PRINT_METADATA["print_id"] = print_id
               if not print_id:
                 print_id = insert_print(
                   PENDING_PRINT_METADATA["file"],
                   print_type or "local",
                   PENDING_PRINT_METADATA["image"],
                 )
+                ACTIVE_PRINT_ID = print_id
 
               normalized = normalize_ams_mapping2(
                 PRINTER_STATE["print"].get("ams_mapping2"),
@@ -608,11 +623,16 @@ def processMessage(data):
         PENDING_PRINT_METADATA["complete_handled"] = True
 
       should_clear = True
-      if PENDING_PRINT_METADATA.get("print_type") == "local" and not PENDING_PRINT_METADATA.get("tracking_started"):
+      if PENDING_PRINT_METADATA.get("print_type") in ("local", "lan_only") and not PENDING_PRINT_METADATA.get("tracking_started"):
         should_clear = False
       if should_clear:
         PENDING_PRINT_METADATA = {}
   
+    gcode_state = PRINTER_STATE.get("print", {}).get("gcode_state")
+    prev_gcode_state = PRINTER_STATE_LAST.get("print", {}).get("gcode_state")
+    if gcode_state in ("FINISH", "FAILED", "IDLE") and prev_gcode_state not in (None, "FINISH", "FAILED", "IDLE"):
+      ACTIVE_PRINT_ID = None
+
     PRINTER_STATE_LAST = copy.deepcopy(PRINTER_STATE)
 
 def publish(client, msg):
