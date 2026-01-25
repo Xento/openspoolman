@@ -48,17 +48,6 @@ PENDING_PRINT_METADATA = {}
 FILAMENT_TRACKER = FilamentUsageTracker()
 LOG_FILE = "/home/app/logs/mqtt.log"
 
-def _is_local_project_file(print_obj: dict | None) -> bool:
-  if not print_obj:
-    return False
-  if print_obj.get("print_type") == "local":
-    return True
-  url = print_obj.get("url") or ""
-  if not url:
-    return False
-  scheme = urlparse(url).scheme
-  return scheme in ("file", "local", "ftp", "ftps")
-
 def _load_project_metadata(url: str) -> dict | None:
   metadata = getMetaDataFrom3mf(url)
   if not metadata or not metadata.get("filaments"):
@@ -66,6 +55,25 @@ def _load_project_metadata(url: str) -> dict | None:
     return None
   metadata["metadata_loaded"] = True
   return metadata
+
+
+def _classify_project_source(
+  url: str | None,
+  incoming_type: str | None,
+  has_ams_mapping: bool,
+) -> str:
+  scheme = (urlparse(url).scheme or "").lower()
+  if scheme in ("http", "https"):
+    return "cloud"
+  if incoming_type == "cloud":
+    return "cloud"
+  if incoming_type == "local":
+    return "lan_only" if has_ams_mapping else "local"
+  if incoming_type:
+    return incoming_type
+  if has_ams_mapping:
+    return "lan_only"
+  return "local"
 
 def _insert_filament_usage_entries(print_id, filaments: dict) -> None:
   log(f"[print-history] Preparing to insert {len(filaments)} filament rows for print {print_id}")
@@ -143,6 +151,10 @@ def getPrinterModel():
         "model": model_name,
         "devicename": device_name
     }
+
+def _supports_early_ftp_download() -> bool:
+  model_name = (getPrinterModel() or {}).get("model", "")
+  return model_name in {"A1", "A1 Mini", "P1P", "P1S"}
 
 def identify_ams_model_from_module(module: dict[str, Any]) -> str | None:
     """Guess the AMS variant that a version module represents."""
@@ -272,9 +284,18 @@ def map_filament(tray_tar):
       PENDING_PRINT_METADATA.get("ams_mapping2"),
       PENDING_PRINT_METADATA.get("ams_mapping"),
     )
-    if existing_mapping and all(entry is not None for entry in existing_mapping):
-      log("Skipping tray-change mapping because AMS mapping is already complete")
-      return None
+    if existing_mapping:
+      filament_order = PENDING_PRINT_METADATA.get("filamentOrder") or {}
+      target_filaments = {int(fid) for fid in filament_order.keys() if str(fid).isdigit()}
+      assigned_filaments = {
+        idx for idx, tray in enumerate(existing_mapping) if tray is not None
+      }
+      if (
+        (target_filaments and target_filaments.issubset(assigned_filaments))
+        or (not target_filaments and all(entry is not None for entry in existing_mapping))
+      ):
+        log("Skipping tray-change mapping because AMS mapping is already complete")
+        return None
     filament_changes = PENDING_PRINT_METADATA.setdefault("filamentChanges", [])
     filament_changes.append(tray_tar)  # Jeder Wechsel zählt, auch auf das gleiche Tray
     log(f'Filamentchange {len(filament_changes)}: Tray {tray_tar}')
@@ -337,11 +358,11 @@ def processMessage(data):
     # Handle project_file events (3MF metadata load) uniformly regardless of origin.
     if data["print"].get("command") == "project_file" and data["print"].get("url"):
       url = data["print"].get("url")
+      incoming_type = PRINTER_STATE["print"].get("print_type")
       scheme = (urlparse(url).scheme or "").lower()
-      is_web_source = scheme in ("http", "https")
       log(
         f"[filament-tracker] project_file url={url!r} scheme={scheme or 'none'} "
-        f"classified={'cloud (web)' if is_web_source else 'local'}"
+        f"classified={source_type}"
       )
 
       metadata = _load_project_metadata(url)
@@ -357,13 +378,15 @@ def processMessage(data):
       PENDING_PRINT_METADATA = metadata
       PENDING_PRINT_METADATA["task_id"] = PRINTER_STATE["print"].get("task_id")
       PENDING_PRINT_METADATA["subtask_id"] = PRINTER_STATE["print"].get("subtask_id")
-      PENDING_PRINT_METADATA["print_type"] = "cloud" if is_web_source else "local"
+      PENDING_PRINT_METADATA["print_type"] = source_type
 
       # check if ams_mapping is available
       normalized = normalize_ams_mapping2(
         PRINTER_STATE["print"].get("ams_mapping2"),
         PRINTER_STATE["print"].get("ams_mapping"),
       )
+      has_ams_mapping = any(entry is not None for entry in normalized)
+      source_type = _classify_project_source(url, incoming_type, has_ams_mapping)
       use_ams_flag = PRINTER_STATE["print"].get("use_ams")
       use_ams = bool(use_ams_flag) if use_ams_flag is not None else bool(normalized)
 
@@ -371,9 +394,15 @@ def processMessage(data):
       if not use_ams:
         normalized = [normalize_ams_mapping_entry(EXTERNAL_SPOOL_ID)]
 
+      start_immediately = source_type in ("cloud", "lan_only")
+
       if normalized:
         PENDING_PRINT_METADATA["ams_mapping"] = normalized
         PENDING_PRINT_METADATA["ams_mapping2"] = normalized
+
+        if not start_immediately:
+          PRINTER_STATE_LAST = copy.deepcopy(PRINTER_STATE)
+          return
 
         print_name = (
           PRINTER_STATE["print"].get("subtask_name")
@@ -398,21 +427,43 @@ def processMessage(data):
     #if ("gcode_state" in data["print"] and data["print"]["gcode_state"] == "RUNNING") and ("print_type" in data["print"] and data["print"]["print_type"] != "local") \
     #  and ("tray_tar" in data["print"] and data["print"]["tray_tar"] != "255") and ("stg_cur" in data["print"] and data["print"]["stg_cur"] == 0 and PRINT_CURRENT_STAGE != 0):
     
-    #TODO: What happens when printed from external spool, is ams and tray_tar set?
-    # Local print flow: start tracking once the job is RUNNING and metadata is available.
-    if PRINTER_STATE.get("print", {}).get("print_type") == "local" and PRINTER_STATE_LAST.get("print"):
-      if (
-          PRINTER_STATE["print"].get("gcode_state") == "RUNNING" and
-          PRINTER_STATE["print"].get("gcode_file") and
-          (
-            PRINTER_STATE_LAST["print"].get("gcode_state") == "PREPARE" or
-            (
-              PENDING_PRINT_METADATA
-              and PENDING_PRINT_METADATA.get("metadata_loaded")
-              and not PENDING_PRINT_METADATA.get("tracking_started")
-            )
+    # Local/SD print flow: start tracking once download is complete (>=99%) or the job is RUNNING.
+    print_state = PRINTER_STATE.get("print", {})
+    print_type = print_state.get("print_type")
+    project_id = print_state.get("project_id")
+    is_local_like = print_type == "local" or (
+      (project_id in (None, 0, "0")) and print_type != "cloud"
+    )
+    if is_local_like and PRINTER_STATE_LAST.get("print"):
+      gcode_state = print_state.get("gcode_state")
+      prev_gcode_state = PRINTER_STATE_LAST["print"].get("gcode_state")
+      previously_idle = prev_gcode_state in ("IDLE", "FAILED", "FINISH")
+      try:
+        gcode_file_prepare_percent = int(print_state.get("gcode_file_prepare_percent", "-1"))
+      except (TypeError, ValueError):
+        gcode_file_prepare_percent = -1
+
+      download_ready = (
+        _supports_early_ftp_download()
+        and gcode_state == "PREPARE"
+        and gcode_file_prepare_percent >= 99
+      )
+      ran_without_download = gcode_state == "RUNNING" and (
+        previously_idle or prev_gcode_state == "PREPARE"
+      )
+      should_attempt_tracking = (
+        print_state.get("gcode_file")
+        and (
+          download_ready
+          or ran_without_download
+          or (
+            PENDING_PRINT_METADATA
+            and PENDING_PRINT_METADATA.get("metadata_loaded")
+            and not PENDING_PRINT_METADATA.get("tracking_started")
           )
-        ):
+        )
+      )
+      if should_attempt_tracking:
 
         # Ensure metadata is loaded from the 3MF before starting tracking.
         if not PENDING_PRINT_METADATA or not PENDING_PRINT_METADATA.get("metadata_loaded"):
@@ -420,9 +471,26 @@ def processMessage(data):
           if PENDING_PRINT_METADATA and PENDING_PRINT_METADATA.get("filaments"):
             PENDING_PRINT_METADATA["metadata_loaded"] = True
         if PENDING_PRINT_METADATA and PENDING_PRINT_METADATA.get("filaments"):
-          PENDING_PRINT_METADATA["print_type"] = PRINTER_STATE["print"].get("print_type")
+          PENDING_PRINT_METADATA["print_type"] = print_type or "local"
           PENDING_PRINT_METADATA["task_id"] = PRINTER_STATE["print"].get("task_id")
           PENDING_PRINT_METADATA["subtask_id"] = PRINTER_STATE["print"].get("subtask_id")
+
+          if gcode_state == "RUNNING":
+            print_id = PENDING_PRINT_METADATA.get("print_id")
+            if not print_id:
+              print_name = (
+                PENDING_PRINT_METADATA.get("file")
+                or PENDING_PRINT_METADATA.get("model_path")
+                or PRINTER_STATE["print"].get("subtask_name")
+                or "print"
+              )
+              print_id = insert_print(
+                print_name,
+                print_type or "local",
+                PENDING_PRINT_METADATA.get("image"),
+              )
+              PENDING_PRINT_METADATA["print_id"] = print_id
+              _link_spools_to_print(print_id, PENDING_PRINT_METADATA.get("ams_mapping"))
 
           # Start tracking once per job, using AMS mapping when available.
           if not PENDING_PRINT_METADATA.get("tracking_started"):
@@ -431,7 +499,11 @@ def processMessage(data):
             else:
               print_id = PENDING_PRINT_METADATA.get("print_id")
               if not print_id:
-                print_id = insert_print(PENDING_PRINT_METADATA["file"], PRINTER_STATE["print"]["print_type"], PENDING_PRINT_METADATA["image"])
+                print_id = insert_print(
+                  PENDING_PRINT_METADATA["file"],
+                  print_type or "local",
+                  PENDING_PRINT_METADATA["image"],
+                )
 
               normalized = normalize_ams_mapping2(
                 PRINTER_STATE["print"].get("ams_mapping2"),

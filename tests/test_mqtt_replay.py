@@ -92,9 +92,15 @@ def _stub_spoolman(monkeypatch):
   monkeypatch.setattr(spoolman_client, "fetchSpoolList", lambda *args, **kwargs: copy.deepcopy(_build_mock_spools()))
 
 
-def _stub_history(monkeypatch):
+def _stub_history(monkeypatch, insert_calls=None):
   # Keep DB untouched.
-  monkeypatch.setattr("print_history.insert_print", lambda *args, **kwargs: 1)
+  def _record_insert(*args, **kwargs):
+    if insert_calls is not None:
+      insert_calls.append((args, kwargs))
+    return 1
+
+  monkeypatch.setattr("print_history.insert_print", _record_insert)
+  monkeypatch.setattr("mqtt_bambulab.insert_print", _record_insert)
   monkeypatch.setattr("print_history.insert_filament_usage", lambda *args, **kwargs: None)
   monkeypatch.setattr("print_history.update_filament_spool", lambda *args, **kwargs: None)
   monkeypatch.setattr("print_history.update_filament_grams_used", lambda *args, **kwargs: None)
@@ -156,6 +162,24 @@ def _model_name_from_url(url: str | None) -> str | None:
   return os.path.basename(parsed.path)
 
 
+def test_print_mode_classification():
+  assert mqtt_bambulab._classify_project_source(
+    "https://or-cloud-upload-prod.s3.us-west-2.amazonaws.com/model.3mf",
+    None,
+    False,
+  ) == "cloud"
+  assert mqtt_bambulab._classify_project_source(
+    "file:///data/Metadata/plate_1.gcode",
+    "local",
+    True,
+  ) == "lan_only"
+  assert mqtt_bambulab._classify_project_source(
+    "file:///data/Metadata/plate_1.gcode",
+    "local",
+    False,
+  ) == "local"
+
+
 @pytest.mark.parametrize(
   "track_layer_usage",
   [False, True],
@@ -196,8 +220,9 @@ def test_mqtt_log_tray_detection(log_path, track_layer_usage, tmp_path, monkeypa
     temp_file.close()
     temp_model_path = Path(temp_file.name)
 
+  insert_calls = []
   _stub_spoolman(monkeypatch)
-  _stub_history(monkeypatch)
+  _stub_history(monkeypatch, insert_calls)
 
   def _record_metadata_assignments(metadata):
     for idx, tray in enumerate((metadata or {}).get("ams_mapping", [])):
@@ -370,6 +395,10 @@ def test_mqtt_log_tray_detection(log_path, track_layer_usage, tmp_path, monkeypa
     assert observed_print_type == expected_print_type, (
       f"{log_path.name}: print type mismatch expected={expected_print_type} observed={observed_print_type}"
     )
+
+  assert len(insert_calls) <= 1, (
+    f"{log_path.name}: expected at most one print insert, got {len(insert_calls)}"
+  )
 
   caplog.set_level(logging.INFO)
   logging.getLogger(__name__).info(
