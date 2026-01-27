@@ -10,7 +10,7 @@ from config import (
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from pathlib import Path
-from print_history import update_filament_spool
+from print_history import update_filament_spool, update_filament_grams_used
 import json
 
 import spoolman_client
@@ -484,10 +484,19 @@ def spendFilaments(printdata):
     if not tray_uid:
       tray_uid = trayUid(EXTERNAL_SPOOL_AMS_ID, EXTERNAL_SPOOL_ID)
 
+    used_length_mm = None
+    used_m = filament.get("used_m")
+    if used_m is not None:
+      try:
+        used_length_mm = float(used_m) * 1000
+      except (TypeError, ValueError):
+        used_length_mm = None
+
     ams_usage.append({
       "trayUid": tray_uid,
       "id": filamentId,
       "usedGrams": float(filament["used_g"]),
+      "usedLengthMm": used_length_mm,
     })
 
   for spool in fetchSpools():
@@ -503,6 +512,12 @@ def spendFilaments(printdata):
         if active_tray == ams_tray["trayUid"]:
           used_grams += ams_tray["usedGrams"]
           update_filament_spool(printdata["print_id"], ams_tray["id"], spool["id"])
+          update_filament_grams_used(
+            printdata["print_id"],
+            ams_tray["id"],
+            ams_tray["usedGrams"],
+            length_used=ams_tray.get("usedLengthMm"),
+          )
         
       if used_grams != 0:
         spoolman_client.consumeSpool(spool["id"], used_grams)

@@ -17,7 +17,13 @@ from spoolman_service import (
     tray_uid_from_mapping_entry,
 )
 from tools_3mf import download3mfFromCloud, download3mfFromFTP, download3mfFromLocalFilesystem
-from print_history import update_filament_spool, update_filament_grams_used, get_all_filament_usage_for_print, update_layer_tracking
+from print_history import (
+  insert_filament_usage,
+  update_filament_spool,
+  update_filament_grams_used,
+  get_all_filament_usage_for_print,
+  update_layer_tracking,
+)
 from logger import log
 
 

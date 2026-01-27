@@ -392,7 +392,13 @@ def processMessage(data):
       if not use_ams:
         normalized = [normalize_ams_mapping_entry(EXTERNAL_SPOOL_ID)]
 
-      start_immediately = source_type == "cloud"
+      start_immediately = source_type in ("cloud", "lan_only") or (
+        source_type == "local" and has_ams_mapping
+      )
+      log(
+        "[filament-tracker] project_file start_immediately=%s has_ams_mapping=%s"
+        % (start_immediately, has_ams_mapping)
+      )
 
       if normalized:
         PENDING_PRINT_METADATA["ams_mapping"] = normalized
@@ -510,6 +516,8 @@ def processMessage(data):
                 _insert_filament_usage_entries(print_id, PENDING_PRINT_METADATA["filaments"])
                 PENDING_PRINT_METADATA["filament_usage_inserted"] = True
               _link_spools_to_print(print_id, PENDING_PRINT_METADATA.get("ams_mapping"))
+            if TRACK_LAYER_USAGE and print_id:
+              FILAMENT_TRACKER.set_print_metadata(PENDING_PRINT_METADATA)
 
           # Start tracking once per job, using AMS mapping when available.
           if not PENDING_PRINT_METADATA.get("tracking_started"):
@@ -618,15 +626,16 @@ def processMessage(data):
             FILAMENT_TRACKER.apply_ams_mapping(PENDING_PRINT_METADATA.get("ams_mapping") or [])
             if mapped:
                 PENDING_PRINT_METADATA["complete"] = True
+                log(f"[print-history] Metadata complete via tray mapping: print_id={PENDING_PRINT_METADATA.get('print_id')} print_type={PENDING_PRINT_METADATA.get('print_type')} ams_mapping={PENDING_PRINT_METADATA.get('ams_mapping')}")
 
     # Finalize or spend once metadata is complete.
     if PENDING_PRINT_METADATA and PENDING_PRINT_METADATA.get("complete"):
       if not PENDING_PRINT_METADATA.get("complete_handled"):
+        log(f"[print-history] Handling complete metadata: print_id={PENDING_PRINT_METADATA.get('print_id')} print_type={PENDING_PRINT_METADATA.get('print_type')} tracking_started={PENDING_PRINT_METADATA.get('tracking_started')}")
         if TRACK_LAYER_USAGE:
+          FILAMENT_TRACKER.set_print_metadata(PENDING_PRINT_METADATA)
           if PENDING_PRINT_METADATA.get("print_type") == "local":
             FILAMENT_TRACKER.apply_ams_mapping(PENDING_PRINT_METADATA.get("ams_mapping") or [])
-          else:
-            FILAMENT_TRACKER.set_print_metadata(PENDING_PRINT_METADATA)
           # Per-layer tracker will handle consumption; skip upfront spend.
         else:
           spendFilaments(PENDING_PRINT_METADATA)
@@ -636,6 +645,7 @@ def processMessage(data):
       if PENDING_PRINT_METADATA.get("print_type") in ("local", "lan_only") and not PENDING_PRINT_METADATA.get("tracking_started"):
         should_clear = False
       if should_clear:
+        log("[print-history] Clearing pending print metadata after completion")
         PENDING_PRINT_METADATA = {}
   
     gcode_state = PRINTER_STATE.get("print", {}).get("gcode_state")
