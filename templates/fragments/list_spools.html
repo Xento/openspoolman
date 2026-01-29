@@ -117,7 +117,7 @@
     {% endif %}
 
     {% if action_assign_print %}
-    <a href="{{ url_for('print_history', print_id=print_id, ams_slot=ams_slot, spool_id=spool.id, old_spool_id=old_spool_id,_anchor='print_' + print_id) }}" class="spool-action-link">
+    <a href="{{ url_for('print_history', print_id=print_id, ams_slot=ams_slot, spool_id=spool.id, old_spool_id=old_spool_id, _anchor='print_' + print_id) }}" class="spool-action-link">
       <span class="badge bg-primary rounded-pill">
         <i class="bi bi-plus-circle"></i> Assign
       </span>

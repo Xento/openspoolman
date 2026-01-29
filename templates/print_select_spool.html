@@ -6,7 +6,7 @@
 {% if change_spool %}
 <h1 class="mb-4 text-center">Change spool</h1>
 <div class="text-center mb-4">
-  <a href="{{ url_for('print_history', print_id=print_id, ams_slot=ams_slot, spool_id='-1',old_spool_id=old_spool_id, _anchor='print_' + print_id) }}" class="btn btn-danger">
+  <a href="{{ url_for('print_history', print_id=print_id, ams_slot=ams_slot, spool_id='-1', old_spool_id=old_spool_id, _anchor='print_' + print_id) }}" class="btn btn-danger">
     <i class="bi bi-x-circle me-2"></i>Remove Assignment
   </a>
 </div>

@@ -7,6 +7,7 @@ import socket
 import ssl
 import os
 import re
+import io
 import time
 import io
 from datetime import datetime
@@ -81,6 +82,7 @@ def parse_date(item):
 def get_filament_order(file):
     filament_order = {} 
     switch_count = 0 
+    filament_ids = set()
 
     for line in file:
         match_filament = re.match(r"^M620 S(\d+)[^;\r\n]*", line.decode("utf-8").strip())
@@ -88,12 +90,39 @@ def get_filament_order(file):
             filament = int(match_filament.group(1))
             if filament not in filament_order and int(filament) != 255:
                 filament_order[int(filament)] = switch_count
+                filament_ids.add(filament)
             switch_count += 1
 
+    if filament_ids and 0 not in filament_ids:
+       filament_order = {fid - 1: order for fid, order in filament_order.items()}
+       log("[filament-tracker] Normalized filament order to 0-based indexing")
+
     if len(filament_order) == 0:
-       filament_order = {1:0}
+       filament_order = {0:0}
 
     return filament_order
+
+def get_filament_sequence(file):
+    sequence = []
+    filament_ids = set()
+
+    for line in file:
+        match_filament = re.match(r"^M620 S(\d+)[^;\r\n]*", line.decode("utf-8").strip())
+        if match_filament:
+            filament = int(match_filament.group(1))
+            if filament == 255:
+                continue
+            sequence.append(filament)
+            filament_ids.add(filament)
+
+    if filament_ids and 0 not in filament_ids:
+       sequence = [fid - 1 for fid in sequence]
+       log("[filament-tracker] Normalized filament sequence to 0-based indexing")
+
+    if len(sequence) == 0:
+       sequence = [0]
+
+    return sequence
 
 def download3mfFromCloud(url, destFile):
   log("Downloading 3MF file from cloud...")
@@ -308,7 +337,16 @@ def download3mfFromLocalFilesystem(path, destFile):
   with open(path, "rb") as src_file:
     destFile.write(src_file.read())
 
-def getMetaDataFrom3mf(url):
+def _plate_id_from_gcode_path(gcode_path: str | None) -> str | None:
+  if not gcode_path:
+    return None
+  match = re.search(r"plate_(\d+)\.gcode", os.path.basename(gcode_path))
+  if match:
+    return match.group(1)
+  return None
+
+
+def getMetaDataFrom3mf(url, gcode_path: str | None = None):
   """
   Download a 3MF file from a URL, unzip it, and parse filament usage.
 
@@ -320,30 +358,36 @@ def getMetaDataFrom3mf(url):
   """
   try:
     metadata = {}
+    desired_plate_id = _plate_id_from_gcode_path(gcode_path)
 
     temp_file_name = None
-    # Create a temporary file; we clean it up manually to keep compatibility across platforms.
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".3mf") as temp_file:
-      temp_file_name = temp_file.name
-      
-      filepath, filename = filename_from_url(url)
-      metadata["file"] = filename or url
+    local_path = None
+    zip_path = None
 
-      if url.startswith("http"):
-        download3mfFromCloud(url, temp_file)
-      elif url.startswith("local:"):
-        download3mfFromLocalFilesystem(url.replace("local:", ""), temp_file)
-      #elif url.startswith(("file://", "ftp://", "ftps://")):
-      else:
-        download3mfFromFTP(filename or url, temp_file)
-      
-      temp_file.close()
+    filepath, filename = filename_from_url(url)
+    metadata["file"] = filename or url
+
+    if url.startswith("local:"):
+      local_path = url.replace("local:", "")
+      if not os.path.exists(local_path):
+        log(f"Local 3MF file not found: {local_path}")
+        return {}
       metadata["model_path"] = url
-
+      zip_path = local_path
+    else:
+      # Create a temporary file; we clean it up manually to keep compatibility across platforms.
+      with tempfile.NamedTemporaryFile(delete=False, suffix=".3mf") as temp_file:
+        temp_file_name = temp_file.name
+        if url.startswith("http"):
+          download3mfFromCloud(url, temp_file)
+        else:
+          download3mfFromFTP(filename or url, temp_file)
+      metadata["model_path"] = url
+      zip_path = temp_file_name
       log(f"3MF file downloaded and saved as {temp_file_name}.")
 
-      # Unzip the 3MF file
-      with zipfile.ZipFile(temp_file_name, 'r') as z:
+    # Unzip the 3MF file
+    with zipfile.ZipFile(zip_path, 'r') as z:
         # Check for the Metadata/slice_info.config file
         slice_info_path = "Metadata/slice_info.config"
         if slice_info_path in z.namelist():
@@ -393,26 +437,49 @@ def getMetaDataFrom3mf(url):
             </config>
             """
             
-            for meta in root.findall(".//plate/metadata"):
-              if meta.attrib.get("key") == "index":
-                  metadata["plateID"] = meta.attrib.get("value", "")
+            plates = root.findall(".//plate")
+            selected_plate = None
+            selected_plate_id = None
+            if desired_plate_id:
+              for plate in plates:
+                plate_id = None
+                for meta in plate.findall("./metadata"):
+                  if meta.attrib.get("key") == "index":
+                    plate_id = meta.attrib.get("value")
+                    break
+                if plate_id == desired_plate_id:
+                  selected_plate = plate
+                  selected_plate_id = plate_id
+                  break
+            if selected_plate is None and plates:
+              selected_plate = plates[-1]
+              for meta in selected_plate.findall("./metadata"):
+                if meta.attrib.get("key") == "index":
+                  selected_plate_id = meta.attrib.get("value")
+                  break
+            if selected_plate_id is None:
+              selected_plate_id = desired_plate_id or ""
+
+            metadata["plateID"] = selected_plate_id
+            if desired_plate_id and desired_plate_id != selected_plate_id:
+              log(f"[filament-tracker] Requested plate {desired_plate_id} not found; using plate {selected_plate_id or 'unknown'}")
+            if selected_plate is None:
+              log("No plate metadata found in slice_info.config.")
+              return {}
 
             usage = {}
             filaments= {}
             filamentId = 1
-            for plate in root.findall(".//plate"):
-              for filament in plate.findall(".//filament"):
-                used_g = filament.attrib.get("used_g")
-                #filamentId = int(filament.attrib.get("id"))
-                
-                usage[filamentId] = used_g
-                filaments[filamentId] = {"id": filamentId,
-                                         "tray_info_idx": filament.attrib.get("tray_info_idx"), 
-                                         "type":filament.attrib.get("type"), 
-                                         "color": filament.attrib.get("color"), 
-                                         "used_g": used_g, 
-                                         "used_m":filament.attrib.get("used_m")}
-                filamentId += 1
+            for filament in selected_plate.findall(".//filament"):
+              used_g = filament.attrib.get("used_g")
+              usage[filamentId] = used_g
+              filaments[filamentId] = {"id": filamentId,
+                                       "tray_info_idx": filament.attrib.get("tray_info_idx"), 
+                                       "type":filament.attrib.get("type"), 
+                                       "color": filament.attrib.get("color"), 
+                                       "used_g": used_g, 
+                                       "used_m":filament.attrib.get("used_m")}
+              filamentId += 1
 
             metadata["filaments"] = filaments
             metadata["usage"] = usage
@@ -427,11 +494,16 @@ def getMetaDataFrom3mf(url):
               target_file.write(source_file.read())
 
         # Check for the Metadata/slice_info.config file
-        gcode_path = "Metadata/plate_"+metadata["plateID"]+".gcode"
-        metadata["gcode_path"] = gcode_path
-        if gcode_path in z.namelist():
-          with z.open(gcode_path) as gcode_file:
-            metadata["filamentOrder"] =  get_filament_order(gcode_file)
+        if gcode_path and gcode_path in z.namelist():
+          metadata["gcode_path"] = gcode_path
+        else:
+          gcode_path = "Metadata/plate_"+metadata["plateID"]+".gcode"
+          metadata["gcode_path"] = gcode_path
+        if metadata["gcode_path"] in z.namelist():
+          with z.open(metadata["gcode_path"]) as gcode_file:
+            gcode_bytes = gcode_file.read()
+            metadata["filamentOrder"] = get_filament_order(io.BytesIO(gcode_bytes))
+            metadata["filamentSequence"] = get_filament_sequence(io.BytesIO(gcode_bytes))
 
         log(metadata)
 

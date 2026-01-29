@@ -49,8 +49,18 @@ PENDING_PRINT_METADATA = {}
 FILAMENT_TRACKER = FilamentUsageTracker()
 LOG_FILE = "/home/app/logs/mqtt.log"
 
-def _load_project_metadata(url: str) -> dict | None:
-  metadata = getMetaDataFrom3mf(url)
+def _reset_pending_print(reason: str, *, clear_printer_mapping: bool = False) -> None:
+  global PENDING_PRINT_METADATA, ACTIVE_PRINT_ID, PRINTER_STATE
+  if PENDING_PRINT_METADATA:
+    log(f"[print-history] Resetting pending print metadata: {reason}")
+  PENDING_PRINT_METADATA = {}
+  ACTIVE_PRINT_ID = None
+  if clear_printer_mapping and isinstance(PRINTER_STATE.get("print"), dict):
+    PRINTER_STATE["print"].pop("ams_mapping", None)
+    PRINTER_STATE["print"].pop("ams_mapping2", None)
+
+def _load_project_metadata(url: str, gcode_path: str | None = None) -> dict | None:
+  metadata = getMetaDataFrom3mf(url, gcode_path)
   if not metadata or not metadata.get("filaments"):
     log("[filament-tracker] No metadata/filaments found in 3MF; skipping tracking for this job")
     return None
@@ -74,9 +84,54 @@ def _classify_project_source(
     return incoming_type
   return "local"
 
-def _insert_filament_usage_entries(print_id, filaments: dict) -> None:
+def _insert_filament_usage_entries(
+    print_id,
+    filaments: dict,
+    filament_order: dict | None = None,
+) -> None:
+  if not filaments:
+    return
+
+  ordered_filament_ids = []
+  if filament_order:
+    for filament_id, order in filament_order.items():
+      try:
+        ordered_filament_ids.append((int(filament_id), int(order)))
+      except (TypeError, ValueError):
+        continue
+    ordered_filament_ids.sort(key=lambda item: item[1])
+
+  if ordered_filament_ids:
+    log(
+      "[print-history] Preparing to insert %d filament rows for print %s (gcode order=%s, meta=%d)"
+      % (len(ordered_filament_ids), print_id, [fid for fid, _ in ordered_filament_ids], len(filaments))
+    )
+    filament_entries = [filaments[key] for key in sorted(filaments.keys())]
+    for index, (gcode_filament, _order) in enumerate(ordered_filament_ids):
+      ams_slot = gcode_filament + 1
+      filament = filament_entries[index] if index < len(filament_entries) else {}
+      parsed_grams = _parse_grams(filament.get("used_g"))
+      parsed_length_m = _parse_grams(filament.get("used_m"))
+      estimated_length_mm = parsed_length_m * 1000 if parsed_length_m is not None else None
+      grams_used = parsed_grams if parsed_grams is not None else 0.0
+      length_used = estimated_length_mm if estimated_length_mm is not None else 0.0
+      if TRACK_LAYER_USAGE:
+        grams_used = 0.0
+        length_used = 0.0
+      insert_filament_usage(
+          print_id,
+          filament.get("type") or "Unknown",
+          filament.get("color") or "#000000",
+          grams_used,
+          ams_slot,
+          estimated_grams=parsed_grams,
+          length_used=length_used,
+          estimated_length=estimated_length_mm,
+      )
+    return
+
   log(f"[print-history] Preparing to insert {len(filaments)} filament rows for print {print_id}")
-  for id, filament in filaments.items():
+  for filament_id, filament in filaments.items():
     parsed_grams = _parse_grams(filament.get("used_g"))
     parsed_length_m = _parse_grams(filament.get("used_m"))
     estimated_length_mm = parsed_length_m * 1000 if parsed_length_m is not None else None
@@ -90,7 +145,7 @@ def _insert_filament_usage_entries(print_id, filaments: dict) -> None:
         filament["type"],
         filament["color"],
         grams_used,
-        id,
+        filament_id,
         estimated_grams=parsed_grams,
         length_used=length_used,
         estimated_length=estimated_length_mm,
@@ -304,18 +359,27 @@ def map_filament(tray_tar):
 
     filament_order = PENDING_PRINT_METADATA.get("filamentOrder") or {}
     ordered_filaments = sorted(filament_order.items(), key=lambda entry: entry[1])
+    filament_sequence = PENDING_PRINT_METADATA.get("filamentSequence") or []
+    sequence_index = PENDING_PRINT_METADATA.get("sequence_index", 0)
     assigned_trays = PENDING_PRINT_METADATA.setdefault("assigned_trays", [])
+    assigned_trays.append(tray_tar)
     filament_assigned = None
-    if tray_tar not in assigned_trays:
-      assigned_trays.append(tray_tar)
-      unique_index = len(assigned_trays) - 1
-      if unique_index < len(ordered_filaments):
-        filament_assigned = ordered_filaments[unique_index][0]
-      else:
-        for filamentId, usage_count in filament_order.items():
-          if usage_count == change_count:
-            filament_assigned = filamentId
-            break
+    if filament_sequence and sequence_index < len(filament_sequence):
+      mapping = PENDING_PRINT_METADATA.setdefault("ams_mapping", [])
+      assigned_filaments = {
+        idx for idx, tray in enumerate(mapping) if tray is not None
+      }
+      candidate = filament_sequence[sequence_index]
+      PENDING_PRINT_METADATA["sequence_index"] = sequence_index + 1
+      if candidate not in assigned_filaments:
+        filament_assigned = candidate
+    elif change_count < len(ordered_filaments):
+      filament_assigned = ordered_filaments[change_count][0]
+    else:
+      for filamentId, usage_count in filament_order.items():
+        if usage_count == change_count:
+          filament_assigned = filamentId
+          break
 
     if filament_assigned is not None:
       mapping_entry = normalize_ams_mapping_entry(tray_tar)
@@ -353,13 +417,44 @@ def processMessage(data):
    # Prepare AMS spending estimation
   if "print" in data:    
     update_dict(PRINTER_STATE, data)
+
+    print_obj = PRINTER_STATE.get("print", {})
+    prev_print = PRINTER_STATE_LAST.get("print", {})
+    new_task_id = print_obj.get("task_id")
+    prev_task_id = prev_print.get("task_id")
+    new_subtask_id = print_obj.get("subtask_id")
+    prev_subtask_id = prev_print.get("subtask_id")
+    new_gcode_file = print_obj.get("gcode_file")
+    prev_gcode_file = prev_print.get("gcode_file")
+    gcode_state = print_obj.get("gcode_state")
+    prev_gcode_state = prev_print.get("gcode_state")
+
+    new_job_detected = False
+    if new_task_id and prev_task_id and new_task_id != prev_task_id:
+      new_job_detected = True
+    elif new_subtask_id and prev_subtask_id and new_subtask_id != prev_subtask_id:
+      new_job_detected = True
+    elif new_gcode_file and prev_gcode_file and new_gcode_file != prev_gcode_file:
+      new_job_detected = True
+    elif (
+      gcode_state in ("PREPARE", "RUNNING")
+      and prev_gcode_state in ("IDLE", "FAILED", "FINISH")
+    ):
+      new_job_detected = True
+
+    if new_job_detected:
+      clear_mapping = not (
+        data["print"].get("ams_mapping") or data["print"].get("ams_mapping2")
+      )
+      _reset_pending_print("new print detected", clear_printer_mapping=clear_mapping)
     
     # Handle project_file events (3MF metadata load) uniformly regardless of origin.
     if data["print"].get("command") == "project_file" and data["print"].get("url"):
       ACTIVE_PRINT_ID = None
       url = data["print"].get("url")
       incoming_type = PRINTER_STATE["print"].get("print_type")
-      metadata = _load_project_metadata(url)
+      gcode_path = data["print"].get("param")
+      metadata = _load_project_metadata(url, gcode_path)
       if metadata is None:
         log(
           "[filament-tracker] Failed to parse 3MF metadata for project "
@@ -419,13 +514,21 @@ def processMessage(data):
         PENDING_PRINT_METADATA["print_id"] = print_id
         ACTIVE_PRINT_ID = print_id
         if not PENDING_PRINT_METADATA.get("filament_usage_inserted") and PENDING_PRINT_METADATA.get("filaments"):
-          _insert_filament_usage_entries(print_id, PENDING_PRINT_METADATA["filaments"])
+          _insert_filament_usage_entries(
+            print_id,
+            PENDING_PRINT_METADATA["filaments"],
+            PENDING_PRINT_METADATA.get("filamentOrder"),
+          )
           PENDING_PRINT_METADATA["filament_usage_inserted"] = True
         _link_spools_to_print(print_id, normalized)
         PENDING_PRINT_METADATA["complete"] = True
 
         if not PENDING_PRINT_METADATA.get("filament_usage_inserted") and PENDING_PRINT_METADATA.get("filaments"):
-          _insert_filament_usage_entries(print_id, PENDING_PRINT_METADATA["filaments"])
+          _insert_filament_usage_entries(
+            print_id,
+            PENDING_PRINT_METADATA["filaments"],
+            PENDING_PRINT_METADATA.get("filamentOrder"),
+          )
           PENDING_PRINT_METADATA["filament_usage_inserted"] = True
         if TRACK_LAYER_USAGE:
           FILAMENT_TRACKER.set_print_metadata(PENDING_PRINT_METADATA)
@@ -513,7 +616,11 @@ def processMessage(data):
               PENDING_PRINT_METADATA["print_id"] = print_id
               ACTIVE_PRINT_ID = print_id
               if not PENDING_PRINT_METADATA.get("filament_usage_inserted") and PENDING_PRINT_METADATA.get("filaments"):
-                _insert_filament_usage_entries(print_id, PENDING_PRINT_METADATA["filaments"])
+                _insert_filament_usage_entries(
+                  print_id,
+                  PENDING_PRINT_METADATA["filaments"],
+                  PENDING_PRINT_METADATA.get("filamentOrder"),
+                )
                 PENDING_PRINT_METADATA["filament_usage_inserted"] = True
               _link_spools_to_print(print_id, PENDING_PRINT_METADATA.get("ams_mapping"))
             if TRACK_LAYER_USAGE and print_id:
@@ -576,7 +683,11 @@ def processMessage(data):
               FILAMENT_TRACKER.start_local_print_from_metadata(PENDING_PRINT_METADATA)
 
               if not PENDING_PRINT_METADATA.get("filament_usage_inserted") and PENDING_PRINT_METADATA.get("filaments"):
-                _insert_filament_usage_entries(print_id, PENDING_PRINT_METADATA["filaments"])
+                _insert_filament_usage_entries(
+                  print_id,
+                  PENDING_PRINT_METADATA["filaments"],
+                  PENDING_PRINT_METADATA.get("filamentOrder"),
+                )
                 PENDING_PRINT_METADATA["filament_usage_inserted"] = True
 
               PENDING_PRINT_METADATA["tracking_started"] = True
@@ -648,10 +759,8 @@ def processMessage(data):
         log("[print-history] Clearing pending print metadata after completion")
         PENDING_PRINT_METADATA = {}
   
-    gcode_state = PRINTER_STATE.get("print", {}).get("gcode_state")
-    prev_gcode_state = PRINTER_STATE_LAST.get("print", {}).get("gcode_state")
     if gcode_state in ("FINISH", "FAILED", "IDLE") and prev_gcode_state not in (None, "FINISH", "FAILED", "IDLE"):
-      ACTIVE_PRINT_ID = None
+      _reset_pending_print(f"print ended ({gcode_state})", clear_printer_mapping=True)
 
     PRINTER_STATE_LAST = copy.deepcopy(PRINTER_STATE)
 

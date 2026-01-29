@@ -165,6 +165,7 @@ def evaluate_gcode(gcode: str) -> dict:
   current_extrusion = {}
   active_filament = None
   layer_filaments = {}
+  filament_ids_seen = set()
 
   for operation in operations:
     if operation.operation == "M73":
@@ -185,6 +186,7 @@ def evaluate_gcode(gcode: str) -> dict:
           continue
         log(f"[filament-tracker] Filament change: {active_filament} -> {filament[:-1]}")
         active_filament = int(filament[:-1])
+        filament_ids_seen.add(active_filament)
 
     if operation.operation in ("G0", "G1", "G2", "G3"):
       extrusion = operation.params.get("E")
@@ -198,6 +200,12 @@ def evaluate_gcode(gcode: str) -> dict:
 
   if current_extrusion:
     layer_filaments[current_layer] = current_extrusion.copy()
+  if filament_ids_seen and 0 not in filament_ids_seen:
+    log("[filament-tracker] Normalizing filament ids to 0-based indexing")
+    normalized = {}
+    for layer, filaments in layer_filaments.items():
+      normalized[layer] = {filament - 1: amount for filament, amount in filaments.items()}
+    layer_filaments = normalized
   return layer_filaments
 
 

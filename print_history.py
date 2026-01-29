@@ -161,7 +161,7 @@ def insert_filament_usage(
     conn.close()
     log(f"[print-history] Inserted filament usage print={print_id} ams_slot={ams_slot} type={filament_type} grams={grams_used}")
 
-def update_filament_spool(print_id: int, filament_id: int, spool_id: int) -> None:
+def update_filament_spool(print_id: int, ams_slot: int, spool_id: int) -> None:
     """
     Updates the spool_id for a given filament usage entry, ensuring it belongs to the specified print job.
     """
@@ -171,22 +171,22 @@ def update_filament_spool(print_id: int, filament_id: int, spool_id: int) -> Non
         SELECT spool_id
         FROM filament_usage
         WHERE ams_slot = ? AND print_id = ?
-    ''', (filament_id, print_id))
+    ''', (ams_slot, print_id))
     existing_row = cursor.fetchone()
     existing_spool = existing_row[0] if existing_row else None
     cursor.execute('''
         UPDATE filament_usage
         SET spool_id = ?
         WHERE ams_slot = ? AND print_id = ?
-    ''', (spool_id, filament_id, print_id))
+    ''', (spool_id, ams_slot, print_id))
     conn.commit()
     conn.close()
     if existing_row is None:
-        log(f"[print-history] No filament_usage row for print={print_id} ams_slot={filament_id} (spool {spool_id} not linked)")
+        log(f"[print-history] No filament_usage row for print={print_id} ams_slot={ams_slot} (spool {spool_id} not linked)")
     elif existing_spool != spool_id:
-        log(f"[print-history] Linked spool {spool_id} to print={print_id} ams_slot={filament_id} (was {existing_spool})")
+        log(f"[print-history] Linked spool {spool_id} to print={print_id} ams_slot={ams_slot} (was {existing_spool})")
 
-def update_filament_grams_used(print_id: int, filament_id: int, grams_used: float, length_used: float | None = None) -> None:
+def update_filament_grams_used(print_id: int, ams_slot: int, grams_used: float, length_used: float | None = None) -> None:
     """
     Updates the grams_used (and optional length_used) for a given filament usage entry, ensuring it belongs to the specified print job.
     """
@@ -197,7 +197,7 @@ def update_filament_grams_used(print_id: int, filament_id: int, grams_used: floa
         params.append(length_used)
 
     set_clause = ", ".join(set_parts)
-    params.extend([filament_id, print_id])
+    params.extend([ams_slot, print_id])
 
     conn = sqlite3.connect(db_config["db_path"])
     cursor = conn.cursor()
@@ -206,8 +206,14 @@ def update_filament_grams_used(print_id: int, filament_id: int, grams_used: floa
         SET {set_clause}
         WHERE ams_slot = ? AND print_id = ?
     ''', params)
+    updated = cursor.rowcount
     conn.commit()
     conn.close()
+    if updated:
+        if length_used is not None:
+            log(f"[print-history] Updated filament usage print={print_id} ams_slot={ams_slot} grams={grams_used} length={length_used}")
+        else:
+            log(f"[print-history] Updated filament usage print={print_id} ams_slot={ams_slot} grams={grams_used}")
 
 
 def get_prints_with_filament(limit: int | None = None, offset: int | None = None):
