@@ -17,6 +17,26 @@ import spoolman_service
 
 LOG_ROOT = Path(__file__).resolve().parent / "MQTT"
 
+def _normalize_windows_path(path: str) -> Path:
+  if ":" in path and "\\" in path:
+    drive, rest = path.split(":", 1)
+    drive = drive.strip().lower()
+    rest = rest.replace("\\", "/").lstrip("/")
+    return Path(f"/mnt/{drive}/{rest}")
+  return Path(path)
+
+
+def _model_override_path() -> Path | None:
+  env_path = os.getenv("MQTT_MODEL_FILE")
+  if not env_path:
+    return None
+  candidate = _normalize_windows_path(env_path)
+  if not candidate.is_absolute():
+    candidate = LOG_ROOT / candidate
+  if candidate.exists():
+    return candidate
+  return None
+
 
 def _build_mock_spools():
   return [
@@ -107,10 +127,10 @@ def _stub_history(monkeypatch, insert_calls=None):
 
 def _build_fake_get_meta(model_path: Path):
   original_get_meta = tools_3mf.getMetaDataFrom3mf
-  def _fake(_url: str):
+  def _fake(_url: str, gcode_path: str | None = None):
     if not model_path.exists():
       raise FileNotFoundError(f"Test 3MF not found: {model_path}")
-    metadata = original_get_meta(f"local:{model_path}")
+    metadata = original_get_meta(f"local:{model_path}", gcode_path)
     if _url:
       _, filename = tools_3mf.filename_from_url(_url)
       metadata["file"] = filename or _url
@@ -120,7 +140,7 @@ def _build_fake_get_meta(model_path: Path):
 
 
 def _build_fake_metadata():
-  def _fake(url: str):
+  def _fake(url: str, gcode_path: str | None = None):
     model_url = url or ""
     _, filename = tools_3mf.filename_from_url(url)
     model_name = filename or "unknown.3mf"
@@ -152,6 +172,82 @@ def _is_model_url(value: str) -> bool:
 def _model_name_from_url(url: str | None) -> str | None:
   _, filename = tools_3mf.filename_from_url(url)
   return filename
+
+
+def test_mqtt_log_full_replay_detects_layer_changes(monkeypatch):
+  env_file = os.getenv("MQTT_LOG_FILE")
+  log_path = None
+  if env_file:
+    candidate = Path(env_file)
+    if ":" in env_file and "\\" in env_file:
+      drive, rest = env_file.split(":", 1)
+      drive = drive.strip().lower()
+      rest = rest.replace("\\", "/").lstrip("/")
+      candidate = Path(f"/mnt/{drive}/{rest}")
+    if not candidate.is_absolute():
+      candidate = LOG_ROOT / candidate
+    if candidate.exists():
+      log_path = candidate
+  if log_path is None:
+    for candidate in (
+      Path("/home/app/logs/mqtt2.log"),
+      Path("C:/home/app/logs/mqtt2.log"),
+    ):
+      if candidate.exists():
+        log_path = candidate
+        break
+  if log_path is None:
+    pytest.skip("Set MQTT_LOG_FILE or provide /home/app/logs/mqtt.log to run this replay test.")
+
+  _stub_spoolman(monkeypatch)
+  _stub_history(monkeypatch)
+  monkeypatch.setattr("mqtt_bambulab.getMetaDataFrom3mf", _build_fake_metadata())
+
+  mqtt_bambulab.PRINTER_STATE = {}
+  mqtt_bambulab.PRINTER_STATE_LAST = {}
+  mqtt_bambulab.PENDING_PRINT_METADATA = {}
+  mqtt_bambulab.FILAMENT_TRACKER = FilamentUsageTracker()
+
+  parsed_payloads = 0
+  processed_payloads = 0
+  layer_changes = 0
+  last_layer = None
+  layer_values = []
+
+  with log_path.open() as handle:
+    for line in handle:
+      if "::" not in line:
+        continue
+      try:
+        payload = json.loads(line.split("::", 1)[1].strip())
+      except Exception:
+        continue
+      parsed_payloads += 1
+      mqtt_bambulab.processMessage(payload)
+      processed_payloads += 1
+      layer = payload.get("print", {}).get("layer_num")
+      if layer is None:
+        continue
+      try:
+        layer_val = int(layer)
+      except (TypeError, ValueError):
+        continue
+      if last_layer is None:
+        last_layer = layer_val
+        layer_values.append(layer_val)
+        continue
+      if layer_val != last_layer:
+        layer_changes += 1
+        layer_values.append(layer_val)
+        last_layer = layer_val
+
+  assert parsed_payloads == processed_payloads, (
+    f"Replay did not process all payloads (parsed={parsed_payloads}, processed={processed_payloads})"
+  )
+  assert layer_changes > 0, (
+    f"No layer changes detected in {log_path} "
+    f"(layer_values_sample={layer_values[:5]})"
+  )
 
 
 def test_print_mode_classification():
@@ -197,7 +293,11 @@ def test_mqtt_log_tray_detection(log_path, track_layer_usage, tmp_path, monkeypa
   )
 
   temp_model_path = None
-  if not skip_3mf_download:
+  model_override = _model_override_path()
+  if model_override is not None:
+    skip_3mf_download = False
+    model_path = model_override
+  elif not skip_3mf_download:
     model_path = _base_model_from_log(log_path)
     if not model_path.exists():
       # Only verify the file name/model URL when no local 3MF is available.
@@ -207,6 +307,11 @@ def test_mqtt_log_tray_detection(log_path, track_layer_usage, tmp_path, monkeypa
       temp_file.close()
       temp_model_path = Path(temp_file.name)
       shutil.copy2(model_path, temp_model_path)
+  if model_override is not None:
+    temp_file = tempfile.NamedTemporaryFile(suffix=".3mf", delete=False)
+    temp_file.close()
+    temp_model_path = Path(temp_file.name)
+    shutil.copy2(model_override, temp_model_path)
   if skip_3mf_download:
     # Provide a stub 3MF path so the filament tracker can initialize AMS mapping.
     temp_file = tempfile.NamedTemporaryFile(suffix=".3mf", delete=False)
@@ -238,6 +343,7 @@ def test_mqtt_log_tray_detection(log_path, track_layer_usage, tmp_path, monkeypa
   observed_model_urls = []
   observed_model_files = []
   observed_print_type = None
+  layer_tracking_started = False
 
   mqtt_bambulab.FILAMENT_TRACKER = FilamentUsageTracker()
 
@@ -275,6 +381,8 @@ def test_mqtt_log_tray_detection(log_path, track_layer_usage, tmp_path, monkeypa
   original_start_model = FilamentUsageTracker._start_layer_tracking_for_model
 
   def _record_start_layer_tracking(self, model_path, gcode_file_name, use_ams, ams_mapping, task_id, subtask_id):
+    nonlocal layer_tracking_started
+    layer_tracking_started = True
     metadata = getattr(self, "print_metadata", {}) or {}
     metadata_file = metadata.get("file")
     if metadata_file:
@@ -387,6 +495,11 @@ def test_mqtt_log_tray_detection(log_path, track_layer_usage, tmp_path, monkeypa
   if expected_print_type is not None:
     assert observed_print_type == expected_print_type, (
       f"{log_path.name}: print type mismatch expected={expected_print_type} observed={observed_print_type}"
+    )
+
+  if track_layer_usage and not skip_3mf_download:
+    assert layer_tracking_started, (
+      f"{log_path.name}: expected layer tracking to start when model is available"
     )
 
   assert len(insert_calls) <= 1, (

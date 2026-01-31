@@ -17,7 +17,7 @@ class _DummyTracker:
 
 
 def test_local_project_file_not_cloud(monkeypatch):
-  def fake_get_meta(url):
+  def fake_get_meta(url, gcode_path=None):
     return {
       "filaments": {
         1: {

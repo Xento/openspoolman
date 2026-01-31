@@ -124,6 +124,24 @@ def get_filament_sequence(file):
 
     return sequence
 
+def get_gcode_flags(file):
+    remap_enabled = False
+    has_filament_commands = False
+
+    for line in file:
+        text = line.decode("utf-8", errors="ignore").strip()
+        if re.match(r"^M620\s+M\b", text):
+            remap_enabled = True
+        match_filament = re.match(r"^M620\s+S(\d+)[^;\r\n]*", text)
+        if match_filament:
+            filament = int(match_filament.group(1))
+            if filament != 255:
+                has_filament_commands = True
+        if remap_enabled and has_filament_commands:
+            break
+
+    return remap_enabled, has_filament_commands
+
 def download3mfFromCloud(url, destFile):
   log("Downloading 3MF file from cloud...")
   # Download the file and save it to the temporary file
@@ -469,20 +487,70 @@ def getMetaDataFrom3mf(url, gcode_path: str | None = None):
 
             usage = {}
             filaments= {}
-            filamentId = 1
+            filament_counter = 1
             for filament in selected_plate.findall(".//filament"):
               used_g = filament.attrib.get("used_g")
-              usage[filamentId] = used_g
-              filaments[filamentId] = {"id": filamentId,
-                                       "tray_info_idx": filament.attrib.get("tray_info_idx"), 
-                                       "type":filament.attrib.get("type"), 
-                                       "color": filament.attrib.get("color"), 
-                                       "used_g": used_g, 
-                                       "used_m":filament.attrib.get("used_m")}
-              filamentId += 1
+              filament_id_attr = filament.attrib.get("id")
+              try:
+                filament_id = int(filament_id_attr)
+              except (TypeError, ValueError):
+                filament_id = filament_counter
+              filament_counter = max(filament_counter, filament_id + 1)
+              usage[filament_id] = used_g
+              filaments[filament_id] = {"id": filament_id,
+                                        "tray_info_idx": filament.attrib.get("tray_info_idx"), 
+                                        "type":filament.attrib.get("type"), 
+                                        "color": filament.attrib.get("color"), 
+                                        "used_g": used_g, 
+                                        "used_m":filament.attrib.get("used_m")}
 
             metadata["filaments"] = filaments
             metadata["usage"] = usage
+
+            layer_filament_lists = {}
+            layer_list_node = selected_plate.find("./layer_filament_lists")
+            if layer_list_node is not None:
+              for entry in layer_list_node.findall("./layer_filament_list"):
+                filament_list = entry.attrib.get("filament_list")
+                layer_ranges = entry.attrib.get("layer_ranges", "")
+                try:
+                  filament_index = int(filament_list)
+                except (TypeError, ValueError):
+                  continue
+                ranges = []
+                for chunk in layer_ranges.split(","):
+                  chunk = chunk.strip()
+                  if not chunk:
+                    continue
+                  parts = chunk.split()
+                  if len(parts) < 2:
+                    continue
+                  try:
+                    start = int(parts[0])
+                    end = int(parts[1])
+                  except (TypeError, ValueError):
+                    continue
+                  ranges.append((start, end))
+                if ranges:
+                  layer_filament_lists[filament_index] = ranges
+
+            if layer_filament_lists:
+              metadata["layer_filament_lists"] = layer_filament_lists
+              sequence_from_layers = []
+              events = []
+              for filament_index, ranges in layer_filament_lists.items():
+                for start, _end in ranges:
+                  events.append((start, filament_index))
+              events.sort(key=lambda item: item[0])
+              for _start, filament_index in events:
+                if not sequence_from_layers or sequence_from_layers[-1] != filament_index:
+                  sequence_from_layers.append(filament_index)
+              metadata["layer_filament_sequence"] = sequence_from_layers
+              layer_order = {}
+              for filament_index in sequence_from_layers:
+                if filament_index not in layer_order:
+                  layer_order[filament_index] = len(layer_order)
+              metadata["layer_filament_order"] = layer_order
         else:
           log(f"File '{slice_info_path}' not found in the archive.")
           return {}
@@ -504,6 +572,21 @@ def getMetaDataFrom3mf(url, gcode_path: str | None = None):
             gcode_bytes = gcode_file.read()
             metadata["filamentOrder"] = get_filament_order(io.BytesIO(gcode_bytes))
             metadata["filamentSequence"] = get_filament_sequence(io.BytesIO(gcode_bytes))
+            remap_enabled, has_filament_commands = get_gcode_flags(io.BytesIO(gcode_bytes))
+            metadata["gcode_remap_enabled"] = remap_enabled
+            metadata["gcode_has_filament_commands"] = has_filament_commands
+
+        layer_sequence = metadata.get("layer_filament_sequence") or []
+        layer_order = metadata.get("layer_filament_order") or {}
+        if layer_sequence:
+          gcode_sequence = metadata.get("filamentSequence") or []
+          gcode_order = metadata.get("filamentOrder") or {}
+          gcode_sequence_meaningful = bool(gcode_sequence and len(set(gcode_sequence)) > 1)
+          gcode_order_meaningful = bool(gcode_order and len(gcode_order) > 1)
+          if not metadata.get("gcode_has_filament_commands") or not gcode_sequence_meaningful:
+            metadata["filamentSequence"] = layer_sequence
+          if not gcode_order_meaningful:
+            metadata["filamentOrder"] = layer_order
 
         log(metadata)
 

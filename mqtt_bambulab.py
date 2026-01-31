@@ -28,6 +28,8 @@ from spoolman_service import (
     normalize_ams_mapping_entry,
     tray_uid_from_mapping_entry,
     get_spool_id_for_tray_uid,
+    normalize_color_hex,
+    color_distance,
 )
 from tools_3mf import getMetaDataFrom3mf
 import time
@@ -58,6 +60,287 @@ def _reset_pending_print(reason: str, *, clear_printer_mapping: bool = False) ->
   if clear_printer_mapping and isinstance(PRINTER_STATE.get("print"), dict):
     PRINTER_STATE["print"].pop("ams_mapping", None)
     PRINTER_STATE["print"].pop("ams_mapping2", None)
+
+def _gcode_mapping_active(metadata: dict | None) -> bool:
+  if not metadata:
+    return False
+  if metadata.get("gcode_mapping_applied"):
+    return True
+  mapping_source = metadata.get("mapping_source") or {}
+  return any(source == "gcode" for source in mapping_source.values())
+
+def _gcode_filament_indices(metadata: dict) -> list[int]:
+  filament_order = metadata.get("filamentOrder") or {}
+  indices = []
+  for filament_id in filament_order.keys():
+    try:
+      indices.append(int(filament_id))
+    except (TypeError, ValueError):
+      continue
+  if indices:
+    return sorted(set(indices))
+  filaments = metadata.get("filaments") or {}
+  if filaments:
+    return list(range(len(filaments)))
+  return []
+
+def _is_multi_material(metadata: dict | None) -> bool:
+  if not metadata:
+    return False
+  if metadata.get("gcode_has_filament_commands"):
+    return True
+  layer_sequence = metadata.get("layer_filament_sequence") or []
+  if len(set(layer_sequence)) > 1:
+    return True
+  layer_lists = metadata.get("layer_filament_lists") or {}
+  if len(layer_lists) > 1:
+    return True
+  layer_order = metadata.get("layer_filament_order") or {}
+  if len(layer_order) > 1:
+    return True
+  filament_sequence = metadata.get("filamentSequence") or []
+  if len(set(filament_sequence)) > 1:
+    return True
+  filament_order = metadata.get("filamentOrder") or {}
+  if len(filament_order) > 1:
+    return True
+  filaments = metadata.get("filaments") or {}
+  return len(filaments) > 1
+
+def _apply_gcode_tray_mapping_if_possible(metadata: dict, *, use_ams: bool | None = None) -> bool:
+  if not metadata:
+    return False
+  if use_ams is False:
+    return False
+  if metadata.get("gcode_remap_enabled"):
+    return False
+  if not metadata.get("gcode_has_filament_commands"):
+    return False
+  log(
+    "[print-history] Skipping gcode tray mapping (gcode indices represent filament IDs, not physical trays)"
+  )
+  return False
+
+def _apply_initial_ams_mapping(print_id: int | None, source: str) -> bool:
+  if not print_id:
+    return False
+  if _gcode_mapping_active(PENDING_PRINT_METADATA):
+    mapping = normalize_ams_mapping2(
+      PENDING_PRINT_METADATA.get("ams_mapping2"),
+      PENDING_PRINT_METADATA.get("ams_mapping"),
+    )
+    if mapping:
+      mapped_filaments = {idx for idx, tray in enumerate(mapping) if tray is not None}
+      if mapped_filaments and not PENDING_PRINT_METADATA.get("mapped_filaments"):
+        PENDING_PRINT_METADATA["mapped_filaments"] = sorted(mapped_filaments)
+      log(
+        "[print-history] Using gcode tray mapping (%s) for print=%s mapped=%s"
+        % (source, print_id, sorted(mapped_filaments))
+      )
+      _link_spools_to_print(print_id, mapping)
+      return True
+  normalized = normalize_ams_mapping2(
+    PRINTER_STATE.get("print", {}).get("ams_mapping2"),
+    PRINTER_STATE.get("print", {}).get("ams_mapping"),
+  )
+  if not normalized:
+    return False
+
+  PENDING_PRINT_METADATA["ams_mapping"] = normalized
+  PENDING_PRINT_METADATA["ams_mapping2"] = normalized
+  mapped_filaments = {idx for idx, tray in enumerate(normalized) if tray is not None}
+  PENDING_PRINT_METADATA["mapped_filaments"] = sorted(mapped_filaments)
+  mapping_source = PENDING_PRINT_METADATA.setdefault("mapping_source", {})
+  for filament_idx in mapped_filaments:
+    mapping_source.setdefault(filament_idx, "initial")
+
+  filament_order = PENDING_PRINT_METADATA.get("filamentOrder") or {}
+  target_filaments = set()
+  for filament_id in filament_order.keys():
+    try:
+      target_filaments.add(int(filament_id))
+    except (TypeError, ValueError):
+      continue
+  if target_filaments:
+    PENDING_PRINT_METADATA["complete"] = target_filaments.issubset(mapped_filaments)
+  else:
+    PENDING_PRINT_METADATA["complete"] = any(tray is not None for tray in normalized)
+
+  log(
+    "[print-history] Applied initial AMS mapping (%s) to print=%s mapped=%s"
+    % (source, print_id, sorted(mapped_filaments))
+  )
+  _link_spools_to_print(print_id, normalized)
+  return True
+
+
+def _filament_colors_by_index(filaments: dict, filament_order: dict | None) -> dict:
+  if not filaments:
+    return {}
+
+  ordered_filament_ids = []
+  if filament_order:
+    for filament_id, order in filament_order.items():
+      try:
+        ordered_filament_ids.append((int(filament_id), int(order)))
+      except (TypeError, ValueError):
+        continue
+    ordered_filament_ids.sort(key=lambda item: item[1])
+
+  filament_entries = [filaments[key] for key in sorted(filaments.keys())]
+  filament_by_index = {
+    index: filaments.get(index + 1)
+    for index in range(len(filament_entries))
+  }
+
+  colors = {}
+  if ordered_filament_ids:
+    for index, (gcode_filament, _order) in enumerate(ordered_filament_ids):
+      filament = filament_by_index.get(gcode_filament)
+      if filament is None:
+        filament = filament_entries[index] if index < len(filament_entries) else {}
+      color = normalize_color_hex(filament.get("color") or "")
+      if color:
+        colors[gcode_filament] = color
+  else:
+    for index, filament in enumerate(filament_entries):
+      color = normalize_color_hex(filament.get("color") or "")
+      if color:
+        colors[index] = color
+  return colors
+
+
+def _infer_ams_mapping_from_colors(metadata: dict) -> list | None:
+  ams_list = LAST_AMS_CONFIG.get("ams") or []
+  if not ams_list:
+    return None
+
+  trays = []
+  for ams in ams_list:
+    for tray in ams.get("tray", []):
+      color = normalize_color_hex(tray.get("tray_color") or "")
+      if not color:
+        continue
+      trays.append(
+        {
+          "entry": {"ams_id": int(ams.get("id", 0)), "slot_id": int(tray.get("id", 0))},
+          "color": color,
+        }
+      )
+  if not trays:
+    return None
+
+  filament_colors = _filament_colors_by_index(
+    metadata.get("filaments") or {},
+    metadata.get("filamentOrder") or {},
+  )
+  if not filament_colors:
+    return None
+
+  pairs = []
+  for filament_index, filament_color in filament_colors.items():
+    for tray in trays:
+      distance = color_distance(filament_color, tray["color"])
+      if distance is None:
+        continue
+      pairs.append((distance, filament_index, tray["entry"]))
+
+  if not pairs:
+    return None
+
+  pairs.sort(key=lambda item: item[0])
+  assigned = {}
+  used_trays = set()
+  for _distance, filament_index, entry in pairs:
+    if filament_index in assigned:
+      continue
+    tray_key = (entry["ams_id"], entry["slot_id"])
+    if tray_key in used_trays:
+      continue
+    assigned[filament_index] = entry
+    used_trays.add(tray_key)
+
+  # Fall back to best remaining matches (allow duplicates) for any unassigned filaments.
+  for filament_index, _color in filament_colors.items():
+    if filament_index in assigned:
+      continue
+    for _distance, candidate_index, entry in pairs:
+      if candidate_index != filament_index:
+        continue
+      assigned[filament_index] = entry
+      break
+
+  if not assigned:
+    return None
+
+  mapping_length = max(assigned.keys()) + 1
+  mapping = [None] * mapping_length
+  for filament_index, entry in assigned.items():
+    mapping[filament_index] = entry
+  return mapping
+
+
+def _apply_color_mapping_if_possible() -> bool:
+  if not PENDING_PRINT_METADATA or not PENDING_PRINT_METADATA.get("filaments"):
+    return False
+  if _gcode_mapping_active(PENDING_PRINT_METADATA):
+    return False
+  if _is_multi_material(PENDING_PRINT_METADATA):
+    return False
+
+  existing = normalize_ams_mapping2(
+    PENDING_PRINT_METADATA.get("ams_mapping2"),
+    PENDING_PRINT_METADATA.get("ams_mapping"),
+  )
+  if any(entry is not None for entry in existing):
+    return False
+
+  inferred = _infer_ams_mapping_from_colors(PENDING_PRINT_METADATA)
+  if not inferred:
+    return False
+
+  PENDING_PRINT_METADATA["ams_mapping"] = inferred
+  PENDING_PRINT_METADATA["ams_mapping2"] = inferred
+  mapping_source = PENDING_PRINT_METADATA.setdefault("mapping_source", {})
+  mapped_filaments = set(PENDING_PRINT_METADATA.get("mapped_filaments") or [])
+  for idx, entry in enumerate(inferred):
+    if entry is None:
+      continue
+    mapping_source.setdefault(idx, "color")
+    mapped_filaments.add(idx)
+  PENDING_PRINT_METADATA["mapped_filaments"] = sorted(mapped_filaments)
+  log("[print-history] Inferred AMS mapping from colors for print=%s" % PENDING_PRINT_METADATA.get("print_id"))
+
+  if PENDING_PRINT_METADATA.get("print_id"):
+    _link_spools_to_print(PENDING_PRINT_METADATA.get("print_id"), inferred)
+  FILAMENT_TRACKER.apply_ams_mapping(inferred)
+  return True
+
+
+def _merge_ams_mappings(existing: list | None, incoming: list | None, mapping_source: dict | None = None) -> list:
+  normalized_existing = normalize_ams_mapping2(None, existing)
+  normalized_incoming = normalize_ams_mapping2(None, incoming)
+  if not normalized_existing:
+    return normalized_incoming
+  if not normalized_incoming:
+    return normalized_existing
+
+  merged_length = max(len(normalized_existing), len(normalized_incoming))
+  merged = [None] * merged_length
+  for idx in range(merged_length):
+    incoming_entry = normalized_incoming[idx] if idx < len(normalized_incoming) else None
+    existing_entry = normalized_existing[idx] if idx < len(normalized_existing) else None
+    if incoming_entry is None:
+      merged[idx] = existing_entry
+      continue
+    if existing_entry is None:
+      merged[idx] = incoming_entry
+      continue
+    if mapping_source and mapping_source.get(idx) == "tray_change":
+      merged[idx] = incoming_entry
+    else:
+      merged[idx] = existing_entry
+  return merged
 
 def _load_project_metadata(url: str, gcode_path: str | None = None) -> dict | None:
   metadata = getMetaDataFrom3mf(url, gcode_path)
@@ -107,9 +390,15 @@ def _insert_filament_usage_entries(
       % (len(ordered_filament_ids), print_id, [fid for fid, _ in ordered_filament_ids], len(filaments))
     )
     filament_entries = [filaments[key] for key in sorted(filaments.keys())]
+    filament_by_index = {
+      index: filaments.get(index + 1)
+      for index in range(len(filament_entries))
+    }
     for index, (gcode_filament, _order) in enumerate(ordered_filament_ids):
       ams_slot = gcode_filament + 1
-      filament = filament_entries[index] if index < len(filament_entries) else {}
+      filament = filament_by_index.get(gcode_filament)
+      if filament is None:
+        filament = filament_entries[index] if index < len(filament_entries) else {}
       parsed_grams = _parse_grams(filament.get("used_g"))
       parsed_length_m = _parse_grams(filament.get("used_m"))
       estimated_length_mm = parsed_length_m * 1000 if parsed_length_m is not None else None
@@ -127,6 +416,10 @@ def _insert_filament_usage_entries(
           estimated_grams=parsed_grams,
           length_used=length_used,
           estimated_length=estimated_length_mm,
+      )
+      log(
+        "[print-history] Mapped filament index %s -> ams_slot=%s color=%s type=%s"
+        % (gcode_filament, ams_slot, filament.get("color") or "#000000", filament.get("type") or "Unknown")
       )
     return
 
@@ -334,22 +627,32 @@ def map_filament(tray_tar):
   # Prüfen, ob ein Filamentwechsel aktiv ist (stg_cur == 4)
   # if stg_cur == 4 and tray_tar is not None:
   if PENDING_PRINT_METADATA:
+    current_entry = normalize_ams_mapping_entry(tray_tar)
+    if current_entry is not None:
+      PENDING_PRINT_METADATA["current_tray"] = current_entry
+      PENDING_PRINT_METADATA["current_tray_uid"] = tray_uid_from_mapping_entry(current_entry)
     existing_mapping = normalize_ams_mapping2(
       PENDING_PRINT_METADATA.get("ams_mapping2"),
       PENDING_PRINT_METADATA.get("ams_mapping"),
     )
+    mapping_source = PENDING_PRINT_METADATA.setdefault("mapping_source", {})
     if existing_mapping:
       filament_order = PENDING_PRINT_METADATA.get("filamentOrder") or {}
       target_filaments = {int(fid) for fid in filament_order.keys() if str(fid).isdigit()}
       assigned_filaments = {
         idx for idx, tray in enumerate(existing_mapping) if tray is not None
       }
-      if (
+      mapping_complete = (
         (target_filaments and target_filaments.issubset(assigned_filaments))
         or (not target_filaments and all(entry is not None for entry in existing_mapping))
-      ):
-        log("Skipping tray-change mapping because AMS mapping is already complete")
-        return None
+      )
+      if mapping_complete:
+        has_soft_mapping = any(
+          mapping_source.get(idx) in ("fallback", "color") for idx in assigned_filaments
+        )
+        if not has_soft_mapping:
+          log("Skipping tray-change mapping because AMS mapping is already complete")
+          return None
     filament_changes = PENDING_PRINT_METADATA.setdefault("filamentChanges", [])
     filament_changes.append(tray_tar)  # Jeder Wechsel zählt, auch auf das gleiche Tray
     log(f'Filamentchange {len(filament_changes)}: Tray {tray_tar}')
@@ -361,25 +664,32 @@ def map_filament(tray_tar):
     ordered_filaments = sorted(filament_order.items(), key=lambda entry: entry[1])
     filament_sequence = PENDING_PRINT_METADATA.get("filamentSequence") or []
     sequence_index = PENDING_PRINT_METADATA.get("sequence_index", 0)
+    try:
+      sequence_index = int(sequence_index)
+    except (TypeError, ValueError):
+      sequence_index = 0
+    mapped_filaments = set(PENDING_PRINT_METADATA.get("mapped_filaments") or [])
+    if existing_mapping:
+      mapped_filaments.update(
+        idx for idx, tray in enumerate(existing_mapping) if tray is not None
+      )
     assigned_trays = PENDING_PRINT_METADATA.setdefault("assigned_trays", [])
     assigned_trays.append(tray_tar)
     filament_assigned = None
     if filament_sequence and sequence_index < len(filament_sequence):
-      mapping = PENDING_PRINT_METADATA.setdefault("ams_mapping", [])
-      assigned_filaments = {
-        idx for idx, tray in enumerate(mapping) if tray is not None
-      }
       candidate = filament_sequence[sequence_index]
-      PENDING_PRINT_METADATA["sequence_index"] = sequence_index + 1
-      if candidate not in assigned_filaments:
+      if candidate not in mapped_filaments or mapping_source.get(candidate) in ("fallback", "color"):
         filament_assigned = candidate
     elif change_count < len(ordered_filaments):
-      filament_assigned = ordered_filaments[change_count][0]
+      candidate = ordered_filaments[change_count][0]
+      if candidate not in mapped_filaments or mapping_source.get(candidate) in ("fallback", "color"):
+        filament_assigned = candidate
     else:
       for filamentId, usage_count in filament_order.items():
         if usage_count == change_count:
-          filament_assigned = filamentId
-          break
+          if filamentId not in mapped_filaments or mapping_source.get(filamentId) in ("fallback", "color"):
+            filament_assigned = filamentId
+            break
 
     if filament_assigned is not None:
       mapping_entry = normalize_ams_mapping_entry(tray_tar)
@@ -393,6 +703,9 @@ def map_filament(tray_tar):
       mapping[filament_idx] = mapping_entry
       mapping2[filament_idx] = mapping_entry
       log(f"✅ Tray {tray_uid or tray_tar} assigned to Filament {filament_assigned}")
+      mapped_filaments.add(filament_idx)
+      PENDING_PRINT_METADATA["mapped_filaments"] = sorted(mapped_filaments)
+      mapping_source[filament_idx] = "tray_change"
 
       for filament, tray in enumerate(mapping):
         if tray is None:
@@ -429,24 +742,30 @@ def processMessage(data):
     gcode_state = print_obj.get("gcode_state")
     prev_gcode_state = prev_print.get("gcode_state")
 
-    new_job_detected = False
-    if new_task_id and prev_task_id and new_task_id != prev_task_id:
-      new_job_detected = True
-    elif new_subtask_id and prev_subtask_id and new_subtask_id != prev_subtask_id:
-      new_job_detected = True
-    elif new_gcode_file and prev_gcode_file and new_gcode_file != prev_gcode_file:
-      new_job_detected = True
-    elif (
+    task_changed = new_task_id and prev_task_id and new_task_id != prev_task_id
+    subtask_changed = new_subtask_id and prev_subtask_id and new_subtask_id != prev_subtask_id
+    file_changed = new_gcode_file and prev_gcode_file and new_gcode_file != prev_gcode_file
+    state_transition = (
       gcode_state in ("PREPARE", "RUNNING")
       and prev_gcode_state in ("IDLE", "FAILED", "FINISH")
-    ):
-      new_job_detected = True
+    )
+
+    new_job_detected = task_changed or subtask_changed or file_changed or state_transition
 
     if new_job_detected:
-      clear_mapping = not (
+      mapping_in_payload = bool(
         data["print"].get("ams_mapping") or data["print"].get("ams_mapping2")
       )
-      _reset_pending_print("new print detected", clear_printer_mapping=clear_mapping)
+      mapping_in_state = bool(
+        print_obj.get("ams_mapping") or print_obj.get("ams_mapping2")
+      )
+      # Preserve mapping if this looks like a state transition into a job that already
+      # announced its AMS mapping (e.g., via project_file).
+      keep_mapping = mapping_in_payload or (state_transition and mapping_in_state and not (task_changed or subtask_changed or file_changed))
+      _reset_pending_print(
+        "new print detected",
+        clear_printer_mapping=not keep_mapping,
+      )
     
     # Handle project_file events (3MF metadata load) uniformly regardless of origin.
     if data["print"].get("command") == "project_file" and data["print"].get("url"):
@@ -477,11 +796,28 @@ def processMessage(data):
         f"[filament-tracker] project_file url={url!r} scheme={scheme or 'none'} "
         f"classified={source_type}"
       )
+      if has_ams_mapping:
+        PRINTER_STATE["print"]["ams_mapping"] = normalized
+        PRINTER_STATE["print"]["ams_mapping2"] = normalized
       PENDING_PRINT_METADATA["task_id"] = PRINTER_STATE["print"].get("task_id")
       PENDING_PRINT_METADATA["subtask_id"] = PRINTER_STATE["print"].get("subtask_id")
       PENDING_PRINT_METADATA["print_type"] = source_type
       use_ams_flag = PRINTER_STATE["print"].get("use_ams")
-      use_ams = bool(use_ams_flag) if use_ams_flag is not None else bool(normalized)
+      if use_ams_flag is not None:
+        use_ams = bool(use_ams_flag)
+      else:
+        use_ams = bool(normalized)
+        if not use_ams and _is_multi_material(PENDING_PRINT_METADATA):
+          use_ams = True
+
+      gcode_mapping_applied = _apply_gcode_tray_mapping_if_possible(
+        PENDING_PRINT_METADATA, use_ams=use_ams
+      )
+      if gcode_mapping_applied:
+        normalized = normalize_ams_mapping2(
+          PENDING_PRINT_METADATA.get("ams_mapping2"),
+          PENDING_PRINT_METADATA.get("ams_mapping"),
+        )
 
       # If no AMS mapping is present fall back to external spool 
       if not use_ams:
@@ -520,8 +856,10 @@ def processMessage(data):
             PENDING_PRINT_METADATA.get("filamentOrder"),
           )
           PENDING_PRINT_METADATA["filament_usage_inserted"] = True
-        _link_spools_to_print(print_id, normalized)
-        PENDING_PRINT_METADATA["complete"] = True
+        mapping_applied = _apply_initial_ams_mapping(print_id, "project_file")
+        if not mapping_applied:
+          _link_spools_to_print(print_id, normalized)
+          PENDING_PRINT_METADATA["complete"] = True
 
         if not PENDING_PRINT_METADATA.get("filament_usage_inserted") and PENDING_PRINT_METADATA.get("filaments"):
           _insert_filament_usage_entries(
@@ -583,6 +921,14 @@ def processMessage(data):
           existing_metadata = PENDING_PRINT_METADATA or {}
           existing_print_id = existing_metadata.get("print_id")
           existing_print_type = existing_metadata.get("print_type")
+          existing_ams_mapping = existing_metadata.get("ams_mapping")
+          existing_ams_mapping2 = existing_metadata.get("ams_mapping2")
+          existing_mapped_filaments = existing_metadata.get("mapped_filaments")
+          existing_complete = existing_metadata.get("complete")
+          existing_mapping_source = existing_metadata.get("mapping_source")
+          existing_gcode_mapping_applied = existing_metadata.get("gcode_mapping_applied")
+          existing_gcode_remap_enabled = existing_metadata.get("gcode_remap_enabled")
+          existing_gcode_has_filament_commands = existing_metadata.get("gcode_has_filament_commands")
           PENDING_PRINT_METADATA = getMetaDataFrom3mf(PRINTER_STATE["print"]["gcode_file"])
           if PENDING_PRINT_METADATA and PENDING_PRINT_METADATA.get("filaments"):
             PENDING_PRINT_METADATA["metadata_loaded"] = True
@@ -590,11 +936,33 @@ def processMessage(data):
               PENDING_PRINT_METADATA["print_id"] = existing_print_id
             if existing_print_type and not PENDING_PRINT_METADATA.get("print_type"):
               PENDING_PRINT_METADATA["print_type"] = existing_print_type
+            if existing_ams_mapping and not PENDING_PRINT_METADATA.get("ams_mapping"):
+              PENDING_PRINT_METADATA["ams_mapping"] = existing_ams_mapping
+            if existing_ams_mapping2 and not PENDING_PRINT_METADATA.get("ams_mapping2"):
+              PENDING_PRINT_METADATA["ams_mapping2"] = existing_ams_mapping2
+            if existing_mapped_filaments and not PENDING_PRINT_METADATA.get("mapped_filaments"):
+              PENDING_PRINT_METADATA["mapped_filaments"] = existing_mapped_filaments
+            if existing_complete and not PENDING_PRINT_METADATA.get("complete"):
+              PENDING_PRINT_METADATA["complete"] = existing_complete
+            if existing_mapping_source and not PENDING_PRINT_METADATA.get("mapping_source"):
+              PENDING_PRINT_METADATA["mapping_source"] = existing_mapping_source
+            if existing_gcode_mapping_applied and not PENDING_PRINT_METADATA.get("gcode_mapping_applied"):
+              PENDING_PRINT_METADATA["gcode_mapping_applied"] = existing_gcode_mapping_applied
+            if existing_gcode_remap_enabled is not None and PENDING_PRINT_METADATA.get("gcode_remap_enabled") is None:
+              PENDING_PRINT_METADATA["gcode_remap_enabled"] = existing_gcode_remap_enabled
+            if existing_gcode_has_filament_commands is not None and PENDING_PRINT_METADATA.get("gcode_has_filament_commands") is None:
+              PENDING_PRINT_METADATA["gcode_has_filament_commands"] = existing_gcode_has_filament_commands
         if PENDING_PRINT_METADATA and PENDING_PRINT_METADATA.get("filaments"):
           if not PENDING_PRINT_METADATA.get("print_type"):
             PENDING_PRINT_METADATA["print_type"] = print_type or "local"
           PENDING_PRINT_METADATA["task_id"] = PRINTER_STATE["print"].get("task_id")
           PENDING_PRINT_METADATA["subtask_id"] = PRINTER_STATE["print"].get("subtask_id")
+          use_ams_flag = PRINTER_STATE["print"].get("use_ams")
+          if use_ams_flag is not None:
+            use_ams = bool(use_ams_flag)
+          else:
+            use_ams = _is_multi_material(PENDING_PRINT_METADATA)
+          _apply_gcode_tray_mapping_if_possible(PENDING_PRINT_METADATA, use_ams=use_ams)
 
           if gcode_state == "RUNNING":
             print_id = PENDING_PRINT_METADATA.get("print_id")
@@ -622,7 +990,9 @@ def processMessage(data):
                   PENDING_PRINT_METADATA.get("filamentOrder"),
                 )
                 PENDING_PRINT_METADATA["filament_usage_inserted"] = True
-              _link_spools_to_print(print_id, PENDING_PRINT_METADATA.get("ams_mapping"))
+              mapping_applied = _apply_initial_ams_mapping(print_id, "local-running")
+              if not mapping_applied:
+                _link_spools_to_print(print_id, PENDING_PRINT_METADATA.get("ams_mapping"))
             if TRACK_LAYER_USAGE and print_id:
               FILAMENT_TRACKER.set_print_metadata(PENDING_PRINT_METADATA)
 
@@ -649,13 +1019,44 @@ def processMessage(data):
               )
               use_ams_flag = PRINTER_STATE["print"].get("use_ams")
               has_mapping = any(entry is not None for entry in normalized)
-              use_ams = bool(use_ams_flag) if use_ams_flag is not None else has_mapping
-              if use_ams and normalized:
+              if use_ams_flag is not None:
+                use_ams = bool(use_ams_flag)
+              else:
+                use_ams = has_mapping
+                if not use_ams and _is_multi_material(PENDING_PRINT_METADATA):
+                  use_ams = True
+
+              gcode_mapping_applied = _apply_gcode_tray_mapping_if_possible(
+                PENDING_PRINT_METADATA, use_ams=use_ams
+              )
+              if gcode_mapping_applied:
+                normalized = normalize_ams_mapping2(
+                  PENDING_PRINT_METADATA.get("ams_mapping2"),
+                  PENDING_PRINT_METADATA.get("ams_mapping"),
+                )
+                has_mapping = any(entry is not None for entry in normalized)
+
+              if use_ams and normalized and not gcode_mapping_applied:
                 PENDING_PRINT_METADATA["ams_mapping"] = normalized
                 PENDING_PRINT_METADATA["ams_mapping2"] = normalized
-              else:
-                PENDING_PRINT_METADATA.setdefault("ams_mapping", [])
-                PENDING_PRINT_METADATA.setdefault("ams_mapping2", [])
+              elif not gcode_mapping_applied:
+                inferred = None
+                if not _is_multi_material(PENDING_PRINT_METADATA):
+                  inferred = _infer_ams_mapping_from_colors(PENDING_PRINT_METADATA)
+                if inferred:
+                  PENDING_PRINT_METADATA["ams_mapping"] = inferred
+                  PENDING_PRINT_METADATA["ams_mapping2"] = inferred
+                  mapping_source = PENDING_PRINT_METADATA.setdefault("mapping_source", {})
+                  mapped_filaments = set(PENDING_PRINT_METADATA.get("mapped_filaments") or [])
+                  for idx, entry in enumerate(inferred):
+                    if entry is not None:
+                      mapping_source.setdefault(idx, "color")
+                      mapped_filaments.add(idx)
+                  PENDING_PRINT_METADATA["mapped_filaments"] = sorted(mapped_filaments)
+                  log("[print-history] Inferred AMS mapping from colors for print=%s" % print_id)
+                else:
+                  PENDING_PRINT_METADATA.setdefault("ams_mapping", [])
+                  PENDING_PRINT_METADATA.setdefault("ams_mapping2", [])
 
               PENDING_PRINT_METADATA["filamentChanges"] = []
               PENDING_PRINT_METADATA["assigned_trays"] = []
@@ -677,9 +1078,11 @@ def processMessage(data):
                 mapping_complete = any(
                   tray is not None for tray in (PENDING_PRINT_METADATA.get("ams_mapping") or [])
                 )
-              PENDING_PRINT_METADATA["complete"] = mapping_complete
               PENDING_PRINT_METADATA["print_id"] = print_id
-              _link_spools_to_print(print_id, PENDING_PRINT_METADATA.get("ams_mapping"))
+              mapping_applied = _apply_initial_ams_mapping(print_id, "local-tracking-start")
+              if not mapping_applied:
+                PENDING_PRINT_METADATA["complete"] = mapping_complete
+                _link_spools_to_print(print_id, PENDING_PRINT_METADATA.get("ams_mapping"))
               FILAMENT_TRACKER.start_local_print_from_metadata(PENDING_PRINT_METADATA)
 
               if not PENDING_PRINT_METADATA.get("filament_usage_inserted") and PENDING_PRINT_METADATA.get("filaments"):
@@ -734,6 +1137,14 @@ def processMessage(data):
             tray_tar_value = PRINTER_STATE["print"].get("ams").get("tray_tar")
             if tray_tar_value and tray_tar_value != "255":
                 mapped = map_filament(int(tray_tar_value))
+            merged_mapping = _merge_ams_mappings(
+              FILAMENT_TRACKER.ams_mapping,
+              PENDING_PRINT_METADATA.get("ams_mapping"),
+              PENDING_PRINT_METADATA.get("mapping_source"),
+            )
+            if merged_mapping:
+              PENDING_PRINT_METADATA["ams_mapping"] = merged_mapping
+              PENDING_PRINT_METADATA["ams_mapping2"] = merged_mapping
             FILAMENT_TRACKER.apply_ams_mapping(PENDING_PRINT_METADATA.get("ams_mapping") or [])
             if mapped:
                 PENDING_PRINT_METADATA["complete"] = True
@@ -826,6 +1237,7 @@ def on_message(client, userdata, msg):
     # Save ams spool data
     if "print" in data and "ams" in data["print"] and "ams" in data["print"]["ams"]:
       LAST_AMS_CONFIG["ams"] = data["print"]["ams"]["ams"]
+      _apply_color_mapping_if_possible()
       for ams in data["print"]["ams"]["ams"]:
         log(f"AMS [{num2letter(ams['id'])}] (hum: {ams['humidity']}, temp: {ams['temp']}ºC)")
         for tray in ams["tray"]:

@@ -1,0 +1,46 @@
+{
+  "cases": {
+    "Testqube_Multicolor_cloud": {
+      "log_path": "tests/MQTT/A1/01.07.00.00/Testqube_Multicolor_cloud.log",
+      "model_file": "tests/MQTT/Testqube_Multicolor.gcode.3mf",
+      "expected_weight_g_by_spool": {
+        "1": 0.15,
+        "2": 0.07,
+        "3": 0.27,
+        "4": 0.22
+      },
+      "expected_length_mm_by_spool": {
+        "1": 56.58832,
+        "2": 28.29416,
+        "3": 93.27441,
+        "4": 56.32733
+      }
+    },
+    "Testqube_local": {
+      "log_path": "tests/MQTT/A1/01.07.00.00/Testqube_local.log",
+      "model_file": "tests/MQTT/Testqube.gcode.3mf",
+      "expected_weight_g_by_spool": {
+        "4": 0.72
+      },
+      "expected_length_mm_by_spool": {
+        "4": 218.48422
+      }
+    },
+    "Testqube_Multicolor_local": {
+      "log_path": "tests/MQTT/A1/01.07.00.00/Testqube_Multicolor_local.log",
+      "model_file": "tests/MQTT/Testqube_Multicolor.gcode.3mf",
+      "expected_weight_g_by_spool": {
+        "1": 0.15,
+        "2": 0.07,
+        "3": 0.27,
+        "4": 0.22
+      },
+      "expected_length_mm_by_spool": {
+        "1": 56.58832,
+        "2": 28.29416,
+        "3": 93.27441,
+        "4": 56.32733
+      }
+    }
+  }
+}

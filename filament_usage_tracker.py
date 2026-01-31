@@ -600,6 +600,8 @@ class FilamentUsageTracker:
     if total_mm <= 0:
       return False
 
+    self._advance_sequence_index_for_filament(filament)
+
     mapping_value = self._resolve_tray_mapping(filament)
     if mapping_value is None:
       self._pending_usage_mm[filament] = self._pending_usage_mm.get(filament, 0.0) + total_mm
@@ -650,6 +652,32 @@ class FilamentUsageTracker:
     self._filament_spool_id_map[filament] = spool_id
     self._spool_data_cache[spool_id] = spool_data
     return True
+
+  def _advance_sequence_index_for_filament(self, filament: int) -> None:
+    metadata = self.print_metadata
+    if not metadata:
+      return
+    previous = metadata.get("current_filament")
+    if previous == filament:
+      return
+    metadata["current_filament"] = filament
+
+    sequence = metadata.get("filamentSequence") or []
+    if not sequence:
+      return
+    try:
+      start_index = int(metadata.get("sequence_index", 0) or 0)
+    except (TypeError, ValueError):
+      start_index = 0
+    if start_index < 0:
+      start_index = 0
+    if start_index >= len(sequence):
+      return
+
+    for idx in range(start_index, len(sequence)):
+      if sequence[idx] == filament:
+        metadata["sequence_index"] = idx + 1
+        return
 
   def _flush_all_pending_usage(self) -> None:
     if not self._pending_usage_mm:
@@ -714,8 +742,8 @@ class FilamentUsageTracker:
     predicted = now + timedelta(seconds=remaining_seconds)
     return self._format_timestamp(predicted)
 
-  def _get_spool_id_for_filament(self, filament_index: int) -> int | None:
-    mapping_value = self._resolve_tray_mapping(filament_index)
+  def _get_spool_id_for_filament(self, filament_index: int, allow_fallback: bool = True) -> int | None:
+    mapping_value = self._resolve_tray_mapping(filament_index, allow_fallback=allow_fallback)
     if mapping_value is None:
       return None
     tray_uid = self._tray_uid_from_mapping(mapping_value)
@@ -734,7 +762,7 @@ class FilamentUsageTracker:
     for filament, total_mm in self._total_usage_mm_per_filament.items():
       spool_id = self._filament_spool_id_map.get(filament)
       if spool_id is None:
-        spool_id = self._get_spool_id_for_filament(filament)
+        spool_id = self._get_spool_id_for_filament(filament, allow_fallback=False)
         if spool_id is None:
           return
         self._filament_spool_id_map[filament] = spool_id
@@ -760,7 +788,7 @@ class FilamentUsageTracker:
       return
 
     for filament_index in self._total_usage_mm_per_filament:
-      spool_id = self._get_spool_id_for_filament(filament_index)
+      spool_id = self._get_spool_id_for_filament(filament_index, allow_fallback=False)
       if spool_id is None:
         continue
 
@@ -824,12 +852,73 @@ class FilamentUsageTracker:
       return mapping_value
     return tray_uid_from_mapping_entry(mapping_value)
 
-  def _resolve_tray_mapping(self, filament_index: int):
+  def _resolve_tray_mapping(self, filament_index: int, allow_fallback: bool = True):
+    mapping_source = {}
+    gcode_multi_material = False
+    if self.print_metadata is not None:
+      mapping_source = self.print_metadata.get("mapping_source") or {}
+      gcode_multi_material = bool(
+        self.print_metadata.get("gcode_has_filament_commands")
+        or (self.print_metadata.get("filaments") and len(self.print_metadata.get("filaments") or {}) > 1)
+        or (self.print_metadata.get("layer_filament_sequence") and len(set(self.print_metadata.get("layer_filament_sequence") or [])) > 1)
+        or (self.print_metadata.get("layer_filament_lists") and len(self.print_metadata.get("layer_filament_lists") or {}) > 1)
+        or (self.print_metadata.get("layer_filament_order") and len(self.print_metadata.get("layer_filament_order") or {}) > 1)
+      )
     if self.using_ams:
-      if self.ams_mapping is None or filament_index >= len(self.ams_mapping):
+      mapping = self.ams_mapping or []
+      if mapping and filament_index < len(mapping) and mapping[filament_index] is not None:
+        if allow_fallback and self.print_metadata is not None:
+          if mapping_source.get(filament_index) in ("color", "fallback"):
+            current_tray = self.print_metadata.get("current_tray")
+            current_entry = normalize_ams_mapping_entry(current_tray)
+            if current_entry is not None and mapping[filament_index] != current_entry:
+              mapping[filament_index] = current_entry
+              self.ams_mapping = mapping
+              self.print_metadata["ams_mapping"] = mapping
+              self.print_metadata["ams_mapping2"] = mapping
+              mapped_filaments = set(self.print_metadata.get("mapped_filaments") or [])
+              mapped_filaments.add(filament_index)
+              self.print_metadata["mapped_filaments"] = sorted(mapped_filaments)
+              if mapping_source.get(filament_index) != "tray_change":
+                mapping_source[filament_index] = "fallback"
+                self.print_metadata["mapping_source"] = mapping_source
+              log(
+                "[filament-tracker] Using current tray for filament %s -> %s"
+                % (filament_index, tray_uid_from_mapping_entry(current_entry))
+              )
+              return current_entry
+            if gcode_multi_material and current_entry is None:
+              return None
+        return mapping[filament_index]
+      if not mapping or filament_index >= len(mapping) or mapping[filament_index] is None:
+        if not allow_fallback:
+          return None
+        current_tray = None
+        if self.print_metadata is not None:
+          current_tray = self.print_metadata.get("current_tray")
+        current_entry = normalize_ams_mapping_entry(current_tray)
+        if current_entry is not None:
+          if len(mapping) <= filament_index:
+            mapping.extend([None] * (filament_index + 1 - len(mapping)))
+          mapping[filament_index] = current_entry
+          self.ams_mapping = mapping
+          if self.print_metadata is not None:
+            self.print_metadata["ams_mapping"] = mapping
+            self.print_metadata["ams_mapping2"] = mapping
+            mapped_filaments = set(self.print_metadata.get("mapped_filaments") or [])
+            mapped_filaments.add(filament_index)
+            self.print_metadata["mapped_filaments"] = sorted(mapped_filaments)
+            mapping_source = self.print_metadata.setdefault("mapping_source", {})
+            if mapping_source.get(filament_index) != "tray_change":
+              mapping_source[filament_index] = "fallback"
+          log(
+            "[filament-tracker] Using current tray for filament %s -> %s"
+            % (filament_index, tray_uid_from_mapping_entry(current_entry))
+          )
+          return current_entry
         log(f"No AMS mapping for filament {filament_index}")
         return None
-      return self.ams_mapping[filament_index]
+      return mapping[filament_index]
     return EXTERNAL_SPOOL_ID
 
   def _lookup_spool_for_tray(self, tray_uid: str):
