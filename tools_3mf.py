@@ -2,16 +2,42 @@ import requests
 import zipfile
 import tempfile
 import xml.etree.ElementTree as ET
-import pycurl
-import urllib.parse
+import ftplib
+import socket
+import ssl
 import os
 import re
 import time
-import io
 from datetime import datetime
 from config import PRINTER_CODE, PRINTER_IP
 from urllib.parse import urlparse
 from logger import log
+
+class ImplicitFTP_TLS(ftplib.FTP_TLS):
+  """
+  FTP_TLS subclass that wraps sockets for implicit FTPS (port 990).
+  Adapted from HA's ha-bambulab implementation.
+  """
+  def __init__(self, *args, **kwargs):
+    super().__init__(*args, **kwargs)
+    self._sock = None
+
+  @property
+  def sock(self):
+    return self._sock
+
+  @sock.setter
+  def sock(self, value):
+    if value is not None and not isinstance(value, ssl.SSLSocket):
+      value = self.context.wrap_socket(value)
+    self._sock = value
+
+  def ntransfercmd(self, cmd, rest=None):
+    conn, size = ftplib.FTP.ntransfercmd(self, cmd, rest)
+    if self._prot_p:
+      session = self.sock.session if isinstance(self.sock, ssl.SSLSocket) else None
+      conn = self.context.wrap_socket(conn, server_hostname=self.host, session=session)
+    return conn, size
 
 def parse_ftp_listing(line):
     """Parse a line from an FTP LIST command."""
@@ -65,114 +91,226 @@ def download3mfFromCloud(url, destFile):
   response.raise_for_status()
   destFile.write(response.content)
 
+def ensure_ftps_connection(ftp_host, ftp_user, ftp_pass, connect_retries, timeout=15):
+  """Create an implicit FTPS connection with retries."""
+  context = ssl.create_default_context()
+  context.check_hostname = False
+  context.verify_mode = ssl.CERT_NONE
+
+  for attempt in range(1, connect_retries + 1):
+    ftp = ImplicitFTP_TLS(context=context, timeout=timeout)
+    try:
+      log(f"[DEBUG] FTP connection check ({attempt}/{connect_retries})...")
+      ftp.connect(host=ftp_host, port=990, timeout=timeout)
+      ftp.login(user=ftp_user, passwd=ftp_pass)
+      ftp.prot_p()
+      return ftp
+    except tuple(list(ftplib.all_errors) + [socket.timeout]) as e:
+      if attempt < connect_retries:
+        log(f"[WARNING] FTP connection failed ({e}). Retrying in 5s...")
+        time.sleep(5)
+      else:
+        log(f"[ERROR] Could not establish FTP connection after {connect_retries} attempts.")
+      try:
+        ftp.close()
+      except Exception:
+        pass
+  return None
+
 def download3mfFromFTP(filename, destFile):
   log("Downloading 3MF file from FTP...")
   ftp_host = PRINTER_IP
   ftp_user = "bblp"
   ftp_pass = PRINTER_CODE
-  local_path = destFile.name  # 🔹 Download into the current directory
-  base_name = os.path.basename(filename)
-  remote_paths = [f"/cache/{base_name}", f"/{base_name}", f"/sdcard/{base_name}"]
+  local_path = destFile.name
+  base_name = os.path.basename(filename).lstrip("/")
+  search_paths = ["/cache/", "/", "/sdcard/"]
+
+  filenames_to_try = []
+  if base_name.endswith(".3mf"):
+    filenames_to_try.append(base_name)
+  else:
+    filenames_to_try.append(f"{base_name}.3mf")
+    filenames_to_try.append(f"{base_name}.gcode.3mf")
+  if base_name and base_name not in filenames_to_try:
+    filenames_to_try.insert(0, base_name)
 
   max_retries = 6
-  last_err_code = None
-  path_count = len(remote_paths)
-  # pycurl error codes we react to:
-  # 7: could not connect, 28: timeout, 35: SSL connect error,
-  # 52: empty reply, 55: send error, 56: recv error.
-  # 78: remote file not found, 13: bad PASV/EPSV response, 9: access denied.
-  reconnect_codes = {7, 28, 35, 52, 55, 56}
-  c = setupPycurlConnection(ftp_user, ftp_pass)
-  try:
-    for attempt in range(1, max_retries + 1):
-      path_index = (attempt - 1) % path_count
-      remote_path = remote_paths[path_index]
-      if not remote_path.startswith("/"):
-        remote_path = "/" + remote_path
-      encoded_remote_path = urllib.parse.quote(remote_path)
-      url = f"ftps://{ftp_host}{encoded_remote_path}"
+  not_found_seen = False
+  connect_retries = 3
+  ftp = ensure_ftps_connection(ftp_host, ftp_user, ftp_pass, connect_retries)
+  if ftp is None:
+    return False
 
-      log(f"[DEBUG] Attempting file download ({path_index + 1}/{path_count}): {remote_path}") # Log attempted path
-
+  def attempt_single_download(path_prefix, name):
+    remote_path = f"{path_prefix}{name.lstrip('/')}"
+    log(f"[DEBUG] Attempting file download: {remote_path}")
+    expected_size = None
+    try:
+      expected_size = int(ftp.size(remote_path))
+      log(f"[DEBUG] Remote size for {remote_path}: {expected_size} bytes")
+    except Exception as e:
+      log(f"[WARNING] Could not fetch size for {remote_path}: {e}")
+    try:
       with open(local_path, "wb") as f:
-        try:
-          c.setopt(c.URL, url)
-          c.setopt(c.WRITEDATA, f)
-          log(f"[DEBUG] Attempt {attempt}: Starting download of {remote_path}...")
-          c.perform()
-          log("[DEBUG] File successfully downloaded!")
-          return True
-        except pycurl.error as e:
-          last_err_code = e.args[0]
-          if last_err_code in reconnect_codes:
-            log(f"[WARNING] FTP connection error (code {last_err_code}). Reconnecting...")
+        ftp.retrbinary(f"RETR {remote_path}", f.write)
+    except Exception:
+      try:
+        if os.path.exists(local_path):
+          os.remove(local_path)
+      except Exception:
+        pass
+      raise
+    if expected_size is not None:
+      try:
+        local_size = os.path.getsize(local_path)
+        if local_size != expected_size:
+          log(f"[WARNING] Downloaded size mismatch for {remote_path}: local {local_size} vs remote {expected_size}")
+          try:
+            os.remove(local_path)
+          except Exception:
+            pass
+          return False
+      except Exception:
+        pass
+    return True
+
+  def find_latest_file(search_paths_inner, extensions):
+    latest_path = None
+    latest_time = None
+    for path in search_paths_inner:
+      try:
+        entries = []
+        def parse_line(line):
+          pattern_with_time = r'^\\S+\\s+\\d+\\s+\\S+\\s+\\S+\\s+\\d+\\s+(\\S+\\s+\\d+\\s+\\d+:\\d+)\\s+(.+)$'
+          pattern_with_year = r'^\\S+\\s+\\d+\\s+\\S+\\s+\\S+\\s+\\d+\\s+(\\S+\\s+\\d+\\s+\\d{4})\\s+(.+)$'
+          m = re.match(pattern_with_time, line)
+          ts = None
+          fname = None
+          if m:
+            ts_str, fname = m.groups()
             try:
-              c.close()
+              ts = datetime.strptime(ts_str, "%b %d %H:%M").replace(year=datetime.now().year)
+            except Exception:
+              ts = None
+          else:
+            m = re.match(pattern_with_year, line)
+            if m:
+              ts_str, fname = m.groups()
+              try:
+                ts = datetime.strptime(ts_str, "%b %d %Y")
+              except Exception:
+                ts = None
+          if fname:
+            _, ext = os.path.splitext(fname)
+            if ext in extensions:
+              entries.append((ts, f"{path}{fname}"))
+        ftp.retrlines(f"LIST {path}", parse_line)
+        for ts, pth in entries:
+          if ts is None:
+            continue
+          if latest_time is None or ts > latest_time:
+            latest_time = ts
+            latest_path = pth
+      except Exception:
+        log(f"[ERROR] Could not LIST path {path}")
+    return latest_path
+
+  try:
+    attempt = 1
+    while attempt <= max_retries:
+      tried_any = False
+      for candidate in filenames_to_try:
+        for path_prefix in search_paths:
+          try:
+            tried_any = True
+            log(f"[DEBUG] Attempt {attempt}: Starting download of {candidate} via {path_prefix}...")
+            if attempt_single_download(path_prefix, candidate):
+              log("[DEBUG] File successfully downloaded!")
+              return True
+          except ftplib.error_perm as e:
+            message = str(e)
+            lowered = message.lower()
+            if message.startswith("550") or "denied" in lowered:
+              not_found_seen = True
+              continue
+            log(f"[ERROR] Fatal FTP permission error: {message}")
+            return False
+          except tuple(list(ftplib.all_errors) + [socket.timeout]) as e:
+            log(f"[WARNING] FTP connection error ({e}). Reconnecting...")
+            try:
+              ftp.close()
             except Exception:
               pass
-            c = setupPycurlConnection(ftp_user, ftp_pass)
+            ftp = ensure_ftps_connection(ftp_host, ftp_user, ftp_pass, connect_retries)
+            if ftp is None:
+              return False
+            continue
+      if not tried_any:
+        break
+      if attempt < max_retries:
+        log(f"[WARNING] Transient FTP error. Retrying in 5s...")
+        time.sleep(5)
+      attempt += 1
 
-          if last_err_code in (78, 13):
-            if attempt < max_retries:
-              log(f"[WARNING] Transient FTP error (code {last_err_code}). Retrying in 5s...")
-              time.sleep(5)
-              continue
-            log("[ERROR] Giving up after max retries for transient FTP errors.")
-            break
-          if last_err_code == 9:
-            log("[DEBUG] Printer denied access to /cache path. Ensure external storage is setup to store print files in printer settings.")
-            return False
-          log(f"[ERROR] Fatal cURL error {last_err_code}: {e}")
-          return False
-  finally:
-    if c is not None:
+    latest = find_latest_file(search_paths, [".3mf"])
+    if latest:
+      log(f"[DEBUG] Falling back to latest .3mf: {latest}")
+      expected_size = None
       try:
-        c.close()
+        expected_size = int(ftp.size(latest))
+        log(f"[DEBUG] Remote size for fallback {latest}: {expected_size} bytes")
+      except Exception as e:
+        log(f"[WARNING] Could not fetch size for fallback {latest}: {e}")
+      try:
+        with open(local_path, "wb") as f:
+          ftp.retrbinary(f"RETR {latest}", f.write)
+        if expected_size is not None:
+          try:
+            local_size = os.path.getsize(local_path)
+            if local_size != expected_size:
+              log(f"[WARNING] Downloaded size mismatch for fallback {latest}: local {local_size} vs remote {expected_size}")
+              try:
+                os.remove(local_path)
+              except Exception:
+                pass
+              return False
+          except Exception:
+            pass
+        log("[DEBUG] File successfully downloaded via fallback.")
+        return True
+      except Exception as e:
+        try:
+          if os.path.exists(local_path):
+            os.remove(local_path)
+        except Exception:
+          pass
+        log(f"[ERROR] Fallback download failed for {latest}: {e}")
+  finally:
+    if ftp is not None:
+      try:
+        ftp.close()
       except Exception:
         pass
 
-  if last_err_code == 78:
+  if not_found_seen:
     log("[ERROR] File not found after max retries.")
-    list_conn = setupPycurlConnection(ftp_user, ftp_pass)
-    try:
-      for list_path in ("/", "/sdcard/", "/cache/"):
+    list_conn = ensure_ftps_connection(ftp_host, ftp_user, ftp_pass, connect_retries)
+    if list_conn:
+      try:
+        list_path = "/"
         log(f"[DEBUG] Listing found printer files in {list_path} directory")
-        buffer = io.BytesIO()
-        list_conn.setopt(list_conn.URL, f"ftps://{ftp_host}{list_path}")
-        list_conn.setopt(list_conn.WRITEDATA, buffer)
-        list_conn.setopt(list_conn.DIRLISTONLY, True)
         try:
-          list_conn.perform()
-          log(f"[DEBUG] Directory Listing ({list_path}): {buffer.getvalue().decode('utf-8').splitlines()}")
+          listing = list_conn.nlst(list_path)
+          log(f"[DEBUG] Directory Listing ({list_path}): {listing}")
         except Exception:
           log(f"[ERROR] Could not retrieve directory listing for {list_path}.")
-    finally:
-      try:
-        list_conn.close()
-      except Exception:
-        pass
+      finally:
+        try:
+          list_conn.close()
+        except Exception:
+          pass
   return False
-
-def setupPycurlConnection(ftp_user, ftp_pass):
-  # Setup shared options for curl connections
-  c = pycurl.Curl()
-
-  # 🔹 Setup explicit FTPS connection (like FileZilla)
-  
-  c.setopt(c.USERPWD, f"{ftp_user}:{ftp_pass}")
-  
-    
-  # 🔹 Enable SSL/TLS
-  c.setopt(c.SSL_VERIFYPEER, 0)  # Disable SSL verification
-  c.setopt(c.SSL_VERIFYHOST, 0)
-    
-  # 🔹 Enable passive mode (like FileZilla)
-  c.setopt(c.FTP_SSL, c.FTPSSL_ALL)
-    
-  # 🔹 Enable proper TLS authentication
-  c.setopt(c.FTPSSLAUTH, c.FTPAUTH_TLS)
-
-  return c
 
 def download3mfFromLocalFilesystem(path, destFile):
   with open(path, "rb") as src_file:
