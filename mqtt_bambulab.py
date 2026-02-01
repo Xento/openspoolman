@@ -256,6 +256,16 @@ def processMessage(data):
     update_dict(PRINTER_STATE, data)
     
     if data["print"].get("command") == "project_file" and data["print"].get("url"):
+      log(
+        "[print] Incoming print command: "
+        f"url={data['print'].get('url')}, "
+        f"gcode_file={data['print'].get('gcode_file')}, "
+        f"print_type={data['print'].get('print_type')}, "
+        f"task_id={data['print'].get('task_id')}, "
+        f"subtask_id={data['print'].get('subtask_id')}, "
+        f"use_ams={data['print'].get('use_ams')}, "
+        f"ams_mapping={data['print'].get('ams_mapping')}"
+      )
       PENDING_PRINT_METADATA = getMetaDataFrom3mf(data["print"]["url"])
       PENDING_PRINT_METADATA["print_type"] = PRINTER_STATE["print"].get("print_type")
       PENDING_PRINT_METADATA["task_id"] = PRINTER_STATE["print"].get("task_id")

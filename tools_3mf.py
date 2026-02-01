@@ -59,6 +59,15 @@ def parse_ftp_listing(line):
 def get_base_name(filename):
     return filename.rsplit('.', 1)[0]
 
+def filename_from_url(url: str | None) -> tuple[str | None, str | None]:
+  if not url:
+    return None, None
+  parsed = urlparse(url)
+  path = parsed.path or parsed.netloc
+  if not path:
+    return None, None
+  return path, os.path.basename(path)
+
 def parse_date(item):
     """Parse the date and time from the FTP listing item."""
     try:
@@ -329,6 +338,7 @@ def getMetaDataFrom3mf(url):
   try:
     metadata = {}
 
+    filepath, filename = filename_from_url(url)
     # Create a temporary file
     with tempfile.NamedTemporaryFile(delete_on_close=False,delete=True, suffix=".3mf") as temp_file:
       temp_file_name = temp_file.name
@@ -338,8 +348,9 @@ def getMetaDataFrom3mf(url):
       elif url.startswith("local:"):
         download3mfFromLocalFilesystem(url.replace("local:", ""), temp_file)
       elif url.startswith(("file://", "ftp://", "ftps://")):
-        file_path = urlparse(url).path
-        filename = os.path.basename(file_path)
+        file_path = filepath
+        if not filename:
+          filename = url.rpartition('/')[-1]
         download3mfFromFTP(filename, temp_file)
       else:
         download3mfFromFTP(url.rpartition('/')[-1], temp_file) # Pull just filename to clear out any unexpected paths
@@ -347,8 +358,7 @@ def getMetaDataFrom3mf(url):
       temp_file.close()
       metadata["model_path"] = url
 
-      parsed_url = urlparse(url)
-      metadata["file"] = os.path.basename(parsed_url.path)
+      metadata["file"] = filename or url
 
       log(f"3MF file downloaded and saved as {temp_file_name}.")
 
