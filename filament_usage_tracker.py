@@ -8,12 +8,21 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from urllib.parse import urlparse
 
-from config import EXTERNAL_SPOOL_AMS_ID, EXTERNAL_SPOOL_ID, TRACK_LAYER_USAGE
+from config import EXTERNAL_SPOOL_AMS_ID, EXTERNAL_SPOOL_ID, TRACK_LAYER_USAGE, PRINTER_ID
 from spoolman_client import consumeSpool
 from spoolman_service import fetchSpools, parse_ams_mapping_value, trayUid
 from tools_3mf import download3mfFromCloud, download3mfFromFTP, download3mfFromLocalFilesystem
 from print_history import update_filament_spool, update_filament_grams_used, get_all_filament_usage_for_print, update_layer_tracking
 from logger import log
+from bambu_state import (
+  PRINT_RUN_REGISTRY,
+  extract_gcode_state,
+  extract_prepare_percent,
+  extract_print_status,
+  is_print_active,
+  is_print_final,
+  normalize_prepare_percent,
+)
 
 
 CHECKPOINT_DIR = Path(__file__).resolve().parent / "data" / "checkpoint"
@@ -31,7 +40,6 @@ ABORT_INDICATOR_STATES = {
     "IDLE",
     "FAILED",
 }
-
 
 def _checkpoint_dir() -> Path:
   CHECKPOINT_DIR.mkdir(parents=True, exist_ok=True)
@@ -231,6 +239,9 @@ class FilamentUsageTracker:
     self._layer_tracking_start_time = None
     self._pending_usage_mm = {}
     self._mc_remaining_time_minutes = None
+    self._prepare_percent_normalized = None
+    self._pending_project_file = None
+    self._last_prepare_logged = None
 
   def set_print_metadata(self, metadata: dict | None) -> None:
     metadata = metadata or {}
@@ -253,6 +264,16 @@ class FilamentUsageTracker:
 
     print_obj = message.get("print", {})
     command = print_obj.get("command")
+    gcode_state = extract_gcode_state(message)
+    print_status = extract_print_status(message)
+    raw_prepare = extract_prepare_percent(message)
+    if "gcode_file_prepare_percent" in print_obj:
+      normalized_prepare = normalize_prepare_percent(raw_prepare)
+      self._prepare_percent_normalized = normalized_prepare
+      current_prepare = (raw_prepare, normalized_prepare)
+      if current_prepare != self._last_prepare_logged:
+        log(f"[filament-tracker] prepare_percent raw={raw_prepare!r} normalized={normalized_prepare}")
+        self._last_prepare_logged = current_prepare
     if print_obj.get('gcode_state') is not None:
       log(f"[filament-tracker] on_message command={command} gcode_state={print_obj.get('gcode_state')}")
 
@@ -265,7 +286,7 @@ class FilamentUsageTracker:
         self._mc_remaining_time_minutes = None
 
     if command == "project_file":
-      self._handle_print_start(print_obj)
+      self._pending_project_file = print_obj
 
     if command == "push_status":
       if "layer_num" in print_obj:
@@ -275,14 +296,16 @@ class FilamentUsageTracker:
           self._handle_layer_change(layer)
           self.current_layer = layer
 
-    if self.gcode_state == "FINISH" and previous_state != "FINISH" and self.active_model is not None:
-      self._handle_print_end()
+    if is_print_active(gcode_state, print_status):
+      active_run = PRINT_RUN_REGISTRY.get_active_run(PRINTER_ID)
+      if active_run and self.active_model is None and self._pending_project_file:
+        self._handle_print_start(self._pending_project_file)
+        self._pending_project_file = None
 
-    elif (
-        previous_state == "RUNNING"
-        and self._is_abort_state(self.gcode_state)
-        and self.active_model is not None
-    ):
+    if is_print_final(gcode_state, print_status) and self.active_model is not None:
+      if self.gcode_state == "FINISH":
+        self._handle_print_end()
+      else:
         status = (
             LAYER_TRACKING_STATUS_FAILED
             if self.gcode_state == "FAILED"

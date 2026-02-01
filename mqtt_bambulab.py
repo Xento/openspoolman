@@ -26,6 +26,20 @@ from collections.abc import Mapping
 from logger import append_to_rotating_file, log
 from print_history import insert_print, insert_filament_usage
 from filament_usage_tracker import FilamentUsageTracker
+from bambu_state import (
+  Features,
+  MODEL_FEATURES,
+  PRINT_RUN_REGISTRY,
+  extract_gcode_state,
+  extract_prepare_percent,
+  extract_print_status,
+  get_job_label,
+  get_printer_model_name,
+  is_prepare_ready_for_early_download,
+  is_print_active,
+  is_print_final,
+  normalize_prepare_percent,
+)
 MQTT_CLIENT = {}  # Global variable storing MQTT Client
 MQTT_CLIENT_CONNECTED = False
 MQTT_KEEPALIVE = 60
@@ -36,7 +50,11 @@ PRINTER_STATE_LAST = {}
 
 PENDING_PRINT_METADATA = {}
 FILAMENT_TRACKER = FilamentUsageTracker()
+LAST_LAN_PROJECT = {}
 LOG_FILE = "/home/app/logs/mqtt.log"
+PENDING_PRINT_REFERENCE = {}
+PRINTER_MODEL_NAME = get_printer_model_name(PRINTER_ID)
+LAST_PREPARE_LOGGED = object()
 
 def getPrinterModel():
     global PRINTER_ID
@@ -164,6 +182,42 @@ def _parse_grams(value):
   except (TypeError, ValueError):
     return None
 
+def _is_lan_project_url(url: str | None) -> bool:
+  if not url:
+    return False
+  return not url.startswith("http")
+
+def _is_valid_print_id(value: Any) -> bool:
+  if value is None:
+    return False
+  if isinstance(value, str) and not value.strip():
+    return False
+  try:
+    return int(value) != 0
+  except (TypeError, ValueError):
+    return True
+
+def _matches_print_identity(print_state: dict, identity: dict) -> bool:
+  if not print_state or not identity:
+    return False
+  if _is_valid_print_id(identity.get("task_id")) and _is_valid_print_id(print_state.get("task_id")):
+    if str(identity.get("task_id")) == str(print_state.get("task_id")):
+      return True
+  if _is_valid_print_id(identity.get("subtask_id")) and _is_valid_print_id(print_state.get("subtask_id")):
+    if str(identity.get("subtask_id")) == str(print_state.get("subtask_id")):
+      return True
+  identity_file = identity.get("file") or identity.get("gcode_file") or identity.get("subtask_name")
+  state_file = print_state.get("gcode_file") or print_state.get("subtask_name")
+  return bool(identity_file and state_file and identity_file == state_file)
+
+def _lan_project_is_active(identity: dict) -> bool:
+  if not identity:
+    return False
+  timestamp = identity.get("timestamp")
+  if not timestamp:
+    return False
+  return (time.time() - timestamp) < (6 * 60 * 60)
+
 def _mask_serial(serial: str | None, keep_chars: int = 3) -> str:
   if not serial:
     return ""
@@ -196,6 +250,19 @@ def _mask_mqtt_payload(payload: str) -> str:
     masked = masked.replace(PRINTER_ID, masked_serial)
 
   return masked
+
+def _maybe_download_metadata(source: str | None, reason: str) -> dict | None:
+  if not source:
+    log(f"[DEBUG] Metadata download skipped: no source ({reason}).")
+    return None
+  try:
+    metadata = getMetaDataFrom3mf(source)
+    if metadata:
+      log(f"[DEBUG] Metadata downloaded for {reason} from {source}")
+    return metadata
+  except Exception as exc:
+    log(f"[WARNING] Metadata download failed ({reason}): {exc}")
+    return None
 
 def map_filament(tray_tar):
   global PENDING_PRINT_METADATA
@@ -249,90 +316,113 @@ def map_filament(tray_tar):
   return False
   
 def processMessage(data):
-  global LAST_AMS_CONFIG, PRINTER_STATE, PRINTER_STATE_LAST, PENDING_PRINT_METADATA
+  global LAST_AMS_CONFIG, PRINTER_STATE, PRINTER_STATE_LAST, PENDING_PRINT_METADATA, LAST_LAN_PROJECT
+  global PENDING_PRINT_REFERENCE
+  global LAST_PREPARE_LOGGED
 
    # Prepare AMS spending estimation
   if "print" in data:    
     update_dict(PRINTER_STATE, data)
-    
-    if data["print"].get("command") == "project_file" and data["print"].get("url"):
+    print_block = PRINTER_STATE.get("print", {})
+    gcode_state = extract_gcode_state(data)
+    print_status = extract_print_status(data)
+    job_label = get_job_label(data)
+    raw_prepare_percent = extract_prepare_percent(data)
+    normalized_prepare_percent = normalize_prepare_percent(raw_prepare_percent)
+    if "gcode_file_prepare_percent" in print_block:
+      current_prepare = (raw_prepare_percent, normalized_prepare_percent)
+      if current_prepare != LAST_PREPARE_LOGGED:
+        log(f"[DEBUG] prepare_percent raw={raw_prepare_percent!r} normalized={normalized_prepare_percent}")
+        LAST_PREPARE_LOGGED = current_prepare
+
+    active_now = is_print_active(gcode_state, print_status)
+    final_now = is_print_final(gcode_state, print_status)
+    supports_early = Features.SUPPORTS_EARLY_FTP_DOWNLOAD in MODEL_FEATURES.get(PRINTER_MODEL_NAME, set())
+    early_ready = active_now or is_prepare_ready_for_early_download(normalized_prepare_percent)
+
+    if print_block.get("command") == "project_file" and print_block.get("url"):
       log(
         "[print] Incoming print command: "
-        f"url={data['print'].get('url')}, "
-        f"gcode_file={data['print'].get('gcode_file')}, "
-        f"print_type={data['print'].get('print_type')}, "
-        f"task_id={data['print'].get('task_id')}, "
-        f"subtask_id={data['print'].get('subtask_id')}, "
-        f"use_ams={data['print'].get('use_ams')}, "
-        f"ams_mapping={data['print'].get('ams_mapping')}"
+        f"url={print_block.get('url')}, "
+        f"gcode_file={print_block.get('gcode_file')}, "
+        f"print_type={print_block.get('print_type')}, "
+        f"task_id={print_block.get('task_id')}, "
+        f"subtask_id={print_block.get('subtask_id')}, "
+        f"use_ams={print_block.get('use_ams')}, "
+        f"ams_mapping={print_block.get('ams_mapping')}"
       )
-      PENDING_PRINT_METADATA = getMetaDataFrom3mf(data["print"]["url"])
-      PENDING_PRINT_METADATA["print_type"] = PRINTER_STATE["print"].get("print_type")
-      PENDING_PRINT_METADATA["task_id"] = PRINTER_STATE["print"].get("task_id")
-      PENDING_PRINT_METADATA["subtask_id"] = PRINTER_STATE["print"].get("subtask_id")
-      if TRACK_LAYER_USAGE:
-        FILAMENT_TRACKER.set_print_metadata(PENDING_PRINT_METADATA)
+      PENDING_PRINT_REFERENCE = {
+        "url": print_block.get("url"),
+        "gcode_file": print_block.get("gcode_file"),
+        "task_id": print_block.get("task_id"),
+        "subtask_id": print_block.get("subtask_id"),
+        "print_type": print_block.get("print_type"),
+        "use_ams": print_block.get("use_ams"),
+        "ams_mapping": print_block.get("ams_mapping"),
+        "subtask_name": print_block.get("subtask_name"),
+      }
+      if _is_lan_project_url(print_block.get("url")):
+        LAST_LAN_PROJECT = {
+          "task_id": print_block.get("task_id"),
+          "subtask_id": print_block.get("subtask_id"),
+          "file": print_block.get("gcode_file") or print_block.get("subtask_name"),
+          "timestamp": time.time(),
+        }
 
-      print_id = insert_print(PRINTER_STATE["print"]["subtask_name"], "cloud", PENDING_PRINT_METADATA["image"])
+    if supports_early and early_ready and job_label and not PENDING_PRINT_METADATA:
+      if PRINT_RUN_REGISTRY.mark_early_download_started(PRINTER_ID, job_label):
+        metadata = _maybe_download_metadata(job_label, "early-download")
+        if metadata:
+          PENDING_PRINT_METADATA = metadata
+          if PENDING_PRINT_REFERENCE:
+            PENDING_PRINT_METADATA["task_id"] = PENDING_PRINT_REFERENCE.get("task_id")
+            PENDING_PRINT_METADATA["subtask_id"] = PENDING_PRINT_REFERENCE.get("subtask_id")
+            PENDING_PRINT_METADATA["print_type"] = PENDING_PRINT_REFERENCE.get("print_type")
 
-      if PRINTER_STATE["print"].get("use_ams"):
-        PENDING_PRINT_METADATA["ams_mapping"] = PRINTER_STATE["print"]["ams_mapping"]
-      else:
-        PENDING_PRINT_METADATA["ams_mapping"] = [EXTERNAL_SPOOL_ID]
+    if active_now:
+      if PRINT_RUN_REGISTRY.can_start_new_run(PRINTER_ID):
+        PRINT_RUN_REGISTRY.start_run(PRINTER_ID, job_label, data)
 
-      PENDING_PRINT_METADATA["print_id"] = print_id
-      PENDING_PRINT_METADATA["complete"] = True
-
-      for id, filament in PENDING_PRINT_METADATA["filaments"].items():
-        parsed_grams = _parse_grams(filament.get("used_g"))
-        parsed_length_m = _parse_grams(filament.get("used_m"))
-        estimated_length_mm = parsed_length_m * 1000 if parsed_length_m is not None else None
-        grams_used = parsed_grams if parsed_grams is not None else 0.0
-        length_used = estimated_length_mm if estimated_length_mm is not None else 0.0
-        if TRACK_LAYER_USAGE:
-          grams_used = 0.0
-          length_used = 0.0
-        insert_filament_usage(
-            print_id,
-            filament["type"],
-            filament["color"],
-            grams_used,
-            id,
-            estimated_grams=parsed_grams,
-            length_used=length_used,
-            estimated_length=estimated_length_mm,
+        source = (
+          (PENDING_PRINT_REFERENCE or {}).get("url")
+          or (PENDING_PRINT_REFERENCE or {}).get("gcode_file")
+          or print_block.get("url")
+          or print_block.get("gcode_file")
+          or job_label
         )
-  
-    #if ("gcode_state" in data["print"] and data["print"]["gcode_state"] == "RUNNING") and ("print_type" in data["print"] and data["print"]["print_type"] != "local") \
-    #  and ("tray_tar" in data["print"] and data["print"]["tray_tar"] != "255") and ("stg_cur" in data["print"] and data["print"]["stg_cur"] == 0 and PRINT_CURRENT_STAGE != 0):
-    
-    #TODO: What happens when printed from external spool, is ams and tray_tar set?
-    if PRINTER_STATE.get("print", {}).get("print_type") == "local" and PRINTER_STATE_LAST.get("print"):
-
-      if (
-          PRINTER_STATE["print"].get("gcode_state") == "RUNNING" and
-          PRINTER_STATE_LAST["print"].get("gcode_state") == "PREPARE" and 
-          PRINTER_STATE["print"].get("gcode_file")
-        ):
-
+        history_print_type = print_block.get("print_type") or ("lan" if _is_lan_project_url(source) else "cloud")
         if not PENDING_PRINT_METADATA:
-          PENDING_PRINT_METADATA = getMetaDataFrom3mf(PRINTER_STATE["print"]["gcode_file"])
+          PENDING_PRINT_METADATA = _maybe_download_metadata(source, "print-start") or {}
+
         if PENDING_PRINT_METADATA:
-          PENDING_PRINT_METADATA["print_type"] = PRINTER_STATE["print"].get("print_type")
-          PENDING_PRINT_METADATA["task_id"] = PRINTER_STATE["print"].get("task_id")
-          PENDING_PRINT_METADATA["subtask_id"] = PRINTER_STATE["print"].get("subtask_id")
+          PENDING_PRINT_METADATA["print_type"] = history_print_type
+          PENDING_PRINT_METADATA["task_id"] = print_block.get("task_id")
+          PENDING_PRINT_METADATA["subtask_id"] = print_block.get("subtask_id")
 
-          if not PENDING_PRINT_METADATA.get("tracking_started"):
-            print_id = insert_print(PENDING_PRINT_METADATA["file"], PRINTER_STATE["print"]["print_type"], PENDING_PRINT_METADATA["image"])
+          use_ams = print_block.get("use_ams", (PENDING_PRINT_REFERENCE or {}).get("use_ams"))
+          ams_mapping = print_block.get("ams_mapping") or (PENDING_PRINT_REFERENCE or {}).get("ams_mapping")
 
-            PENDING_PRINT_METADATA["ams_mapping"] = []
+          if history_print_type == "local":
+            PENDING_PRINT_METADATA.setdefault("ams_mapping", [])
             PENDING_PRINT_METADATA["filamentChanges"] = []
             PENDING_PRINT_METADATA["assigned_trays"] = []
             PENDING_PRINT_METADATA["complete"] = False
-            PENDING_PRINT_METADATA["print_id"] = print_id
-            FILAMENT_TRACKER.start_local_print_from_metadata(PENDING_PRINT_METADATA)
+          else:
+            if use_ams:
+              PENDING_PRINT_METADATA["ams_mapping"] = ams_mapping or []
+            else:
+              PENDING_PRINT_METADATA["ams_mapping"] = [EXTERNAL_SPOOL_ID]
+            PENDING_PRINT_METADATA["complete"] = True
 
-            for id, filament in PENDING_PRINT_METADATA["filaments"].items():
+          if not PENDING_PRINT_METADATA.get("tracking_started"):
+            print_id = insert_print(
+              PENDING_PRINT_METADATA.get("file") or print_block.get("subtask_name") or "Print",
+              history_print_type,
+              PENDING_PRINT_METADATA.get("image"),
+            )
+            PENDING_PRINT_METADATA["print_id"] = print_id
+
+            for id, filament in PENDING_PRINT_METADATA.get("filaments", {}).items():
               parsed_grams = _parse_grams(filament.get("used_g"))
               parsed_length_m = _parse_grams(filament.get("used_m"))
               estimated_length_mm = parsed_length_m * 1000 if parsed_length_m is not None else None
@@ -352,10 +442,25 @@ def processMessage(data):
                   estimated_length=estimated_length_mm,
               )
 
+            if history_print_type == "local":
+              FILAMENT_TRACKER.start_local_print_from_metadata(PENDING_PRINT_METADATA)
+            elif TRACK_LAYER_USAGE:
+              FILAMENT_TRACKER.set_print_metadata(PENDING_PRINT_METADATA)
+
             PENDING_PRINT_METADATA["tracking_started"] = True
 
-        #TODO 
+          PENDING_PRINT_REFERENCE = {}
+      else:
+        PRINT_RUN_REGISTRY.update_run(PRINTER_ID, data)
+
+    if final_now:
+      PRINT_RUN_REGISTRY.finalize_run(PRINTER_ID, data)
+
+    #if ("gcode_state" in data["print"] and data["print"]["gcode_state"] == "RUNNING") and ("print_type" in data["print"] and data["print"]["print_type"] != "local") \
+    #  and ("tray_tar" in data["print"] and data["print"]["tray_tar"] != "255") and ("stg_cur" in data["print"] and data["print"]["stg_cur"] == 0 and PRINT_CURRENT_STAGE != 0):
     
+    #TODO: What happens when printed from external spool, is ams and tray_tar set?
+    if PRINTER_STATE.get("print", {}).get("print_type") == "local" and PRINTER_STATE_LAST.get("print"):
       # When stage changed to "change filament" and PENDING_PRINT_METADATA is set
       if (PENDING_PRINT_METADATA and 
           (
@@ -409,7 +514,16 @@ def processMessage(data):
       else:
         spendFilaments(PENDING_PRINT_METADATA)
 
-      PENDING_PRINT_METADATA = {}
+        PENDING_PRINT_METADATA = {}
+
+    if _lan_project_is_active(LAST_LAN_PROJECT) and _matches_print_identity(PRINTER_STATE.get("print", {}), LAST_LAN_PROJECT):
+      if (
+        PRINTER_STATE.get("print", {}).get("gcode_state") == "IDLE"
+        and PRINTER_STATE_LAST.get("print", {}).get("gcode_state") not in (None, "IDLE")
+      ):
+        LAST_LAN_PROJECT = {}
+    elif LAST_LAN_PROJECT and not _lan_project_is_active(LAST_LAN_PROJECT):
+      LAST_LAN_PROJECT = {}
   
     PRINTER_STATE_LAST = copy.deepcopy(PRINTER_STATE)
 

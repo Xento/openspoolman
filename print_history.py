@@ -3,6 +3,8 @@ import sqlite3
 from datetime import datetime
 from pathlib import Path
 
+from logger import log
+
 DEFAULT_DB_NAME = "3d_printer_logs.db"
 DB_ENV_VAR = "OPENSPOOLMAN_PRINT_HISTORY_DB"
 
@@ -132,6 +134,11 @@ def insert_print(file_name: str, print_type: str, image_file: str = None, print_
     print_id = cursor.lastrowid
     conn.commit()
     conn.close()
+    log(
+        "[print-history] print created "
+        f"id={print_id} file={file_name!r} type={print_type} date={print_date} "
+        f"image={'yes' if image_file else 'no'}"
+    )
     return print_id
 
 def insert_filament_usage(
@@ -155,6 +162,12 @@ def insert_filament_usage(
     ''', (print_id, filament_type, color, grams_used, ams_slot, estimated_grams, length_used, estimated_length))
     conn.commit()
     conn.close()
+    log(
+        "[print-history] filament usage inserted "
+        f"print_id={print_id} ams_slot={ams_slot} type={filament_type!r} color={color} "
+        f"grams_used={grams_used} estimated_grams={estimated_grams} "
+        f"length_used={length_used} estimated_length={estimated_length}"
+    )
 
 def update_filament_spool(print_id: int, filament_id: int, spool_id: int) -> None:
     """
@@ -169,6 +182,10 @@ def update_filament_spool(print_id: int, filament_id: int, spool_id: int) -> Non
     ''', (spool_id, filament_id, print_id))
     conn.commit()
     conn.close()
+    log(
+        "[print-history] spool assigned "
+        f"print_id={print_id} ams_slot={filament_id} spool_id={spool_id}"
+    )
 
 def update_filament_grams_used(print_id: int, filament_id: int, grams_used: float, length_used: float | None = None) -> None:
     """
@@ -192,6 +209,10 @@ def update_filament_grams_used(print_id: int, filament_id: int, grams_used: floa
     ''', params)
     conn.commit()
     conn.close()
+    log(
+        "[print-history] filament billed "
+        f"print_id={print_id} ams_slot={filament_id} grams_used={grams_used} length_used={length_used}"
+    )
 
 
 def get_prints_with_filament(limit: int | None = None, offset: int | None = None):
