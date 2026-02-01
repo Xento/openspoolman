@@ -1,0 +1,19 @@
+{
+  "model_path": "tests/MQTT/Testqube.gcode.3mf",
+  "metadata_overrides": {
+    "ams_mapping2": [
+      {
+        "ams_id": 0,
+        "slot_id": 0
+      }
+    ]
+  },
+  "mapping": {
+    "no_layer_tracking": {
+      "expected_spool_ids": {
+        "1": 103
+      },
+      "expect_ams_mapping2_mismatch": true
+    }
+  }
+}

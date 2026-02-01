@@ -3,6 +3,95 @@
     "0": "3",
     "1": "0",
     "2": "2",
-	"3": "1"
+    "3": "1"
+  },
+  "expected_print_type": "local",
+  "mapping": {
+    "no_layer_tracking": {
+      "expected_spool_ids": {
+        "1": 103,
+        "2": 100,
+        "3": 102,
+        "4": 101
+      }
+    }
+  },
+  "accounting": {
+    "no_layer_tracking": {
+      "filaments": {
+        "1": {
+          "spool_id": 103,
+          "grams_used": 0.22,
+          "length_used": 70.0
+        },
+        "2": {
+          "spool_id": 100,
+          "grams_used": 0.15,
+          "length_used": 50.0
+        },
+        "3": {
+          "spool_id": 102,
+          "grams_used": 0.27,
+          "length_used": 90.0
+        },
+        "4": {
+          "spool_id": 101,
+          "grams_used": 0.07,
+          "length_used": 30.0
+        }
+      },
+      "consume_totals": {
+        "103": {
+          "use_weight": 0.22
+        },
+        "100": {
+          "use_weight": 0.15
+        },
+        "102": {
+          "use_weight": 0.27
+        },
+        "101": {
+          "use_weight": 0.07
+        }
+      }
+    },
+    "layer_tracking": {
+      "filaments": {
+        "1": {
+          "spool_id": 103,
+          "grams_used": 0.17,
+          "length_used": 56.32733
+        },
+        "2": {
+          "spool_id": 100,
+          "grams_used": 0.17,
+          "length_used": 56.58832
+        },
+        "3": {
+          "spool_id": 102,
+          "grams_used": 0.28,
+          "length_used": 93.27441
+        },
+        "4": {
+          "spool_id": 101,
+          "grams_used": 0.08,
+          "length_used": 28.29416
+        }
+      },
+      "consume_totals": {
+        "103": {
+          "use_length": 56.32733
+        },
+        "100": {
+          "use_length": 56.58832
+        },
+        "102": {
+          "use_length": 93.27441
+        },
+        "101": {
+          "use_length": 28.29416
+        }
+      }
+    }
   }
 }

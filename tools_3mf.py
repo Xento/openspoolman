@@ -335,12 +335,17 @@ def getMetaDataFrom3mf(url):
   Returns:
       list[dict]: List of dictionaries with `tray_info_idx` and `used_g`.
   """
+  temp_file_name = None
   try:
     metadata = {}
 
     filepath, filename = filename_from_url(url)
-    # Create a temporary file
-    with tempfile.NamedTemporaryFile(delete_on_close=False,delete=True, suffix=".3mf") as temp_file:
+    # Create a temporary file (delete_on_close is only available in newer Python versions)
+    try:
+      temp_file = tempfile.NamedTemporaryFile(delete_on_close=False, delete=False, suffix=".3mf")
+    except TypeError:
+      temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".3mf")
+    with temp_file:
       temp_file_name = temp_file.name
       
       if url.startswith("http"):
@@ -469,3 +474,9 @@ def getMetaDataFrom3mf(url):
   except Exception as e:
     log(f"An unexpected error occurred: {e}")
     return {}
+  finally:
+    if temp_file_name:
+      try:
+        os.remove(temp_file_name)
+      except Exception:
+        pass

@@ -1,0 +1,26 @@
+{
+  "model_path": "tests/MQTT/Testqube.gcode.3mf",
+  "mapping": {
+    "no_layer_tracking": {
+      "expected_spool_ids": {
+        "1": 110
+      }
+    }
+  },
+  "accounting": {
+    "no_layer_tracking": {
+      "filaments": {
+        "1": {
+          "spool_id": 110,
+          "grams_used": 0.72,
+          "length_used": 240.0
+        }
+      },
+      "consume_totals": {
+        "110": {
+          "use_weight": 0.72
+        }
+      }
+    }
+  }
+}

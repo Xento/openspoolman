@@ -221,3 +221,72 @@ def test_mqtt_log_tray_detection(log_path, monkeypatch, caplog):
       assignments,
       expected_assignments,
   )
+
+
+def test_ftp_project_file_uses_lan_history_and_skips_local_duplicate(monkeypatch):
+  calls = []
+
+  def _insert_print(file_name, print_type, image_file=None, print_date=None):
+    calls.append((file_name, print_type))
+    return 1
+
+  monkeypatch.setattr(mqtt_bambulab, "insert_print", _insert_print)
+  monkeypatch.setattr(mqtt_bambulab, "insert_filament_usage", lambda *args, **kwargs: None)
+  monkeypatch.setattr(mqtt_bambulab, "spendFilaments", lambda *args, **kwargs: None)
+  monkeypatch.setattr(mqtt_bambulab, "TRACK_LAYER_USAGE", False)
+  monkeypatch.setattr(
+    mqtt_bambulab,
+    "getMetaDataFrom3mf",
+    lambda _url: {
+      "file": "Testprint.3mf",
+      "image": None,
+      "filaments": {
+        1: {"type": "PLA", "color": "#FFFFFF", "used_g": "1.0", "used_m": "1.0"},
+      },
+    },
+  )
+
+  mqtt_bambulab.PRINTER_STATE = {}
+  mqtt_bambulab.PRINTER_STATE_LAST = {}
+  mqtt_bambulab.PENDING_PRINT_METADATA = {}
+  mqtt_bambulab.LAST_LAN_PROJECT = {}
+  mqtt_bambulab.FILAMENT_TRACKER = FilamentUsageTracker()
+
+  mqtt_bambulab.processMessage(
+    {
+      "print": {
+        "command": "project_file",
+        "url": "ftp://printer.local/Testprint.3mf",
+        "subtask_name": "Testprint",
+        "task_id": "42",
+        "subtask_id": "42",
+        "use_ams": True,
+        "ams_mapping": [0],
+      }
+    }
+  )
+  mqtt_bambulab.processMessage(
+    {
+      "print": {
+        "gcode_state": "PREPARE",
+        "gcode_file": "Testprint.3mf",
+        "print_type": "local",
+        "task_id": "42",
+        "subtask_id": "42",
+      }
+    }
+  )
+  mqtt_bambulab.processMessage(
+    {
+      "print": {
+        "gcode_state": "RUNNING",
+        "gcode_file": "Testprint.3mf",
+        "print_type": "local",
+        "task_id": "42",
+        "subtask_id": "42",
+      }
+    }
+  )
+
+  assert len(calls) == 1
+  assert calls[0][1] == "lan"

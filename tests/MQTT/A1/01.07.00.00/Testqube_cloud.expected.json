@@ -1,5 +1,43 @@
 {
   "expected_assignments": {
     "0": "3"
+  },
+  "expected_print_type": "cloud",
+  "mapping": {
+    "no_layer_tracking": {
+      "expected_spool_ids": {
+        "1": 103
+      }
+    }
+  },
+  "accounting": {
+    "no_layer_tracking": {
+      "filaments": {
+        "1": {
+          "spool_id": 103,
+          "grams_used": 0.72,
+          "length_used": 240.0
+        }
+      },
+      "consume_totals": {
+        "103": {
+          "use_weight": 0.72
+        }
+      }
+    },
+    "layer_tracking": {
+      "filaments": {
+        "1": {
+          "spool_id": 103,
+          "grams_used": 0.65,
+          "length_used": 218.48422
+        }
+      },
+      "consume_totals": {
+        "103": {
+          "use_length": 218.48422
+        }
+      }
+    }
   }
 }
