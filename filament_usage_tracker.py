@@ -10,7 +10,7 @@ from urllib.parse import urlparse
 
 from config import EXTERNAL_SPOOL_AMS_ID, EXTERNAL_SPOOL_ID, TRACK_LAYER_USAGE
 from spoolman_client import consumeSpool
-from spoolman_service import fetchSpools, getAMSFromTray, trayUid
+from spoolman_service import fetchSpools, parse_ams_mapping_value, trayUid
 from tools_3mf import download3mfFromCloud, download3mfFromFTP, download3mfFromLocalFilesystem
 from print_history import update_filament_spool, update_filament_grams_used, get_all_filament_usage_for_print, update_layer_tracking
 from logger import log
@@ -768,12 +768,12 @@ class FilamentUsageTracker:
       self._layer_tracking_status = status
 
   def _tray_uid_from_mapping(self, mapping_value: int) -> str | None:
-    if mapping_value == EXTERNAL_SPOOL_ID:
+    entry = parse_ams_mapping_value(mapping_value)
+    if entry["source_type"] == "external":
       return trayUid(EXTERNAL_SPOOL_AMS_ID, EXTERNAL_SPOOL_ID)
-
-    ams_id = getAMSFromTray(mapping_value)
-    tray_id = mapping_value - ams_id * 4
-    return trayUid(ams_id, tray_id)
+    if entry["source_type"] != "ams":
+      return None
+    return trayUid(entry["ams_id"], entry["slot_id"])
 
   def _resolve_tray_mapping(self, filament_index: int) -> int | None:
     if self.using_ams:
