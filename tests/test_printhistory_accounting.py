@@ -46,7 +46,7 @@ def _resolve_model_path(log_path: Path, expected: dict) -> Path:
 
 def _filament_info_by_slot(print_row: dict) -> dict[int, dict]:
     filament_info = json.loads(print_row["filament_info"])
-    return {entry["ams_slot"]: entry for entry in filament_info}
+    return {entry["filament_id"]: entry for entry in filament_info}
 
 
 def _sum_consume_calls(calls: list[dict]) -> dict[int, dict[str, float]]:

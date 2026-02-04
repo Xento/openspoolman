@@ -47,7 +47,7 @@ def _get_print_by_id(print_id: int):
 
 def _filament_info_by_slot(print_row: dict) -> dict[int, dict]:
     filament_info = json.loads(print_row["filament_info"])
-    return {entry["ams_slot"]: entry for entry in filament_info}
+    return {entry["filament_id"]: entry for entry in filament_info}
 
 
 def _iter_cases():

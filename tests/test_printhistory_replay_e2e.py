@@ -69,9 +69,9 @@ def test_replay_detects_filaments_and_maps_to_spools(mqtt_replay, fake_spoolman)
     }
 
     for entry in filament_info:
-        ams_slot = entry["ams_slot"]
-        assert entry["spool_id"] == expected_spool_ids[ams_slot]
-        assert entry["color"].upper() == expected_colors[ams_slot]
+        filament_id = entry["filament_id"]
+        assert entry["spool_id"] == expected_spool_ids[filament_id]
+        assert entry["color"].upper() == expected_colors[filament_id]
 
     consumed_spools = {call["spool_id"] for call in fake_spoolman["consume_calls"]}
     assert consumed_spools == set(expected_spool_ids.values())

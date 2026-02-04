@@ -76,9 +76,9 @@ def parse_date(item):
     except ValueError:
         return None
 
-def get_filament_order(file):
-    filament_order = {} 
-    switch_count = 0 
+def get_filament_order(file, fallback_ids=None):
+    filament_order = {}
+    switch_count = 0
 
     for line in file:
         match_filament = re.match(r"^M620 S(\d+)[^;\r\n]*", line.decode("utf-8").strip())
@@ -89,7 +89,10 @@ def get_filament_order(file):
             switch_count += 1
 
     if len(filament_order) == 0:
-       filament_order = {1:0}
+       if fallback_ids:
+          filament_order = {int(filament_id): idx for idx, filament_id in enumerate(fallback_ids)}
+       else:
+          filament_order = {1:0}
 
     return filament_order
 
@@ -424,23 +427,34 @@ def getMetaDataFrom3mf(url):
 
             usage = {}
             filaments= {}
-            filamentId = 1
+            filament_id_order = []
             for plate in root.findall(".//plate"):
               for filament in plate.findall(".//filament"):
                 used_g = filament.attrib.get("used_g")
-                #filamentId = int(filament.attrib.get("id"))
-                
-                usage[filamentId] = used_g
-                filaments[filamentId] = {"id": filamentId,
+                filament_raw = filament.attrib.get("id")
+                try:
+                  filament_id = int(filament_raw)
+                except (TypeError, ValueError):
+                  filament_id = len(filament_id_order) + 1
+
+                if filament_id in filaments:
+                  continue
+
+                filament_id_order.append(filament_id)
+                usage[filament_id] = used_g
+                filaments[filament_id] = {
+                                         "id": filament_id,
                                          "tray_info_idx": filament.attrib.get("tray_info_idx"), 
                                          "type":filament.attrib.get("type"), 
                                          "color": filament.attrib.get("color"), 
                                          "used_g": used_g, 
-                                         "used_m":filament.attrib.get("used_m")}
-                filamentId += 1
+                                         "used_m":filament.attrib.get("used_m"),
+                }
 
             metadata["filaments"] = filaments
             metadata["usage"] = usage
+            metadata["filament_id_order"] = filament_id_order
+            metadata["filament_id_to_index"] = {fid: idx for idx, fid in enumerate(filament_id_order)}
         else:
           log(f"File '{slice_info_path}' not found in the archive.")
           return {}
@@ -456,7 +470,33 @@ def getMetaDataFrom3mf(url):
         metadata["gcode_path"] = gcode_path
         if gcode_path in z.namelist():
           with z.open(gcode_path) as gcode_file:
-            metadata["filamentOrder"] =  get_filament_order(gcode_file)
+            metadata["filamentOrder"] =  get_filament_order(gcode_file, fallback_ids=filament_id_order)
+            tool_order = sorted(metadata["filamentOrder"].items(), key=lambda entry: entry[1])
+            tool_indices_by_usage = []
+            for tool_id, _order in tool_order:
+              try:
+                tool_indices_by_usage.append(int(tool_id))
+              except (TypeError, ValueError):
+                continue
+
+            tool_indices = sorted(set(tool_indices_by_usage))
+            if filament_id_order:
+              tool_to_filament = {}
+              filament_to_tool = {}
+              expected_indices = list(range(len(filament_id_order)))
+              if tool_indices == expected_indices:
+                for idx, filament_id in enumerate(filament_id_order):
+                  tool_to_filament[idx] = filament_id
+                  filament_to_tool[filament_id] = idx
+              elif tool_indices_by_usage and len(tool_indices_by_usage) == len(filament_id_order):
+                for idx, tool_id in enumerate(tool_indices_by_usage):
+                  filament_id = filament_id_order[idx]
+                  tool_to_filament[tool_id] = filament_id
+                  filament_to_tool[filament_id] = tool_id
+
+              if tool_to_filament:
+                metadata["tool_index_to_filament_id"] = tool_to_filament
+                metadata["filament_id_to_tool_index"] = filament_to_tool
 
         log(metadata)
 
