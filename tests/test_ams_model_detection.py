@@ -1,27 +1,23 @@
+import pytest
+
 import mqtt_bambulab
 
 
-def test_identifies_ams_lite_module():
-    module = {"name": "ams_f1/0", "product_name": "AMS Lite"}
-    assert mqtt_bambulab.identify_ams_model_from_module(module) == "AMS Lite"
+@pytest.mark.parametrize(
+    "module, expected",
+    [
+        ({"name": "ams_f1/0", "product_name": "AMS Lite"}, "AMS Lite"),
+        ({"name": "n3f/1", "product_name": "AMS 2 Pro (2)"}, "AMS 2 Pro"),
+        ({"name": "ams_ht/0", "product_name": "AMS HT"}, "AMS HT"),
+        ({"name": "ams/3", "product_name": "AMS (3)"}, "AMS"),
+    ],
+    ids=["lite", "2pro", "ht", "ams"],
+)
+def test_returns_expected_model_when_module_signature_matches(module, expected):
+    assert mqtt_bambulab.identify_ams_model_from_module(module) == expected
 
 
-def test_identifies_ams_2_pro_module():
-    module = {"name": "n3f/1", "product_name": "AMS 2 Pro (2)"}
-    assert mqtt_bambulab.identify_ams_model_from_module(module) == "AMS 2 Pro"
-
-
-def test_identifies_ams_ht_module():
-    module = {"name": "ams_ht/0", "product_name": "AMS HT"}
-    assert mqtt_bambulab.identify_ams_model_from_module(module) == "AMS HT"
-
-
-def test_falls_back_to_ams_when_name_matches():
-    module = {"name": "ams/3", "product_name": "AMS (3)"}
-    assert mqtt_bambulab.identify_ams_model_from_module(module) == "AMS"
-
-
-def test_detects_multiple_modules():
+def test_returns_models_when_multiple_modules_are_present():
     modules = [
         {"name": "ams_f1/0", "product_name": "AMS Lite"},
         {"name": "n3f/0", "product_name": "AMS 2 Pro (1)"},
@@ -33,7 +29,7 @@ def test_detects_multiple_modules():
     assert results["ams/0"]["model"] == "AMS"
 
 
-def test_detects_models_by_numeric_id():
+def test_returns_models_by_id_when_modules_have_numeric_suffixes():
     modules = [
         {"name": "ams_f1/0", "product_name": "AMS Lite"},
         {"name": "n3f/1", "product_name": "AMS 2 Pro (2)"},

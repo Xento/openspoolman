@@ -3,7 +3,6 @@ import json
 import logging
 import os
 import shutil
-import tempfile
 from pathlib import Path
 
 import pytest
@@ -109,7 +108,12 @@ def _build_fake_get_meta(model_path: Path):
 
 
 @pytest.mark.parametrize("log_path", _iter_log_files(), ids=lambda p: p.name)
-def test_mqtt_log_tray_detection(log_path, monkeypatch, caplog):
+def test_records_expected_tray_assignments_when_replaying_log(
+  log_path,
+  monkeypatch,
+  caplog,
+  tmp_path,
+):
   expected = _load_expected(log_path)
   expected_assignments_raw = expected.get("expected_assignments") or {}
   expected_assignments = {str(k): str(v) for k, v in expected_assignments_raw.items()}
@@ -119,9 +123,7 @@ def test_mqtt_log_tray_detection(log_path, monkeypatch, caplog):
   if not model_path.exists():
     pytest.skip(f"Missing test model: {model_path}")
 
-  temp_file = tempfile.NamedTemporaryFile(suffix=".3mf", delete=False)
-  temp_file.close()
-  temp_model_path = Path(temp_file.name)
+  temp_model_path = tmp_path / "model.3mf"
   shutil.copy2(model_path, temp_model_path)
 
   _stub_spoolman(monkeypatch)
@@ -139,53 +141,17 @@ def test_mqtt_log_tray_detection(log_path, monkeypatch, caplog):
 
   mqtt_bambulab.FILAMENT_TRACKER = FilamentUsageTracker()
 
-  original_map_filament = mqtt_bambulab.map_filament
+  monkeypatch.setattr(FilamentUsageTracker, "_retrieve_model", lambda self, _: str(temp_model_path))
 
-  def _record_map(tray_tar):
-    result = original_map_filament(tray_tar)
+  for payload in mqtt_bambulab.iter_mqtt_payloads_from_log(log_path):
+    mqtt_bambulab.processMessage(payload)
+    mqtt_bambulab.FILAMENT_TRACKER.on_message(payload)
     metadata = mqtt_bambulab.PENDING_PRINT_METADATA or {}
     for idx, tray in enumerate(metadata.get("ams_mapping", [])):
       assignments[str(idx)] = str(tray)
-    return result
-  
-  monkeypatch.setattr(mqtt_bambulab, "map_filament", _record_map)
-  original_resolve = FilamentUsageTracker._resolve_tray_mapping
-
-  def _record_resolve(self, filament_index):
-    result = original_resolve(self, filament_index)
-    if result is not None:
-      assignments[str(filament_index)] = str(result)
-    return result
-  
-  monkeypatch.setattr(FilamentUsageTracker, "_resolve_tray_mapping", _record_resolve)
-  monkeypatch.setattr(FilamentUsageTracker, "_retrieve_model", lambda self, _: str(temp_model_path))
-
-  try:
-    with log_path.open() as handle:
-      for line in handle:
-        if "::" not in line:
-          continue
-        try:
-          payload = json.loads(line.split("::", 1)[1].strip())
-        except Exception:
-          continue
-
-        mqtt_bambulab.processMessage(payload)
-        mqtt_bambulab.FILAMENT_TRACKER.on_message(payload)
-        metadata = mqtt_bambulab.PENDING_PRINT_METADATA
-        if metadata:
-          for idx, tray in enumerate(metadata.get("ams_mapping", [])):
-            assignments[str(idx)] = str(tray)
-        print_obj = payload.get("print", {})
-        if print_obj.get("command") == "project_file":
-          ams_mapping = print_obj.get("ams_mapping") or []
-          for idx, tray in enumerate(ams_mapping):
-            assignments[str(idx)] = str(tray)
-        tracker_mapping = mqtt_bambulab.FILAMENT_TRACKER.ams_mapping
-        if tracker_mapping:
-          last_tracker_mapping = list(tracker_mapping)
-  finally:
-    temp_model_path.unlink(missing_ok=True)
+    tracker_mapping = mqtt_bambulab.FILAMENT_TRACKER.ams_mapping
+    if tracker_mapping:
+      last_tracker_mapping = list(tracker_mapping)
 
   if expected_assignments:
     missing = {

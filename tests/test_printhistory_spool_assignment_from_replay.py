@@ -5,9 +5,6 @@ import pytest
 
 import conftest
 import print_history
-import spoolman_service
-import tools_3mf
-from config import EXTERNAL_SPOOL_AMS_ID, EXTERNAL_SPOOL_ID
 
 
 LOG_ROOT = Path(__file__).resolve().parent / "MQTT"
@@ -47,73 +44,20 @@ def _resolve_model_path(log_path: Path, expected: dict) -> Path:
     return LOG_ROOT / f"{base_name}.gcode.3mf"
 
 
-def _iter_payloads(log_path: Path):
-    with log_path.open() as handle:
-        for line in handle:
-            if "::" not in line:
-                continue
-            try:
-                payload = json.loads(line.split("::", 1)[1].strip())
-            except Exception:
-                continue
-            yield payload
-
-
-def _extract_ams_mapping(log_path: Path) -> list | None:
-    for payload in _iter_payloads(log_path):
-        print_block = payload.get("print") or {}
-        if print_block.get("command") == "project_file":
-            mapping = print_block.get("ams_mapping")
-            if isinstance(mapping, list) and mapping:
-                return mapping
-    return None
-
-
-def _tray_uid_to_spool_id(fake_spoolman: dict) -> dict[str, int]:
-    mapping: dict[str, int] = {}
-    for spool in fake_spoolman.get("spools", []):
-        extra = spool.get("extra") or {}
-        active_tray = extra.get("active_tray")
-        if not active_tray:
-            continue
-        try:
-            tray_uid = json.loads(active_tray)
-        except (TypeError, json.JSONDecodeError):
-            tray_uid = active_tray
-        if tray_uid:
-            mapping[tray_uid] = int(spool["id"])
-    return mapping
-
-
-def _expected_spool_for_filament(
-    filament_id: int,
-    ams_mapping: list,
-    tray_to_spool: dict[str, int],
-    metadata: dict,
-) -> int | None:
-    if not ams_mapping:
-        return None
-
-    if ams_mapping[0] == EXTERNAL_SPOOL_ID:
-        tray_uid = spoolman_service.trayUid(EXTERNAL_SPOOL_AMS_ID, EXTERNAL_SPOOL_ID)
-        return tray_to_spool.get(tray_uid)
-
-    index = spoolman_service._resolve_tool_index_for_filament(metadata, filament_id)
-    if index is None:
-        return None
-    entry = (
-        spoolman_service.parse_ams_mapping_value(ams_mapping[index])
-        if 0 <= index < len(ams_mapping)
-        else {"source_type": "unknown", "ams_id": None, "slot_id": None}
-    )
-
-    if entry.get("source_type") == "external":
-        tray_uid = spoolman_service.trayUid(EXTERNAL_SPOOL_AMS_ID, EXTERNAL_SPOOL_ID)
-        return tray_to_spool.get(tray_uid)
-    if entry.get("source_type") == "ams":
-        tray_uid = spoolman_service.trayUid(entry.get("ams_id"), entry.get("slot_id"))
-        return tray_to_spool.get(tray_uid)
-    return None
+def _expected_spool_ids(expected: dict) -> dict[int, int | None]:
+    mapping_root = expected.get("mapping") or {}
+    mapping_cfg = mapping_root.get("no_layer_tracking") or mapping_root.get("layer_tracking")
+    if not mapping_cfg:
+        return {}
+    expected_spools = mapping_cfg.get("expected_spool_ids") or {}
+    normalized: dict[int, int | None] = {}
+    for slot, spool_id in expected_spools.items():
+        slot_id = int(slot)
+        if spool_id is None:
+            normalized[slot_id] = None
+        else:
+            normalized[slot_id] = int(spool_id)
+    return normalized
 
 
 def _iter_cases():
@@ -122,23 +66,18 @@ def _iter_cases():
 
 
 @pytest.mark.parametrize("log_path, expected", list(_iter_cases()))
-def test_replay_printhistory_spool_assignment_matches_ams_mapping(
+def test_assigns_spools_when_replaying_print_history(
     mqtt_replay,
-    fake_spoolman,
     log_path,
     expected,
 ):
-    ams_mapping = _extract_ams_mapping(log_path)
-    if not ams_mapping:
-        pytest.skip(f"No ams_mapping found in replay: {log_path.name}")
+    expected_spools = _expected_spool_ids(expected)
+    if not expected_spools:
+        pytest.skip(f"No expected spool mapping for {log_path.name}")
 
     model_path = _resolve_model_path(log_path, expected)
     if not model_path.exists():
         pytest.skip(f"Missing 3MF model for replay: {model_path}")
-
-    metadata = tools_3mf.getMetaDataFrom3mf(f"local:{model_path}")
-    if expected.get("metadata_overrides"):
-        metadata.update(expected["metadata_overrides"])
 
     before_id = _max_print_id()
     mqtt_replay(
@@ -153,11 +92,6 @@ def test_replay_printhistory_spool_assignment_matches_ams_mapping(
     assert print_row is not None
 
     filament_info = json.loads(print_row["filament_info"])
-    tray_to_spool = _tray_uid_to_spool_id(fake_spoolman)
-
-    for entry in filament_info:
-        filament_id = int(entry["filament_id"])
-        expected_spool_id = _expected_spool_for_filament(
-            filament_id, ams_mapping, tray_to_spool, metadata
-        )
-        assert entry.get("spool_id") == expected_spool_id
+    actual_spools = {int(entry["filament_id"]): entry.get("spool_id") for entry in filament_info}
+    observed_spools = {filament_id: actual_spools.get(filament_id) for filament_id in expected_spools}
+    assert observed_spools == expected_spools

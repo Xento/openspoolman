@@ -1,7 +1,9 @@
+import pytest
+
 import spoolman_service
 
 
-def test_parse_ht_direct_with_mapping2_match(monkeypatch):
+def test_returns_mapping_when_mapping2_matches(monkeypatch):
     logs = []
     monkeypatch.setattr(spoolman_service, "log", lambda msg: logs.append(msg))
 
@@ -16,23 +18,20 @@ def test_parse_ht_direct_with_mapping2_match(monkeypatch):
     assert not any("AMS mapping mismatch" in msg for msg in logs)
 
 
-def test_parse_ams_mapping_cases():
+def test_parses_ams_mapping_when_values_provided():
     parsed = spoolman_service.parse_ams_mapping([1, 512, 3, 0, 2])
     assert [entry["ams_id"] for entry in parsed] == [0, 128, 0, 0, 0]
     assert [entry["slot_id"] for entry in parsed] == [1, 0, 3, 0, 2]
 
-    unload = spoolman_service.parse_ams_mapping_value(255)
-    assert unload["source_type"] == "unload"
-    assert unload["ams_id"] is None
-    assert unload["slot_id"] is None
 
-    external = spoolman_service.parse_ams_mapping_value(254)
-    assert external["source_type"] == "external"
-    assert external["ams_id"] is None
-    assert external["slot_id"] is None
-
-    # Deterministic handling for values between 256 and 511 (encoded standard)
-    encoded = spoolman_service.parse_ams_mapping_value(500)
-    assert encoded["source_type"] == "ams"
-    assert encoded["ams_id"] == 125
-    assert encoded["slot_id"] == 0
+@pytest.mark.parametrize(
+    "value, expected",
+    [
+        (255, {"source_type": "unload", "ams_id": None, "slot_id": None}),
+        (254, {"source_type": "external", "ams_id": None, "slot_id": None}),
+        (500, {"source_type": "ams", "ams_id": 125, "slot_id": 0}),
+    ],
+    ids=["unload", "external", "encoded"],
+)
+def test_parses_mapping_value_when_code_provided(value, expected):
+    assert spoolman_service.parse_ams_mapping_value(value) == expected

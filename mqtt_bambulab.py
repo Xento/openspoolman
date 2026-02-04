@@ -3,6 +3,7 @@
 import json
 import ssl
 import traceback
+from pathlib import Path
 from threading import Thread
 from typing import Any, Iterable
 
@@ -250,6 +251,41 @@ def _mask_mqtt_payload(payload: str) -> str:
     masked = masked.replace(PRINTER_ID, masked_serial)
 
   return masked
+
+
+def iter_mqtt_payloads_from_lines(lines: Iterable[str]) -> Iterable[dict[str, Any]]:
+  """Yield decoded MQTT payloads from log lines (format: '<timestamp> :: <json>')."""
+  for line in lines:
+    if "::" not in line:
+      continue
+    payload_raw = line.split("::", 1)[1].strip()
+    if not payload_raw:
+      continue
+    try:
+      payload = json.loads(payload_raw)
+    except (TypeError, ValueError):
+      continue
+    if isinstance(payload, dict):
+      yield payload
+
+
+def iter_mqtt_payloads_from_log(log_path: str | Path) -> Iterable[dict[str, Any]]:
+  """Yield decoded MQTT payloads from a saved mqtt.log file."""
+  path = Path(log_path)
+  with path.open("r", encoding="utf-8") as handle:
+    yield from iter_mqtt_payloads_from_lines(handle)
+
+
+def replay_mqtt_payloads(payloads: Iterable[dict[str, Any]]) -> None:
+  """Replay decoded MQTT payloads through the on_message handler."""
+  for payload in payloads:
+    msg = type("ReplayMsg", (), {"payload": json.dumps(payload).encode("utf-8")})()
+    on_message(None, None, msg)
+
+
+def replay_mqtt_log(log_path: str | Path) -> None:
+  """Replay an mqtt.log file through the on_message handler."""
+  replay_mqtt_payloads(iter_mqtt_payloads_from_log(log_path))
 
 def _maybe_download_metadata(source: str | None, reason: str) -> dict | None:
   if not source:

@@ -71,7 +71,7 @@ def _iter_cases():
 
 @pytest.mark.parametrize("track_layer_usage", [False, True], ids=["no_layer_tracking", "layer_tracking"])
 @pytest.mark.parametrize("log_path, expected", list(_iter_cases()))
-def test_replay_accounts_filament_consumption_correctly(
+def test_accounts_filament_consumption_when_replaying_log(
     mqtt_replay,
     fake_spoolman,
     log_path,

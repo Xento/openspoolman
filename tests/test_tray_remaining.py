@@ -1,3 +1,4 @@
+import pytest
 from jinja2 import Environment, FileSystemLoader
 
 
@@ -28,12 +29,20 @@ def _unmapped_tray_data():
     }
 
 
-def test_unmapped_remaining_hidden_for_ams_lite():
-    html = _render_tray(tray_data=_unmapped_tray_data(), ams_models_by_id={0: "AMS Lite"})
-    assert "Remaining" not in html
-
-
-def test_unmapped_remaining_shown_for_other_models():
-    html = _render_tray(tray_data=_unmapped_tray_data(), ams_models_by_id={0: "AMS"})
-    assert "Remaining" in html
-    assert "42%" in html
+@pytest.mark.parametrize(
+    "ams_models_by_id, expect_visible",
+    [
+        ({0: "AMS Lite"}, False),
+        ({0: "AMS"}, True),
+    ],
+    ids=["ams_lite", "ams"],
+)
+def test_unmapped_remaining_visibility_when_ams_model_changes(
+    ams_models_by_id, expect_visible
+):
+    html = _render_tray(tray_data=_unmapped_tray_data(), ams_models_by_id=ams_models_by_id)
+    if expect_visible:
+        assert "Remaining" in html
+        assert "42%" in html
+    else:
+        assert "Remaining" not in html
