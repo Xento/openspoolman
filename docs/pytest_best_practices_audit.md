@@ -33,7 +33,7 @@
   - Renamed tests for clearer intent.
   - Replaced aggregated failure loop with parameterized cases for isolated, deterministic failures.
 - `tests/test_mqtt_replay.py`
-  - Removed internal function patching of `map_filament` and `_resolve_tray_mapping`; now only inspects production state updates.
+  - Wraps production `map_filament` and `_resolve_tray_mapping` to observe assignments before state is cleared (observation only, no logic duplication).
 - `tests/test_printhistory_replay_e2e.py`
   - Simplified assertions to direct dict comparisons for clarity.
 - `tests/test_printhistory_spool_assignment_from_replay.py`
@@ -46,7 +46,6 @@
 - Assertions compare direct outputs instead of re-implementing business rules.
 
 ## Anti-Patterns Removed
-- Internal function patching for mapping logic in replay tests.
 - Monolithic tests with multiple independent behaviors bundled together.
 
 ## New Fixtures and Parameterization

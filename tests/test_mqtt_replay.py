@@ -135,12 +135,36 @@ def test_records_expected_tray_assignments_when_replaying_log(
   mqtt_bambulab.PRINTER_STATE = {}
   mqtt_bambulab.PRINTER_STATE_LAST = {}
   mqtt_bambulab.PENDING_PRINT_METADATA = {}
+  mqtt_bambulab.PENDING_PRINT_REFERENCE = {}
+  mqtt_bambulab.PRINT_RUN_REGISTRY.reset()
+  mqtt_bambulab.LAST_LAN_PROJECT = {}
 
   assignments = {}
   last_tracker_mapping: list[int] | None = None
 
   mqtt_bambulab.FILAMENT_TRACKER = FilamentUsageTracker()
 
+  original_map_filament = mqtt_bambulab.map_filament
+
+  def _record_map(tray_tar):
+    result = original_map_filament(tray_tar)
+    metadata = mqtt_bambulab.PENDING_PRINT_METADATA or {}
+    for idx, tray in enumerate(metadata.get("ams_mapping", [])):
+      if tray is None:
+        continue
+      assignments[str(idx)] = str(tray)
+    return result
+
+  monkeypatch.setattr(mqtt_bambulab, "map_filament", _record_map)
+  original_resolve = FilamentUsageTracker._resolve_tray_mapping
+
+  def _record_resolve(self, filament_index):
+    result = original_resolve(self, filament_index)
+    if result is not None:
+      assignments[str(filament_index)] = str(result)
+    return result
+
+  monkeypatch.setattr(FilamentUsageTracker, "_resolve_tray_mapping", _record_resolve)
   monkeypatch.setattr(FilamentUsageTracker, "_retrieve_model", lambda self, _: str(temp_model_path))
 
   for payload in mqtt_bambulab.iter_mqtt_payloads_from_log(log_path):
@@ -148,6 +172,8 @@ def test_records_expected_tray_assignments_when_replaying_log(
     mqtt_bambulab.FILAMENT_TRACKER.on_message(payload)
     metadata = mqtt_bambulab.PENDING_PRINT_METADATA or {}
     for idx, tray in enumerate(metadata.get("ams_mapping", [])):
+      if tray is None:
+        continue
       assignments[str(idx)] = str(tray)
     tracker_mapping = mqtt_bambulab.FILAMENT_TRACKER.ams_mapping
     if tracker_mapping:
