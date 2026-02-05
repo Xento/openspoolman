@@ -52,7 +52,8 @@ PRINTER_STATE_LAST = {}
 PENDING_PRINT_METADATA = {}
 FILAMENT_TRACKER = FilamentUsageTracker()
 LAST_LAN_PROJECT = {}
-LOG_FILE = "/home/app/logs/mqtt.log"
+LOG_FILE = os.getenv("OPENSPOOLMAN_MQTT_LOG_PATH", "/home/app/logs/mqtt.log")
+_LOG_WRITE_FAILED = False
 PENDING_PRINT_REFERENCE = {}
 PRINTER_MODEL_NAME = get_printer_model_name(PRINTER_ID)
 LAST_PREPARE_LOGGED = object()
@@ -696,7 +697,13 @@ def on_message(client, userdata, msg):
       }
 
     if "print" in data:
-      append_to_rotating_file("/home/app/logs/mqtt.log", _mask_mqtt_payload(msg.payload.decode()))
+      global _LOG_WRITE_FAILED
+      if LOG_FILE and not _LOG_WRITE_FAILED:
+        try:
+          append_to_rotating_file(LOG_FILE, _mask_mqtt_payload(msg.payload.decode()))
+        except OSError as exc:
+          _LOG_WRITE_FAILED = True
+          log(f"[WARNING] Failed to write MQTT log to {LOG_FILE!r}: {exc}")
 
     #print(data)
 
