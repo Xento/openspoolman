@@ -1,4 +1,5 @@
 import os
+import shutil
 import sqlite3
 from datetime import datetime
 from pathlib import Path
@@ -7,6 +8,32 @@ from logger import log
 
 DEFAULT_DB_NAME = "3d_printer_logs.db"
 DB_ENV_VAR = "OPENSPOOLMAN_PRINT_HISTORY_DB"
+PRIMARY_VERSION_SUFFIX = ".v2"
+
+
+def _is_versioned_name(path: Path) -> bool:
+    return PRIMARY_VERSION_SUFFIX in path.stem
+
+
+def _strip_version_suffix(stem: str) -> str:
+    if PRIMARY_VERSION_SUFFIX in stem:
+        return stem.split(PRIMARY_VERSION_SUFFIX)[0]
+    return stem
+
+
+def _find_latest_versioned(base_path: Path) -> Path | None:
+    if _is_versioned_name(base_path) and base_path.exists():
+        return base_path
+
+    parent = base_path.parent
+    if not parent.exists():
+        return None
+
+    pattern = f"{base_path.stem}{PRIMARY_VERSION_SUFFIX}*{base_path.suffix}"
+    candidates = [p for p in parent.glob(pattern) if p.is_file()]
+    if not candidates:
+        return None
+    return max(candidates, key=lambda p: p.stat().st_mtime)
 
 
 def _default_db_path() -> Path:
@@ -14,9 +41,13 @@ def _default_db_path() -> Path:
 
     env_path = os.getenv(DB_ENV_VAR)
     if env_path:
-        return Path(env_path).expanduser().resolve()
+        base = Path(env_path).expanduser().resolve()
+        versioned = _find_latest_versioned(base)
+        return versioned or base
 
-    return Path(__file__).resolve().parent / "data" / DEFAULT_DB_NAME
+    base = Path(__file__).resolve().parent / "data" / DEFAULT_DB_NAME
+    versioned = _find_latest_versioned(base)
+    return versioned or base
 
 
 db_config = {"db_path": str(_default_db_path())}  # Configuration for database location
@@ -39,6 +70,62 @@ def _rename_column(cursor: sqlite3.Cursor, table: str, old: str, new: str) -> No
             cursor.execute(f"ALTER TABLE {table} ADD COLUMN {new} INTEGER")
             cursor.execute(f"UPDATE {table} SET {new} = {old} WHERE {new} IS NULL")
 
+def _table_columns(cursor: sqlite3.Cursor, table: str) -> set[str] | None:
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name=?", (table,))
+    if cursor.fetchone() is None:
+        return None
+    cursor.execute(f"PRAGMA table_info({table})")
+    return {row[1] for row in cursor.fetchall()}
+
+
+def _needs_migration(db_path: Path) -> bool:
+    if not db_path.exists():
+        return False
+    if db_path.stat().st_size == 0:
+        return False
+
+    conn = sqlite3.connect(db_path)
+    try:
+        cursor = conn.cursor()
+        tables = {
+            row[0]
+            for row in cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        }
+        if not tables:
+            return False
+
+        usage_columns = _table_columns(cursor, "filament_usage")
+        if usage_columns is None:
+            return True
+        if "filament_id" not in usage_columns:
+            return True
+        for required in ("estimated_grams", "length_used", "estimated_length"):
+            if required not in usage_columns:
+                return True
+
+        tracking_columns = _table_columns(cursor, "print_layer_tracking")
+        if tracking_columns is None:
+            return True
+        for required in ("predicted_end_time", "actual_end_time"):
+            if required not in tracking_columns:
+                return True
+
+        return False
+    finally:
+        conn.close()
+
+
+def _versioned_target_path(source: Path) -> Path:
+    stem = _strip_version_suffix(source.stem)
+    suffix = source.suffix
+    if not stem.endswith(PRIMARY_VERSION_SUFFIX):
+        stem = f"{stem}{PRIMARY_VERSION_SUFFIX}"
+    candidate = source.with_name(f"{stem}{suffix}")
+    if candidate.exists():
+        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+        candidate = source.with_name(f"{stem}.{timestamp}{suffix}")
+    return candidate
+
 
 def create_database() -> None:
     """
@@ -46,6 +133,17 @@ def create_database() -> None:
     """
     db_path = Path(db_config["db_path"])
     db_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if _needs_migration(db_path):
+        source_path = db_path
+        migrated_path = _versioned_target_path(source_path)
+        shutil.copy2(source_path, migrated_path)
+        db_config["db_path"] = str(migrated_path)
+        db_path = migrated_path
+        log(
+            "[print-history] Detected schema changes; "
+            f"copied {source_path.name!r} to {migrated_path.name!r} and migrating the copy."
+        )
 
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
