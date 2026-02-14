@@ -5,6 +5,7 @@ import ssl
 import traceback
 from threading import Thread
 from typing import Any, Iterable
+from urllib.parse import unquote
 
 import paho.mqtt.client as mqtt
 
@@ -55,6 +56,15 @@ LOG_FILE = "/home/app/logs/mqtt.log"
 PENDING_PRINT_REFERENCE = {}
 PRINTER_MODEL_NAME = get_printer_model_name(PRINTER_ID)
 LAST_PREPARE_LOGGED = object()
+
+def _build_model_cache_path(printer_id: str) -> Path:
+  safe_printer_id = "".join(
+    char if char.isalnum() or char in ("-", "_") else "_"
+    for char in str(printer_id or "unknown")
+  )
+  return Path(__file__).resolve().parent / "data" / "cache" / f"{safe_printer_id}.3mf"
+
+MODEL_CACHE_PATH = _build_model_cache_path(PRINTER_ID)
 
 def getPrinterModel():
     global PRINTER_ID
@@ -197,6 +207,21 @@ def _is_valid_print_id(value: Any) -> bool:
   except (TypeError, ValueError):
     return True
 
+def _normalize_print_file_label(label: Any) -> str | None:
+  if not isinstance(label, str):
+    return None
+  normalized = unquote(label.strip())
+  if not normalized:
+    return None
+  normalized = normalized.replace("\\", "/").rsplit("/", 1)[-1]
+  lowered = normalized.lower()
+  for suffix in (".gcode.3mf", ".3mf", ".gcode"):
+    if lowered.endswith(suffix):
+      normalized = normalized[: -len(suffix)]
+      break
+  normalized = normalized.strip().lower()
+  return normalized or None
+
 def _matches_print_identity(print_state: dict, identity: dict) -> bool:
   if not print_state or not identity:
     return False
@@ -208,6 +233,10 @@ def _matches_print_identity(print_state: dict, identity: dict) -> bool:
       return True
   identity_file = identity.get("file") or identity.get("gcode_file") or identity.get("subtask_name")
   state_file = print_state.get("gcode_file") or print_state.get("subtask_name")
+  normalized_identity_file = _normalize_print_file_label(identity_file)
+  normalized_state_file = _normalize_print_file_label(state_file)
+  if normalized_identity_file and normalized_state_file:
+    return normalized_identity_file == normalized_state_file
   return bool(identity_file and state_file and identity_file == state_file)
 
 def _lan_project_is_active(identity: dict) -> bool:
@@ -251,12 +280,97 @@ def _mask_mqtt_payload(payload: str) -> str:
 
   return masked
 
+
+def iter_mqtt_payloads_from_lines(lines: Iterable[str]) -> Iterable[dict[str, Any]]:
+  """Yield decoded MQTT payloads from log lines (format: '<timestamp> :: <json>')."""
+  for line in lines:
+    if "::" not in line:
+      continue
+    payload_raw = line.split("::", 1)[1].strip()
+    if not payload_raw:
+      continue
+    try:
+      payload = json.loads(payload_raw)
+    except (TypeError, ValueError):
+      continue
+    if isinstance(payload, dict):
+      yield payload
+
+
+def iter_mqtt_payloads_from_log(log_path: str | Path) -> Iterable[dict[str, Any]]:
+  """Yield decoded MQTT payloads from a saved mqtt.log file."""
+  path = Path(log_path)
+  with path.open("r", encoding="utf-8") as handle:
+    yield from iter_mqtt_payloads_from_lines(handle)
+
+
+def replay_mqtt_payloads(payloads: Iterable[dict[str, Any]]) -> None:
+  """Replay decoded MQTT payloads through the on_message handler."""
+  for payload in payloads:
+    msg = type("ReplayMsg", (), {"payload": json.dumps(payload).encode("utf-8")})()
+    on_message(None, None, msg)
+
+
+def replay_mqtt_log(log_path: str | Path) -> None:
+  """Replay an mqtt.log file through the on_message handler."""
+  replay_mqtt_payloads(iter_mqtt_payloads_from_log(log_path))
+
+def _cleanup_cached_download(metadata: dict | None, skip_path: str | None = None) -> None:
+  if not metadata:
+    return
+  cached_model_path = metadata.get("downloaded_model_path")
+  if not cached_model_path:
+    return
+  if skip_path and cached_model_path == skip_path:
+    return
+  try:
+    os.remove(cached_model_path)
+  except FileNotFoundError:
+    return
+  except OSError as exc:
+    log(f"[WARNING] Failed to remove cached model file {cached_model_path!r}: {exc}")
+
+def _set_pending_print_metadata(metadata: dict | None) -> None:
+  global PENDING_PRINT_METADATA
+  if metadata is PENDING_PRINT_METADATA:
+    return
+  next_cached_path = metadata.get("downloaded_model_path") if isinstance(metadata, dict) else None
+  _cleanup_cached_download(PENDING_PRINT_METADATA, skip_path=next_cached_path)
+  PENDING_PRINT_METADATA = metadata or {}
+
+def _cleanup_startup_model_cache() -> None:
+  try:
+    os.remove(MODEL_CACHE_PATH)
+    log(f"[DEBUG] Removed stale startup model cache: {MODEL_CACHE_PATH}")
+  except FileNotFoundError:
+    return
+  except OSError as exc:
+    log(f"[WARNING] Failed to remove startup model cache {str(MODEL_CACHE_PATH)!r}: {exc}")
+
+
+_cleanup_startup_model_cache()
+
 def _maybe_download_metadata(source: str | None, reason: str) -> dict | None:
   if not source:
     log(f"[DEBUG] Metadata download skipped: no source ({reason}).")
     return None
   try:
-    metadata = getMetaDataFrom3mf(source)
+    metadata = getMetaDataFrom3mf(
+      source,
+      keep_downloaded_file=TRACK_LAYER_USAGE,
+      downloaded_file_path=str(MODEL_CACHE_PATH) if TRACK_LAYER_USAGE else None,
+    )
+    if metadata:
+      log(f"[DEBUG] Metadata downloaded for {reason} from {source}")
+    return metadata
+  except TypeError as exc:
+    # Compatibility fallback for tests/patches that still stub an older signature.
+    if "downloaded_file_path" in str(exc):
+      metadata = getMetaDataFrom3mf(source, keep_downloaded_file=TRACK_LAYER_USAGE)
+    elif "keep_downloaded_file" in str(exc):
+      metadata = getMetaDataFrom3mf(source)
+    else:
+      raise
     if metadata:
       log(f"[DEBUG] Metadata downloaded for {reason} from {source}")
     return metadata
@@ -269,11 +383,15 @@ def map_filament(tray_tar):
   # Prüfen, ob ein Filamentwechsel aktiv ist (stg_cur == 4)
   #if stg_cur == 4 and tray_tar is not None:
   if PENDING_PRINT_METADATA:
-    PENDING_PRINT_METADATA["filamentChanges"].append(tray_tar)  # Jeder Wechsel zählt, auch auf das gleiche Tray
-    log(f'Filamentchange {len(PENDING_PRINT_METADATA["filamentChanges"])}: Tray {tray_tar}')
+    if not PENDING_PRINT_METADATA.get("use_ams", True):
+      return False
+
+    filament_changes = PENDING_PRINT_METADATA.setdefault("filamentChanges", [])
+    filament_changes.append(tray_tar)  # Jeder Wechsel zählt, auch auf das gleiche Tray
+    log(f'Filamentchange {len(filament_changes)}: Tray {tray_tar}')
 
     # Anzahl der erkannten Wechsel
-    change_count = len(PENDING_PRINT_METADATA["filamentChanges"]) - 1  # -1, weil der erste Eintrag kein Wechsel ist
+    change_count = len(filament_changes) - 1  # -1, weil der erste Eintrag kein Wechsel ist
 
     filament_order = PENDING_PRINT_METADATA.get("filamentOrder") or {}
     ordered_filaments = sorted(filament_order.items(), key=lambda entry: entry[1])
@@ -292,8 +410,14 @@ def map_filament(tray_tar):
 
     if filament_assigned is not None:
       mapping = PENDING_PRINT_METADATA.setdefault("ams_mapping", [])
-      filament_idx = int(filament_assigned)
-      while len(mapping) <= filament_idx:
+      try:
+        filament_idx = int(filament_assigned)
+      except (TypeError, ValueError):
+        filament_idx = None
+      if filament_idx is None:
+        return False
+      mapping_index = filament_idx
+      while len(mapping) <= mapping_index:
         mapping.append(None)
       mapping[filament_idx] = tray_tar
       log(f"✅ Tray {tray_tar} assigned to Filament {filament_assigned}")
@@ -369,11 +493,59 @@ def processMessage(data):
           "timestamp": time.time(),
         }
 
+      if not PENDING_PRINT_METADATA:
+        metadata = _maybe_download_metadata(incoming_print.get("url"), "project-file")
+        if metadata:
+          _set_pending_print_metadata(metadata)
+          PENDING_PRINT_METADATA["print_type"] = history_print_type
+          PENDING_PRINT_METADATA["task_id"] = incoming_print.get("task_id")
+          PENDING_PRINT_METADATA["subtask_id"] = incoming_print.get("subtask_id")
+          if TRACK_LAYER_USAGE:
+            FILAMENT_TRACKER.set_print_metadata(PENDING_PRINT_METADATA)
+          print_id = insert_print(
+            incoming_print.get("subtask_name") or PENDING_PRINT_METADATA.get("file") or "Print",
+            history_print_type,
+            PENDING_PRINT_METADATA.get("image"),
+          )
+          PENDING_PRINT_METADATA["print_id"] = print_id
+          if incoming_print.get("use_ams"):
+            PENDING_PRINT_METADATA["ams_mapping"] = incoming_print.get("ams_mapping") or []
+          else:
+            PENDING_PRINT_METADATA["ams_mapping"] = [EXTERNAL_SPOOL_ID]
+          PENDING_PRINT_METADATA["use_ams"] = bool(incoming_print.get("use_ams"))
+          PENDING_PRINT_METADATA["complete"] = True
+          PENDING_PRINT_REFERENCE["print_id"] = print_id
+          PENDING_PRINT_REFERENCE["history_created"] = True
+          PENDING_PRINT_REFERENCE["accounted"] = True
+          PENDING_PRINT_REFERENCE["metadata"] = PENDING_PRINT_METADATA
+
+          for id, filament in PENDING_PRINT_METADATA.get("filaments", {}).items():
+            parsed_grams = _parse_grams(filament.get("used_g"))
+            parsed_length_m = _parse_grams(filament.get("used_m"))
+            estimated_length_mm = parsed_length_m * 1000 if parsed_length_m is not None else None
+            grams_used = parsed_grams if parsed_grams is not None else 0.0
+            length_used = estimated_length_mm if estimated_length_mm is not None else 0.0
+            if TRACK_LAYER_USAGE:
+              grams_used = 0.0
+              length_used = 0.0
+            insert_filament_usage(
+                print_id,
+                filament["type"],
+                filament["color"],
+                grams_used,
+                id,
+                estimated_grams=parsed_grams,
+                length_used=length_used,
+                estimated_length=estimated_length_mm,
+            )
+
     if supports_early and early_ready and job_label and not PENDING_PRINT_METADATA:
       if PRINT_RUN_REGISTRY.mark_early_download_started(PRINTER_ID, job_label):
         metadata = _maybe_download_metadata(job_label, "early-download")
         if metadata:
-          PENDING_PRINT_METADATA = metadata
+          _set_pending_print_metadata(metadata)
+          if PENDING_PRINT_REFERENCE:
+            PENDING_PRINT_REFERENCE["metadata"] = PENDING_PRINT_METADATA
           if PENDING_PRINT_REFERENCE:
             PENDING_PRINT_METADATA["task_id"] = PENDING_PRINT_REFERENCE.get("task_id")
             PENDING_PRINT_METADATA["subtask_id"] = PENDING_PRINT_REFERENCE.get("subtask_id")
@@ -392,7 +564,10 @@ def processMessage(data):
         )
         history_print_type = print_block.get("print_type") or ("lan" if _is_lan_project_url(source) else "cloud")
         if not PENDING_PRINT_METADATA:
-          PENDING_PRINT_METADATA = _maybe_download_metadata(source, "print-start") or {}
+          if PENDING_PRINT_REFERENCE and PENDING_PRINT_REFERENCE.get("metadata"):
+            _set_pending_print_metadata(PENDING_PRINT_REFERENCE.get("metadata") or {})
+          else:
+            _set_pending_print_metadata(_maybe_download_metadata(source, "print-start") or {})
 
         if PENDING_PRINT_METADATA:
           PENDING_PRINT_METADATA["print_type"] = history_print_type
@@ -401,6 +576,8 @@ def processMessage(data):
 
           use_ams = print_block.get("use_ams", (PENDING_PRINT_REFERENCE or {}).get("use_ams"))
           ams_mapping = print_block.get("ams_mapping") or (PENDING_PRINT_REFERENCE or {}).get("ams_mapping")
+          use_ams = bool(use_ams)
+          PENDING_PRINT_METADATA["use_ams"] = use_ams
 
           if history_print_type == "local":
             PENDING_PRINT_METADATA.setdefault("ams_mapping", [])
@@ -455,14 +632,19 @@ def processMessage(data):
 
     if final_now:
       PRINT_RUN_REGISTRY.finalize_run(PRINTER_ID, data)
+      if PENDING_PRINT_METADATA:
+        _set_pending_print_metadata({})
 
     #if ("gcode_state" in data["print"] and data["print"]["gcode_state"] == "RUNNING") and ("print_type" in data["print"] and data["print"]["print_type"] != "local") \
     #  and ("tray_tar" in data["print"] and data["print"]["tray_tar"] != "255") and ("stg_cur" in data["print"] and data["print"]["stg_cur"] == 0 and PRINT_CURRENT_STAGE != 0):
     
     #TODO: What happens when printed from external spool, is ams and tray_tar set?
     if PRINTER_STATE.get("print", {}).get("print_type") == "local" and PRINTER_STATE_LAST.get("print"):
+      should_handle_local_ams_mapping = not (
+        PENDING_PRINT_METADATA and not PENDING_PRINT_METADATA.get("use_ams", True)
+      )
       # When stage changed to "change filament" and PENDING_PRINT_METADATA is set
-      if (PENDING_PRINT_METADATA and 
+      if (should_handle_local_ams_mapping and PENDING_PRINT_METADATA and 
           (
             (
               int(PRINTER_STATE["print"].get("stg_cur", -1)) == 4 and      # change filament stage (beginning of print)
@@ -514,7 +696,7 @@ def processMessage(data):
       else:
         spendFilaments(PENDING_PRINT_METADATA)
 
-        PENDING_PRINT_METADATA = {}
+        _set_pending_print_metadata({})
 
     if _lan_project_is_active(LAST_LAN_PROJECT) and _matches_print_identity(PRINTER_STATE.get("print", {}), LAST_LAN_PROJECT):
       if (

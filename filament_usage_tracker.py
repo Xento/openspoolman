@@ -321,12 +321,23 @@ class FilamentUsageTracker:
   def _handle_print_start(self, print_obj: dict) -> None:
     log("[filament-tracker] Print start")
 
-    model_url = print_obj.get("url")
-    model_path = self._retrieve_model(model_url)
+    cached_model_path = None
+    if isinstance(self.print_metadata, dict):
+      cached_model_path = self.print_metadata.get("downloaded_model_path")
+
+    if cached_model_path and os.path.exists(cached_model_path):
+      log(f"[filament-tracker] Reusing cached model file: {cached_model_path}")
+      model_path = cached_model_path
+    else:
+      model_url = print_obj.get("url")
+      model_path = self._retrieve_model(model_url)
 
     if model_path is None:
       log("Failed to retrieve model. Print will not be tracked.")
       return
+
+    if isinstance(self.print_metadata, dict) and self.print_metadata.get("downloaded_model_path") == model_path:
+      self.print_metadata.pop("downloaded_model_path", None)
 
     use_ams = bool(print_obj.get("use_ams", False))
     ams_mapping = print_obj.get("ams_mapping", []) if use_ams else None

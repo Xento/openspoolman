@@ -7,6 +7,7 @@ import socket
 import ssl
 import os
 import re
+import shutil
 import time
 from datetime import datetime
 from config import PRINTER_CODE, PRINTER_IP
@@ -325,7 +326,11 @@ def download3mfFromLocalFilesystem(path, destFile):
   with open(path, "rb") as src_file:
     destFile.write(src_file.read())
 
-def getMetaDataFrom3mf(url):
+def getMetaDataFrom3mf(
+  url,
+  keep_downloaded_file: bool = False,
+  downloaded_file_path: str | None = None,
+):
   """
   Download a 3MF file from a URL, unzip it, and parse filament usage.
 
@@ -458,6 +463,19 @@ def getMetaDataFrom3mf(url):
           with z.open(gcode_path) as gcode_file:
             metadata["filamentOrder"] =  get_filament_order(gcode_file)
 
+        if keep_downloaded_file:
+          if downloaded_file_path:
+            target_path = os.path.abspath(downloaded_file_path)
+            target_dir = os.path.dirname(target_path)
+            if target_dir:
+              os.makedirs(target_dir, exist_ok=True)
+            staging_path = f"{target_path}.tmp"
+            shutil.copyfile(temp_file_name, staging_path)
+            os.replace(staging_path, target_path)
+            metadata["downloaded_model_path"] = target_path
+          else:
+            metadata["downloaded_model_path"] = temp_file_name
+
         log(metadata)
 
         return metadata
@@ -475,7 +493,8 @@ def getMetaDataFrom3mf(url):
     log(f"An unexpected error occurred: {e}")
     return {}
   finally:
-    if temp_file_name:
+    keep_temp_download = keep_downloaded_file and not downloaded_file_path
+    if temp_file_name and not keep_temp_download:
       try:
         os.remove(temp_file_name)
       except Exception:
