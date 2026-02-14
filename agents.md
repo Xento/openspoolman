@@ -52,6 +52,7 @@ Key folders/files you will interact with:
 
 ### 4.1 Local Python run (development)
 1. Configure environment (see §5). Create `config.env` from `config.env.template` or export env vars.
+1. Activate the correct Python environment (virtualenv/conda) for this repo before running or testing.
 2. Start the server:
    - `python wsgi.py`
 

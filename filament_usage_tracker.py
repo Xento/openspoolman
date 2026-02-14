@@ -286,7 +286,11 @@ class FilamentUsageTracker:
         self._mc_remaining_time_minutes = None
 
     if command == "project_file":
-      self._pending_project_file = print_obj
+      if TRACK_LAYER_USAGE and self.active_model is None:
+        self._handle_print_start(print_obj)
+        self._pending_project_file = None
+      else:
+        self._pending_project_file = print_obj
 
     if command == "push_status":
       if "layer_num" in print_obj:
@@ -615,21 +619,24 @@ class FilamentUsageTracker:
     usage_grams = self._mm_to_grams(total_mm, diameter_mm, density)
 
     usage_rounded = round(total_mm, 5)
-    filament_key = filament + 1
-    previous_grams = self.cumulative_grams_used.get(filament_key, 0.0)
-    self.cumulative_grams_used[filament_key] = previous_grams + usage_grams
-    previous_length = self.cumulative_length_used.get(filament_key, 0.0)
+    filament_id = self._resolve_filament_id(filament)
+    tracking_key = filament_id if filament_id is not None else f"tool_{filament}"
+    previous_grams = self.cumulative_grams_used.get(tracking_key, 0.0)
+    self.cumulative_grams_used[tracking_key] = previous_grams + usage_grams
+    previous_length = self.cumulative_length_used.get(tracking_key, 0.0)
     cumulative_length = previous_length + usage_rounded
-    self.cumulative_length_used[filament_key] = cumulative_length
+    self.cumulative_length_used[tracking_key] = cumulative_length
 
-    grams_rounded = round(self.cumulative_grams_used[filament_key], 2)
+    grams_rounded = round(self.cumulative_grams_used[tracking_key], 2)
     log(f"[filament-tracker] Consume spool {spool_id} for filament {filament} with {usage_rounded}mm ({grams_rounded}g cumulative) (tray_uid={tray_uid})")
 
     consumeSpool(spool_id, use_length=usage_rounded)
 
-    if self.print_id:
-      update_filament_spool(self.print_id, filament_key, spool_id)
-      update_filament_grams_used(self.print_id, filament_key, grams_rounded, length_used=cumulative_length)
+    if self.print_id and filament_id is not None:
+      update_filament_spool(self.print_id, filament_id, spool_id)
+      update_filament_grams_used(self.print_id, filament_id, grams_rounded, length_used=cumulative_length)
+    elif self.print_id and filament_id is None:
+      log(f"[filament-tracker] Skipping print history update for tool {filament}: missing filament_id mapping")
 
     self._filament_spool_id_map[filament] = spool_id
     self._spool_data_cache[spool_id] = spool_data
@@ -748,7 +755,11 @@ class FilamentUsageTracker:
       if spool_id is None:
         continue
 
-      update_filament_spool(self.print_id, filament_index + 1, spool_id)
+      filament_id = self._resolve_filament_id(filament_index)
+      if filament_id is not None:
+        update_filament_spool(self.print_id, filament_id, spool_id)
+      else:
+        log(f"[filament-tracker] Skipping initial spool bind for tool {filament_index}: missing filament_id mapping")
       self._filament_spool_id_map[filament_index] = spool_id
 
       if spool_id not in self._spool_data_cache:
@@ -817,6 +828,33 @@ class FilamentUsageTracker:
       return self.ams_mapping[filament_index]
     return EXTERNAL_SPOOL_ID
 
+  def _resolve_filament_id(self, filament_index: int) -> int | None:
+    metadata = self.print_metadata or {}
+    tool_to_filament = metadata.get("tool_index_to_filament_id") or {}
+    if tool_to_filament:
+      direct = tool_to_filament.get(filament_index)
+      if direct is None:
+        direct = tool_to_filament.get(str(filament_index))
+      try:
+        return int(direct) if direct is not None else None
+      except (TypeError, ValueError):
+        return None
+
+    filament_id_order = metadata.get("filament_id_order") or []
+    if filament_id_order:
+      try:
+        ordered_ids = [int(fid) for fid in filament_id_order]
+      except (TypeError, ValueError):
+        ordered_ids = []
+      if ordered_ids == sorted(ordered_ids):
+        start = ordered_ids[0] if ordered_ids else 0
+        if ordered_ids == list(range(start, start + len(ordered_ids))):
+          if 0 <= filament_index < len(ordered_ids):
+            return ordered_ids[filament_index]
+      return None
+
+    return filament_index + 1
+
   def _lookup_spool_for_tray(self, tray_uid: str):
     for spool in fetchSpools():
       extra = spool.get("extra") or {}
@@ -863,11 +901,11 @@ class FilamentUsageTracker:
     self.cumulative_length_used = {}
     if self.print_id:
       existing_usage = get_all_filament_usage_for_print(self.print_id)
-      for ams_slot, usage in existing_usage.items():
+      for filament_id, usage in existing_usage.items():
         grams_value = usage.get("grams_used") if isinstance(usage, dict) else usage
         length_value = usage.get("length_used") if isinstance(usage, dict) else None
         if grams_value is not None:
-          self.cumulative_grams_used[ams_slot] = grams_value
+          self.cumulative_grams_used[filament_id] = grams_value
         if length_value is not None:
-          self.cumulative_length_used[ams_slot] = length_value
-        log(f"[filament-tracker] Resumed cumulative usage for filament {ams_slot}: {grams_value}g, {length_value or 0}mm")
+          self.cumulative_length_used[filament_id] = length_value
+        log(f"[filament-tracker] Resumed cumulative usage for filament {filament_id}: {grams_value}g, {length_value or 0}mm")

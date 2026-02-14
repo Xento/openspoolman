@@ -39,18 +39,6 @@ def _copy_model_to_temp(model_path: Path) -> Path:
     return temp_model_path
 
 
-def _iter_payloads(log_path: Path):
-    with log_path.open() as handle:
-        for line in handle:
-            if "::" not in line:
-                continue
-            try:
-                payload = json.loads(line.split("::", 1)[1].strip())
-            except Exception:
-                continue
-            yield payload
-
-
 def _make_spool(spool_id: int, tray_uid: str, color_hex: str = "FFFFFF") -> dict:
     return {
         "id": spool_id,
@@ -190,9 +178,7 @@ def mqtt_replay(monkeypatch, tmp_storage, fake_spoolman):
         existing_prints = {p.name for p in prints_dir.iterdir() if p.is_file()}
 
         try:
-            for payload in _iter_payloads(log_path):
-                msg = type("FakeMsg", (), {"payload": json.dumps(payload).encode("utf-8")})()
-                mqtt_bambulab.on_message(None, None, msg)
+            mqtt_bambulab.replay_mqtt_log(log_path)
         finally:
             temp_model_path.unlink(missing_ok=True)
             current_prints = {p.name for p in prints_dir.iterdir() if p.is_file()}

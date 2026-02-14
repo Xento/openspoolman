@@ -47,7 +47,7 @@ def _get_print_by_id(print_id: int):
 
 def _filament_info_by_slot(print_row: dict) -> dict[int, dict]:
     filament_info = json.loads(print_row["filament_info"])
-    return {entry["ams_slot"]: entry for entry in filament_info}
+    return {entry["filament_id"]: entry for entry in filament_info}
 
 
 def _iter_cases():
@@ -60,7 +60,7 @@ def _iter_cases():
 
 @pytest.mark.parametrize("track_layer_usage", [False, True], ids=["no_layer_tracking", "layer_tracking"])
 @pytest.mark.parametrize("log_path, expected", list(_iter_cases()))
-def test_replay_ams_mapping_assigns_spools(
+def test_assigns_spools_when_replaying_ams_mapping(
     mqtt_replay,
     fake_spoolman,
     monkeypatch,

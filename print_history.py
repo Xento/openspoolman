@@ -1,4 +1,5 @@
 import os
+import shutil
 import sqlite3
 from datetime import datetime
 from pathlib import Path
@@ -7,6 +8,32 @@ from logger import log
 
 DEFAULT_DB_NAME = "3d_printer_logs.db"
 DB_ENV_VAR = "OPENSPOOLMAN_PRINT_HISTORY_DB"
+PRIMARY_VERSION_SUFFIX = ".v2"
+
+
+def _is_versioned_name(path: Path) -> bool:
+    return PRIMARY_VERSION_SUFFIX in path.stem
+
+
+def _strip_version_suffix(stem: str) -> str:
+    if PRIMARY_VERSION_SUFFIX in stem:
+        return stem.split(PRIMARY_VERSION_SUFFIX)[0]
+    return stem
+
+
+def _find_latest_versioned(base_path: Path) -> Path | None:
+    if _is_versioned_name(base_path) and base_path.exists():
+        return base_path
+
+    parent = base_path.parent
+    if not parent.exists():
+        return None
+
+    pattern = f"{base_path.stem}{PRIMARY_VERSION_SUFFIX}*{base_path.suffix}"
+    candidates = [p for p in parent.glob(pattern) if p.is_file()]
+    if not candidates:
+        return None
+    return max(candidates, key=lambda p: p.stat().st_mtime)
 
 
 def _default_db_path() -> Path:
@@ -14,9 +41,13 @@ def _default_db_path() -> Path:
 
     env_path = os.getenv(DB_ENV_VAR)
     if env_path:
-        return Path(env_path).expanduser().resolve()
+        base = Path(env_path).expanduser().resolve()
+        versioned = _find_latest_versioned(base)
+        return versioned or base
 
-    return Path(__file__).resolve().parent / "data" / DEFAULT_DB_NAME
+    base = Path(__file__).resolve().parent / "data" / DEFAULT_DB_NAME
+    versioned = _find_latest_versioned(base)
+    return versioned or base
 
 
 db_config = {"db_path": str(_default_db_path())}  # Configuration for database location
@@ -29,12 +60,90 @@ def _ensure_column(cursor: sqlite3.Cursor, table: str, column: str, definition: 
         cursor.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
 
 
+def _rename_column(cursor: sqlite3.Cursor, table: str, old: str, new: str) -> None:
+    cursor.execute(f"PRAGMA table_info({table})")
+    columns = {row[1] for row in cursor.fetchall()}
+    if old in columns and new not in columns:
+        try:
+            cursor.execute(f"ALTER TABLE {table} RENAME COLUMN {old} TO {new}")
+        except sqlite3.OperationalError:
+            cursor.execute(f"ALTER TABLE {table} ADD COLUMN {new} INTEGER")
+            cursor.execute(f"UPDATE {table} SET {new} = {old} WHERE {new} IS NULL")
+
+def _table_columns(cursor: sqlite3.Cursor, table: str) -> set[str] | None:
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name=?", (table,))
+    if cursor.fetchone() is None:
+        return None
+    cursor.execute(f"PRAGMA table_info({table})")
+    return {row[1] for row in cursor.fetchall()}
+
+
+def _needs_migration(db_path: Path) -> bool:
+    if not db_path.exists():
+        return False
+    if db_path.stat().st_size == 0:
+        return False
+
+    conn = sqlite3.connect(db_path)
+    try:
+        cursor = conn.cursor()
+        tables = {
+            row[0]
+            for row in cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        }
+        if not tables:
+            return False
+
+        usage_columns = _table_columns(cursor, "filament_usage")
+        if usage_columns is None:
+            return True
+        if "filament_id" not in usage_columns:
+            return True
+        for required in ("estimated_grams", "length_used", "estimated_length"):
+            if required not in usage_columns:
+                return True
+
+        tracking_columns = _table_columns(cursor, "print_layer_tracking")
+        if tracking_columns is None:
+            return True
+        for required in ("predicted_end_time", "actual_end_time"):
+            if required not in tracking_columns:
+                return True
+
+        return False
+    finally:
+        conn.close()
+
+
+def _versioned_target_path(source: Path) -> Path:
+    stem = _strip_version_suffix(source.stem)
+    suffix = source.suffix
+    if not stem.endswith(PRIMARY_VERSION_SUFFIX):
+        stem = f"{stem}{PRIMARY_VERSION_SUFFIX}"
+    candidate = source.with_name(f"{stem}{suffix}")
+    if candidate.exists():
+        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+        candidate = source.with_name(f"{stem}.{timestamp}{suffix}")
+    return candidate
+
+
 def create_database() -> None:
     """
     Ensure the SQLite schema exists (used for both fresh and upgrading databases).
     """
     db_path = Path(db_config["db_path"])
     db_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if _needs_migration(db_path):
+        source_path = db_path
+        migrated_path = _versioned_target_path(source_path)
+        shutil.copy2(source_path, migrated_path)
+        db_config["db_path"] = str(migrated_path)
+        db_path = migrated_path
+        log(
+            "[print-history] Detected schema changes; "
+            f"copied {source_path.name!r} to {migrated_path.name!r} and migrating the copy."
+        )
 
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
@@ -57,13 +166,15 @@ def create_database() -> None:
             filament_type TEXT NOT NULL,
             color TEXT NOT NULL,
             grams_used REAL NOT NULL,
-            ams_slot INTEGER NOT NULL,
+            filament_id INTEGER NOT NULL,
             estimated_grams REAL,
             length_used REAL,
             estimated_length REAL,
             FOREIGN KEY (print_id) REFERENCES prints (id) ON DELETE CASCADE
         )
     ''')
+
+    _rename_column(cursor, "filament_usage", "ams_slot", "filament_id")
 
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS print_layer_tracking (
@@ -146,7 +257,7 @@ def insert_filament_usage(
     filament_type: str,
     color: str,
     grams_used: float,
-    ams_slot: int,
+    filament_id: int,
     estimated_grams: float | None = None,
     length_used: float | None = None,
     estimated_length: float | None = None,
@@ -157,14 +268,14 @@ def insert_filament_usage(
     conn = sqlite3.connect(db_config["db_path"])
     cursor = conn.cursor()
     cursor.execute('''
-        INSERT INTO filament_usage (print_id, filament_type, color, grams_used, ams_slot, estimated_grams, length_used, estimated_length)
+        INSERT INTO filament_usage (print_id, filament_type, color, grams_used, filament_id, estimated_grams, length_used, estimated_length)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    ''', (print_id, filament_type, color, grams_used, ams_slot, estimated_grams, length_used, estimated_length))
+    ''', (print_id, filament_type, color, grams_used, filament_id, estimated_grams, length_used, estimated_length))
     conn.commit()
     conn.close()
     log(
         "[print-history] filament usage inserted "
-        f"print_id={print_id} ams_slot={ams_slot} type={filament_type!r} color={color} "
+        f"print_id={print_id} filament_id={filament_id} type={filament_type!r} color={color} "
         f"grams_used={grams_used} estimated_grams={estimated_grams} "
         f"length_used={length_used} estimated_length={estimated_length}"
     )
@@ -178,13 +289,13 @@ def update_filament_spool(print_id: int, filament_id: int, spool_id: int) -> Non
     cursor.execute('''
         UPDATE filament_usage
         SET spool_id = ?
-        WHERE ams_slot = ? AND print_id = ?
+        WHERE filament_id = ? AND print_id = ?
     ''', (spool_id, filament_id, print_id))
     conn.commit()
     conn.close()
     log(
         "[print-history] spool assigned "
-        f"print_id={print_id} ams_slot={filament_id} spool_id={spool_id}"
+        f"print_id={print_id} filament_id={filament_id} spool_id={spool_id}"
     )
 
 def update_filament_grams_used(print_id: int, filament_id: int, grams_used: float, length_used: float | None = None) -> None:
@@ -205,13 +316,13 @@ def update_filament_grams_used(print_id: int, filament_id: int, grams_used: floa
     cursor.execute(f'''
         UPDATE filament_usage
         SET {set_clause}
-        WHERE ams_slot = ? AND print_id = ?
+        WHERE filament_id = ? AND print_id = ?
     ''', params)
     conn.commit()
     conn.close()
     log(
         "[print-history] filament billed "
-        f"print_id={print_id} ams_slot={filament_id} grams_used={grams_used} length_used={length_used}"
+        f"print_id={print_id} filament_id={filament_id} grams_used={grams_used} length_used={length_used}"
     )
 
 
@@ -241,7 +352,8 @@ def get_prints_with_filament(limit: int | None = None, offset: int | None = None
                 'estimated_grams', f.estimated_grams,
                 'length_used', f.length_used,
                 'estimated_length', f.estimated_length,
-                'ams_slot', f.ams_slot
+                'filament_id', f.filament_id,
+                'ams_slot', f.filament_id
             )) FROM filament_usage f WHERE f.print_id = p.id
         ) AS filament_info
         FROM prints p
@@ -276,19 +388,27 @@ def get_prints_by_spool(spool_id: int):
     conn.close()
     return prints
 
-def get_filament_for_slot(print_id: int, ams_slot: int):
+def get_filament_for_filament_id(print_id: int, filament_id: int):
   conn = sqlite3.connect(db_config["db_path"])
   conn.row_factory = sqlite3.Row  # Enable column name access
   cursor = conn.cursor()
 
   cursor.execute('''
       SELECT * FROM filament_usage
-      WHERE print_id = ? AND ams_slot = ?
-  ''', (print_id, ams_slot))
+      WHERE print_id = ? AND filament_id = ?
+  ''', (print_id, filament_id))
 
   row = cursor.fetchone()
   conn.close()
-  return dict(row) if row else None
+  if not row:
+    return None
+  result = dict(row)
+  result.setdefault("ams_slot", result.get("filament_id"))
+  return result
+
+
+def get_filament_for_slot(print_id: int, ams_slot: int):
+  return get_filament_for_filament_id(print_id, ams_slot)
 
 def _ensure_layer_tracking_entry(print_id: int):
   conn = sqlite3.connect(db_config["db_path"])
@@ -353,19 +473,19 @@ def get_layer_tracking_for_prints(print_ids: list[int]):
 def get_all_filament_usage_for_print(print_id: int):
   """
   Retrieves all filament usage entries for a specific print.
-  Returns a dict mapping ams_slot to a dict with grams_used and length_used.
+  Returns a dict mapping filament_id to a dict with grams_used and length_used.
   """
   conn = sqlite3.connect(db_config["db_path"])
   conn.row_factory = sqlite3.Row
   cursor = conn.cursor()
 
   cursor.execute('''
-      SELECT ams_slot, grams_used, length_used FROM filament_usage
+      SELECT filament_id, grams_used, length_used FROM filament_usage
       WHERE print_id = ?
   ''', (print_id,))
 
   results = {
-      row["ams_slot"]: {
+      row["filament_id"]: {
           "grams_used": row["grams_used"],
           "length_used": row["length_used"],
       }

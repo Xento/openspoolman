@@ -179,25 +179,31 @@ def get_prints_with_filament(limit=50, offset=0):
     return prints, len(dataset.get("prints", []))
 
 
-def get_filament_for_slot(print_id, ams_slot):
+def get_filament_for_filament_id(print_id, filament_id):
     dataset = _ensure_dataset_loaded()
     for print_job in dataset.get("prints", []):
         if int(print_job.get("id")) != int(print_id):
             continue
         for filament in json.loads(print_job.get("filament_info", "[]")):
-            if int(filament.get("ams_slot")) == int(ams_slot):
+            current_id = filament.get("filament_id", filament.get("ams_slot"))
+            if current_id is not None and int(current_id) == int(filament_id):
                 return filament
     return None
 
 
-def update_filament_spool(print_id, ams_slot, spool_id):
+def get_filament_for_slot(print_id, ams_slot):
+    return get_filament_for_filament_id(print_id, ams_slot)
+
+
+def update_filament_spool(print_id, filament_id, spool_id):
     dataset = _ensure_dataset_loaded()
     for print_job in dataset.get("prints", []):
         if int(print_job.get("id")) != int(print_id):
             continue
         filaments = json.loads(print_job.get("filament_info", "[]"))
         for filament in filaments:
-            if int(filament.get("ams_slot")) == int(ams_slot):
+            current_id = filament.get("filament_id", filament.get("ams_slot"))
+            if current_id is not None and int(current_id) == int(filament_id):
                 filament["spool_id"] = int(spool_id)
         print_job["filament_info"] = json.dumps(filaments)
     return True
@@ -221,6 +227,7 @@ _PATCH_TARGETS = {
     "spoolman_client.consumeSpool": consumeSpool,
     "spoolman_client.patchExtraTags": patchExtraTags,
     "print_history.get_prints_with_filament": get_prints_with_filament,
+    "print_history.get_filament_for_filament_id": get_filament_for_filament_id,
     "print_history.get_filament_for_slot": get_filament_for_slot,
     "print_history.update_filament_spool": update_filament_spool,
     "spoolman_service.fetchSpools": fetchSpools,

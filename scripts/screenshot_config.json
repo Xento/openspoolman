@@ -36,7 +36,7 @@
     },
     {
       "name": "change_spool",
-      "route": "/print_select_spool?ams_slot=1&print_id=352&old_spool_id=33&change_spool=True",
+      "route": "/print_select_spool?filament_id=1&print_id=352&old_spool_id=33&change_spool=True",
       "output": "docs/img/change_spool.PNG",
       "max_height": {"desktop": 1100, "mobile": 1100}
     }

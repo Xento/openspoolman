@@ -181,7 +181,7 @@ SpoolMan can print QR-code stickers for every spool; follow the SpoolMan label g
   - set `DISABLE_MISMATCH_WARNING` to `True` to hide mismatch warnings in the UI (mismatches are still detected and logged to `logs/filament_mismatch.json`, including the detected color difference when applicable).
   - set `CLEAR_ASSIGNMENT_WHEN_EMPTY` to `True` if you want OpenSpoolMan to clear any SpoolMan assignment and reset the AMS tray whenever the printer reports no spool in that slot.
   - set `COLOR_DISTANCE_TOLERANCE` to an integer (default `40`) if you want to make the perceptual ΔE threshold for tray/spool color mismatch warnings stricter or more lenient; when either side (AMS tray or SpoolMan spool) lacks a color the warning is skipped and the UI shows "Color not set".
- - By default, the app reads `data/3d_printer_logs.db` for print history; override it through `OPENSPOOLMAN_PRINT_HISTORY_DB` or via the screenshot helper (which targets `data/demo.db` by default).
+ - By default, the app reads `data/3d_printer_logs.db` for print history; override it through `OPENSPOOLMAN_PRINT_HISTORY_DB` or via the screenshot helper (which targets `data/demo.db` by default). When schema migrations are required, OpenSpoolMan creates a copy with a `.v2` suffix, migrates that copy, and will prefer the versioned file on subsequent starts so you can roll back to the original if needed.
 
  - Run SpoolMan.
  - Add these extra fields in SpoolMan:

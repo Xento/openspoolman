@@ -562,7 +562,7 @@ def print_history():
   per_page = 50
   offset = max((page - 1) * per_page, 0)
 
-  ams_slot = request.args.get("ams_slot")
+  filament_id = request.args.get("filament_id") or request.args.get("ams_slot")
   print_id = request.args.get("print_id")
   spool_id = request.args.get("spool_id")
   old_spool_id = request.args.get("old_spool_id")
@@ -570,7 +570,7 @@ def print_history():
   if not old_spool_id:
     old_spool_id = -1
 
-  if READ_ONLY_MODE and all([ams_slot, print_id, spool_id]):
+  if READ_ONLY_MODE and all([filament_id, print_id, spool_id]):
     return render_template('error.html', exception="Live read-only mode: updating print-to-spool assignments is disabled.")
 
   def _consume_for_spool(spool_id_value, grams_value=None, length_value=None):
@@ -581,9 +581,9 @@ def print_history():
     elif grams_value is not None:
       spoolman_client.consumeSpool(spool_id_value, use_weight=grams_value)
 
-  if all([ams_slot, print_id, spool_id]):
-    filament = print_history_service.get_filament_for_slot(print_id, ams_slot)
-    print_history_service.update_filament_spool(print_id, ams_slot, spool_id)
+  if all([filament_id, print_id, spool_id]):
+    filament = print_history_service.get_filament_for_filament_id(print_id, filament_id)
+    print_history_service.update_filament_spool(print_id, filament_id, spool_id)
 
     if(filament["spool_id"] != int(spool_id) and (not old_spool_id or (old_spool_id and filament["spool_id"] == int(old_spool_id)))):
       grams_used = _to_float(filament.get("grams_used"))
@@ -676,7 +676,7 @@ def print_history():
 def print_select_spool():
 
   try:
-    ams_slot = request.args.get("ams_slot")
+    filament_id = request.args.get("filament_id") or request.args.get("ams_slot")
     print_id = request.args.get("print_id")
     old_spool_id = request.args.get("old_spool_id")
     
@@ -685,7 +685,7 @@ def print_select_spool():
     if not old_spool_id:
       old_spool_id = -1
 
-    if not all([ams_slot, print_id]):
+    if not all([filament_id, print_id]):
       return render_template('error.html', exception="Missing spool ID or print ID.")
 
     spools = mqtt_bambulab.fetchSpools()
@@ -693,7 +693,7 @@ def print_select_spool():
     materials = extract_materials(spools)
     selected_materials = []
 
-    filament = print_history_service.get_filament_for_slot(print_id, ams_slot)
+    filament = print_history_service.get_filament_for_filament_id(print_id, filament_id)
 
     try:
       filament_material = filament["filament_type"] if filament else None
@@ -706,7 +706,7 @@ def print_select_spool():
     return render_template(
       'print_select_spool.html',
       spools=spools,
-      ams_slot=ams_slot,
+      filament_id=filament_id,
       print_id=print_id,
       old_spool_id=old_spool_id,
       change_spool=change_spool,

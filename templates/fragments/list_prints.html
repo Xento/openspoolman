@@ -159,6 +159,7 @@
                                                 <div class="spool-details">
                                                     <h6>#{{ filament['spool'].id }} – {{ filament['spool'].filament.vendor.name }} – {{ filament['spool'].filament.material }}</h6>
                                                 <small class="d-flex flex-column gap-1">
+                                                    <span class="text-muted small">Filament ID: {{ filament['filament_id'] }}</span>
                                                     <span>{{ filament['spool'].filament.name }}</span>
                                                     <span class="text-muted small">
                                                         {% if filament['grams_used'] is not none %}
@@ -185,14 +186,14 @@
                                             </div>
 
                                             <!-- Edit Button rechts -->
-                                            <a href="{{ url_for('print_select_spool', ams_slot=filament['ams_slot'], print_id=print['id'], old_spool_id=filament['spool'].id, change_spool=true )}}" class="btn btn-sm btn-outline-primary ms-3">
+                                            <a href="{{ url_for('print_select_spool', filament_id=filament['filament_id'], print_id=print['id'], old_spool_id=filament['spool'].id, change_spool=true )}}" class="btn btn-sm btn-outline-primary ms-3">
                                                 <i class="bi bi-pencil"></i>
                                             </a>
                                         </div>
                                     </a>
                                 {% else %}
                                     <div class="spool-info">
-                                        <a href="{{ url_for('print_select_spool', ams_slot=filament['ams_slot'], print_id=print['id']) }}" class="nav-link link-body-emphasis" title="Assign Spool">
+                                        <a href="{{ url_for('print_select_spool', filament_id=filament['filament_id'], print_id=print['id']) }}" class="nav-link link-body-emphasis" title="Assign Spool">
                                             <div class="filament-info">
                                                 <div class="d-flex align-items-start">
                                                     <div class="slicer-color-stack me-3">
@@ -204,6 +205,7 @@
                                                     <div class="spool-details">
                                                         <h6>No spool assigned - {{ filament['filament_type'] }}</h6>
                                                     <small class="text-muted">
+                                                        <span class="text-muted small d-block">Filament ID: {{ filament['filament_id'] }}</span>
                                                         <span {% if length_title %}title="{{ length_title }}"{% endif %}>
                                                             {{ '%.2f' | format(filament['grams_used'] or 0) }}g printed
                                                         </span>

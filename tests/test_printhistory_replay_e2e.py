@@ -29,7 +29,7 @@ def _get_print_by_id(print_id: int):
         ("Testqube_local.log", "local"),
     ],
 )
-def test_replay_creates_printhistory_entry_and_detects_type(
+def test_creates_printhistory_entry_when_replaying_log(
     mqtt_replay, log_name, expected_type
 ):
     log_path = LOG_ROOT / "A1" / "01.07.00.00" / log_name
@@ -43,7 +43,7 @@ def test_replay_creates_printhistory_entry_and_detects_type(
     assert print_row["print_type"] == expected_type
 
 
-def test_replay_detects_filaments_and_maps_to_spools(mqtt_replay, fake_spoolman):
+def test_maps_filaments_to_spools_when_replaying_log(mqtt_replay, fake_spoolman):
     log_path = LOG_ROOT / "A1" / "01.07.00.00" / "Testqube_Multicolor_cloud.log"
     before_id = _max_print_id()
     mqtt_replay(log_path)
@@ -68,16 +68,16 @@ def test_replay_detects_filaments_and_maps_to_spools(mqtt_replay, fake_spoolman)
         4: "#0000FF",
     }
 
-    for entry in filament_info:
-        ams_slot = entry["ams_slot"]
-        assert entry["spool_id"] == expected_spool_ids[ams_slot]
-        assert entry["color"].upper() == expected_colors[ams_slot]
+    actual_spool_ids = {entry["filament_id"]: entry["spool_id"] for entry in filament_info}
+    actual_colors = {entry["filament_id"]: entry["color"].upper() for entry in filament_info}
+    assert actual_spool_ids == expected_spool_ids
+    assert actual_colors == expected_colors
 
     consumed_spools = {call["spool_id"] for call in fake_spoolman["consume_calls"]}
     assert consumed_spools == set(expected_spool_ids.values())
 
 
-def test_replay_appends_history_entry_on_repeat(mqtt_replay, fake_spoolman):
+def test_appends_history_entry_when_replaying_log_twice(mqtt_replay, fake_spoolman):
     log_path = LOG_ROOT / "A1" / "01.07.00.00" / "Testqube_cloud.log"
 
     before_id = _max_print_id()

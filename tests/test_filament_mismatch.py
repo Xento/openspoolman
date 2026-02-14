@@ -45,7 +45,7 @@ def _run_case(tray, spool, ams_id=0, tray_id="tray-1", log_stub=None):
     return tray
 
 
-def test_match_with_extra_type():
+def test_matches_when_spool_extra_type_matches_tray_sub_brand():
     tray = _make_tray("PLA", "PLA CF")
     spool = _make_spool("PLA", "CF")
     result = _run_case(tray, spool)
@@ -56,7 +56,7 @@ def test_match_with_extra_type():
     assert result["spool_sub_brand"] == "CF"
 
 
-def test_match_when_material_contains_subtype():
+def test_matches_when_spool_material_includes_subtype():
     tray = _make_tray("PLA", "PLA CF")
     spool = _make_spool("PLA CF", "-")
     result = _run_case(tray, spool)
@@ -67,7 +67,7 @@ def test_match_when_material_contains_subtype():
     assert result["spool_sub_brand"] == "CF"
 
 
-def test_mismatch_when_subtype_missing_on_spool():
+def test_flags_mismatch_when_spool_subtype_missing():
     tray = _make_tray("PLA", "PLA CF")
     spool = _make_spool("PLA", "")
     result = _run_case(tray, spool)
@@ -78,7 +78,7 @@ def test_mismatch_when_subtype_missing_on_spool():
     assert result["spool_sub_brand"] == ""
 
 
-def test_material_mismatch_even_if_subtype_matches():
+def test_flags_mismatch_when_material_differs_even_with_subtype():
     tray = _make_tray("PLA", "PLA CF")
     spool = _make_spool("ABS CF", "CF")
     result = _run_case(tray, spool)
@@ -89,7 +89,7 @@ def test_material_mismatch_even_if_subtype_matches():
     assert result["spool_sub_brand"] == "CF"
 
 
-def test_variant_type_requires_exact_material_match():
+def test_flags_mismatch_when_variant_type_material_differs():
     tray = _make_tray("PLA-S", "Support for PLA")
     spool = _make_spool("PLA", "Support for PLA")
     result = _run_case(tray, spool)
@@ -98,7 +98,7 @@ def test_variant_type_requires_exact_material_match():
     assert result["mismatch"] is True  # main type differs because tray expects PLA-S
 
 
-def test_variant_type_matches_when_spool_material_exact():
+def test_matches_when_variant_type_material_matches():
     tray = _make_tray("PLA-S", "Support for PLA")
     spool = _make_spool("PLA-S", "Support for PLA")
     result = _run_case(tray, spool)
@@ -107,7 +107,7 @@ def test_variant_type_matches_when_spool_material_exact():
     assert result["mismatch"] is False
 
 
-def test_mismatch_warning_can_be_disabled(monkeypatch):
+def test_hides_mismatch_when_warning_disabled(monkeypatch):
     monkeypatch.setattr(svc, "DISABLE_MISMATCH_WARNING", True)
     tray = _make_tray("PLA", "PLA CF")
     spool = _make_spool("PLA", "")
@@ -117,7 +117,7 @@ def test_mismatch_warning_can_be_disabled(monkeypatch):
     assert result["mismatch"] is False  # hidden in UI
 
 
-def test_color_mismatch_logs_distance():
+def test_logs_color_distance_when_color_mismatch():
     tray = _make_tray("PLA", "")
     tray["tray_color"] = "FFFFFF"
     spool = _make_spool("PLA", "")
@@ -207,23 +207,28 @@ BAMBULAB_BASE_MAPPINGS = [
 ]
 
 
-def test_bambu_base_profiles_match_tray_expectations():
-    failures = []
-    for tray_type, tray_sub_brands, spool_material, spool_type, expected_match in BAMBULAB_BASE_MAPPINGS:
-        tray = _make_tray(tray_type, tray_sub_brands)
-        spool = _make_spool(spool_material, spool_type, spool_extra_type=spool_type)
+@pytest.mark.parametrize(
+    "tray_type,tray_sub_brands,spool_material,spool_type,expected_match",
+    BAMBULAB_BASE_MAPPINGS,
+    ids=[
+        f"{tray_type}|{tray_sub_brands}|{spool_material}|{spool_type}|{expected_match}"
+        for tray_type, tray_sub_brands, spool_material, spool_type, expected_match in BAMBULAB_BASE_MAPPINGS
+    ],
+)
+def test_bambu_base_profile_expectations_when_tray_and_spool_compare(
+    tray_type,
+    tray_sub_brands,
+    spool_material,
+    spool_type,
+    expected_match,
+):
+    tray = _make_tray(tray_type, tray_sub_brands)
+    spool = _make_spool(spool_material, spool_type, spool_extra_type=spool_type)
 
-        result = _run_case(tray, spool)
+    result = _run_case(tray, spool)
 
-        ctx = f"(tray_type={tray_type!r}, tray_sub_brands={tray_sub_brands!r}, spool_material={spool_material!r}, spool_type={spool_type!r})"
-        if result["matched"] is not True:
-            failures.append(f"{ctx} did not match tray/spool assignment")
-            continue
-
-        if expected_match and result.get("mismatch_detected"):
-            failures.append(f"{ctx} unexpectedly triggered mismatch")
-        if not expected_match and not result.get("mismatch_detected"):
-            failures.append(f"{ctx} should trigger mismatch but did not")
-
-    if failures:
-        pytest.fail("\n".join(failures))
+    assert result["matched"] is True
+    if expected_match:
+        assert not result.get("mismatch_detected")
+    else:
+        assert result.get("mismatch_detected")

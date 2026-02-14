@@ -46,7 +46,7 @@ def _resolve_model_path(log_path: Path, expected: dict) -> Path:
 
 def _filament_info_by_slot(print_row: dict) -> dict[int, dict]:
     filament_info = json.loads(print_row["filament_info"])
-    return {entry["ams_slot"]: entry for entry in filament_info}
+    return {entry["filament_id"]: entry for entry in filament_info}
 
 
 def _sum_consume_calls(calls: list[dict]) -> dict[int, dict[str, float]]:
@@ -71,7 +71,7 @@ def _iter_cases():
 
 @pytest.mark.parametrize("track_layer_usage", [False, True], ids=["no_layer_tracking", "layer_tracking"])
 @pytest.mark.parametrize("log_path, expected", list(_iter_cases()))
-def test_replay_accounts_filament_consumption_correctly(
+def test_accounts_filament_consumption_when_replaying_log(
     mqtt_replay,
     fake_spoolman,
     log_path,
