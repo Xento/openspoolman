@@ -115,6 +115,13 @@ jobs:
             fi
 
             echo "TAGS=$TAGS" >> "$GITHUB_ENV"
+          elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            # Manual run without tag: use the selected branch name
+            BRANCH="${{ github.ref_name }}"
+            BRANCH_TAG=$(echo "$BRANCH" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9._-]/-/g')
+            if [[ -n "$BRANCH_TAG" ]]; then
+              echo "TAGS=ghcr.io/${{ env.REPO_NAME }}:${BRANCH_TAG}" >> "$GITHUB_ENV"
+            fi
           elif [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
             # Dev image for pushes to main (and equivalent contexts)
             echo "TAGS=ghcr.io/${{ env.REPO_NAME }}:dev" >> "$GITHUB_ENV"
