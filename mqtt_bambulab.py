@@ -59,6 +59,18 @@ _LOG_WRITE_FAILED = False
 PENDING_PRINT_REFERENCE = {}
 PRINTER_MODEL_NAME = get_printer_model_name(PRINTER_ID)
 LAST_PREPARE_LOGGED = object()
+HISTORY_REUSE_DEBOUNCE_SECONDS = 20
+FAILURE_GCODE_STATES = {
+  "FAILED",
+  "STOP",
+  "STOPPED",
+  "CANCEL",
+  "CANCELLED",
+  "CANCELED",
+  "ABORT",
+  "ABORTED",
+  "ERROR",
+}
 
 def _build_model_cache_path(printer_id: str) -> Path:
   safe_printer_id = "".join(
@@ -225,6 +237,14 @@ def _normalize_print_file_label(label: Any) -> str | None:
   normalized = normalized.strip().lower()
   return normalized or None
 
+def _normalized_identity_labels(*labels: Any) -> set[str]:
+  normalized_labels = set()
+  for label in labels:
+    normalized = _normalize_print_file_label(label)
+    if normalized:
+      normalized_labels.add(normalized)
+  return normalized_labels
+
 def _matches_print_identity(print_state: dict, identity: dict) -> bool:
   if not print_state or not identity:
     return False
@@ -234,13 +254,53 @@ def _matches_print_identity(print_state: dict, identity: dict) -> bool:
   if _is_valid_print_id(identity.get("subtask_id")) and _is_valid_print_id(print_state.get("subtask_id")):
     if str(identity.get("subtask_id")) == str(print_state.get("subtask_id")):
       return True
-  identity_file = identity.get("file") or identity.get("gcode_file") or identity.get("subtask_name")
-  state_file = print_state.get("gcode_file") or print_state.get("subtask_name")
-  normalized_identity_file = _normalize_print_file_label(identity_file)
-  normalized_state_file = _normalize_print_file_label(state_file)
-  if normalized_identity_file and normalized_state_file:
-    return normalized_identity_file == normalized_state_file
-  return bool(identity_file and state_file and identity_file == state_file)
+
+  identity_labels = _normalized_identity_labels(
+    identity.get("file"),
+    identity.get("gcode_file"),
+    identity.get("subtask_name"),
+  )
+  state_labels = _normalized_identity_labels(
+    print_state.get("gcode_file"),
+    print_state.get("subtask_name"),
+    print_state.get("file"),
+  )
+  if identity_labels and state_labels and identity_labels.intersection(state_labels):
+    return True
+
+  raw_identity_labels = (
+    identity.get("file"),
+    identity.get("gcode_file"),
+    identity.get("subtask_name"),
+  )
+  raw_state_labels = (
+    print_state.get("gcode_file"),
+    print_state.get("subtask_name"),
+    print_state.get("file"),
+  )
+  for identity_label in raw_identity_labels:
+    for state_label in raw_state_labels:
+      if identity_label and state_label and identity_label == state_label:
+        return True
+  return False
+
+def _should_reuse_recent_history(reference: dict, print_state: dict) -> bool:
+  if not reference or not print_state:
+    return False
+  if not reference.get("history_created") or not reference.get("print_id"):
+    return False
+
+  created_at = reference.get("history_created_at")
+  if not isinstance(created_at, (int, float)):
+    return False
+  if (time.time() - created_at) > HISTORY_REUSE_DEBOUNCE_SECONDS:
+    return False
+
+  gcode_state = (print_state.get("gcode_state") or "").upper()
+  if gcode_state in FAILURE_GCODE_STATES:
+    return False
+
+  return True
 
 def _lan_project_is_active(identity: dict) -> bool:
   if not identity:
@@ -530,6 +590,7 @@ def processMessage(data):
           PENDING_PRINT_METADATA["complete"] = True
           PENDING_PRINT_REFERENCE["print_id"] = print_id
           PENDING_PRINT_REFERENCE["history_created"] = True
+          PENDING_PRINT_REFERENCE["history_created_at"] = time.time()
           PENDING_PRINT_REFERENCE["accounted"] = True
           PENDING_PRINT_REFERENCE["metadata"] = PENDING_PRINT_METADATA
 
@@ -573,19 +634,27 @@ def processMessage(data):
         if PENDING_PRINT_REFERENCE and PENDING_PRINT_REFERENCE.get("print_id"):
           if _matches_print_identity(print_block, PENDING_PRINT_REFERENCE):
             existing_print_id = PENDING_PRINT_REFERENCE.get("print_id")
-          elif not (print_block.get("task_id") or print_block.get("subtask_id")):
+          elif _should_reuse_recent_history(PENDING_PRINT_REFERENCE, print_block):
             existing_print_id = PENDING_PRINT_REFERENCE.get("print_id")
 
+        reference = PENDING_PRINT_REFERENCE or {}
         source = (
-          (PENDING_PRINT_REFERENCE or {}).get("url")
-          or (PENDING_PRINT_REFERENCE or {}).get("gcode_file")
+          reference.get("url")
+          or reference.get("gcode_file")
           or print_block.get("url")
           or print_block.get("gcode_file")
           or job_label
         )
+        prefer_reference_type = bool(
+          reference.get("history_print_type") and (
+            _matches_print_identity(print_block, reference)
+            or _should_reuse_recent_history(reference, print_block)
+          )
+        )
         history_print_type = (
-          print_block.get("print_type")
-          or (PENDING_PRINT_REFERENCE or {}).get("history_print_type")
+          (reference.get("history_print_type") if prefer_reference_type else None)
+          or print_block.get("print_type")
+          or reference.get("history_print_type")
           or ("lan" if _is_lan_project_url(source) else "cloud")
         )
         if not PENDING_PRINT_METADATA:

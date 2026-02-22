@@ -342,3 +342,196 @@ def test_lan_project_with_zero_ids_and_trimmed_name_does_not_create_duplicate(mo
 
   assert len(calls) == 1
   assert calls[0][1] == "lan"
+
+
+def test_lan_project_with_running_metadata_path_keeps_lan_history(monkeypatch):
+  calls = []
+
+  def _insert_print(file_name, print_type, image_file=None, print_date=None):
+    calls.append((file_name, print_type))
+    return 1
+
+  monkeypatch.setattr(mqtt_bambulab, "insert_print", _insert_print)
+  monkeypatch.setattr(mqtt_bambulab, "insert_filament_usage", lambda *args, **kwargs: None)
+  monkeypatch.setattr(mqtt_bambulab, "spendFilaments", lambda *args, **kwargs: None)
+  monkeypatch.setattr(mqtt_bambulab, "TRACK_LAYER_USAGE", False)
+  monkeypatch.setattr(
+    mqtt_bambulab,
+    "getMetaDataFrom3mf",
+    lambda _url: {
+      "file": "Swatch Samples BLANK x5.gcode.3mf",
+      "image": None,
+      "filaments": {
+        1: {"type": "PLA", "color": "#FFFFFF", "used_g": "1.0", "used_m": "1.0"},
+      },
+    },
+  )
+
+  mqtt_bambulab.PRINTER_STATE = {}
+  mqtt_bambulab.PRINTER_STATE_LAST = {}
+  mqtt_bambulab.PENDING_PRINT_METADATA = {}
+  mqtt_bambulab.PENDING_PRINT_REFERENCE = {}
+  mqtt_bambulab.LAST_LAN_PROJECT = {}
+  mqtt_bambulab.FILAMENT_TRACKER = FilamentUsageTracker()
+  mqtt_bambulab.PRINT_RUN_REGISTRY.reset()
+
+  mqtt_bambulab.processMessage(
+    {
+      "print": {
+        "command": "project_file",
+        "url": "file:///sdcard/Swatch Samples BLANK x5.gcode.3mf",
+        "subtask_name": "Swatch Samples BLANK x5",
+        "task_id": "0",
+        "subtask_id": "0",
+        "use_ams": True,
+        "ams_mapping": [0],
+      }
+    }
+  )
+  mqtt_bambulab.processMessage(
+    {
+      "print": {
+        "gcode_state": "RUNNING",
+        "gcode_file": "/data/Metadata/plate_1.gcode",
+        "print_type": "local",
+        "task_id": "3234",
+        "subtask_id": "0",
+        "subtask_name": "Swatch Samples BLANK x5",
+      }
+    }
+  )
+
+  assert len(calls) == 1
+  assert calls[0][1] == "lan"
+
+
+def test_recent_history_debounce_reuses_lan_without_identity_match(monkeypatch):
+  calls = []
+  now = {"value": 1_000.0}
+
+  def _insert_print(file_name, print_type, image_file=None, print_date=None):
+    calls.append((file_name, print_type))
+    return len(calls)
+
+  monkeypatch.setattr(mqtt_bambulab, "insert_print", _insert_print)
+  monkeypatch.setattr(mqtt_bambulab, "insert_filament_usage", lambda *args, **kwargs: None)
+  monkeypatch.setattr(mqtt_bambulab, "spendFilaments", lambda *args, **kwargs: None)
+  monkeypatch.setattr(mqtt_bambulab, "TRACK_LAYER_USAGE", False)
+  monkeypatch.setattr(mqtt_bambulab.time, "time", lambda: now["value"])
+  monkeypatch.setattr(
+    mqtt_bambulab,
+    "getMetaDataFrom3mf",
+    lambda _url: {
+      "file": "Swatch Samples BLANK x5.gcode.3mf",
+      "image": None,
+      "filaments": {
+        1: {"type": "PLA", "color": "#FFFFFF", "used_g": "1.0", "used_m": "1.0"},
+      },
+    },
+  )
+
+  mqtt_bambulab.PRINTER_STATE = {}
+  mqtt_bambulab.PRINTER_STATE_LAST = {}
+  mqtt_bambulab.PENDING_PRINT_METADATA = {}
+  mqtt_bambulab.PENDING_PRINT_REFERENCE = {}
+  mqtt_bambulab.LAST_LAN_PROJECT = {}
+  mqtt_bambulab.FILAMENT_TRACKER = FilamentUsageTracker()
+  mqtt_bambulab.PRINT_RUN_REGISTRY.reset()
+
+  mqtt_bambulab.processMessage(
+    {
+      "print": {
+        "command": "project_file",
+        "url": "file:///sdcard/Swatch Samples BLANK x5.gcode.3mf",
+        "subtask_name": "Swatch Samples BLANK x5",
+        "task_id": "0",
+        "subtask_id": "0",
+        "use_ams": True,
+        "ams_mapping": [0],
+      }
+    }
+  )
+
+  # No matching name/task here; debounce should still reuse the fresh LAN history entry.
+  now["value"] += 3
+  mqtt_bambulab.processMessage(
+    {
+      "print": {
+        "gcode_state": "RUNNING",
+        "gcode_file": "/data/Metadata/plate_1.gcode",
+        "print_type": "local",
+        "task_id": "3234",
+        "subtask_id": "0",
+        "subtask_name": "Other job",
+      }
+    }
+  )
+
+  assert len(calls) == 1
+  assert calls[0][1] == "lan"
+
+
+def test_history_debounce_expires_and_allows_new_entry(monkeypatch):
+  calls = []
+  now = {"value": 1_000.0}
+
+  def _insert_print(file_name, print_type, image_file=None, print_date=None):
+    calls.append((file_name, print_type))
+    return len(calls)
+
+  monkeypatch.setattr(mqtt_bambulab, "insert_print", _insert_print)
+  monkeypatch.setattr(mqtt_bambulab, "insert_filament_usage", lambda *args, **kwargs: None)
+  monkeypatch.setattr(mqtt_bambulab, "spendFilaments", lambda *args, **kwargs: None)
+  monkeypatch.setattr(mqtt_bambulab, "TRACK_LAYER_USAGE", False)
+  monkeypatch.setattr(mqtt_bambulab.time, "time", lambda: now["value"])
+  monkeypatch.setattr(
+    mqtt_bambulab,
+    "getMetaDataFrom3mf",
+    lambda _url: {
+      "file": "Swatch Samples BLANK x5.gcode.3mf",
+      "image": None,
+      "filaments": {
+        1: {"type": "PLA", "color": "#FFFFFF", "used_g": "1.0", "used_m": "1.0"},
+      },
+    },
+  )
+
+  mqtt_bambulab.PRINTER_STATE = {}
+  mqtt_bambulab.PRINTER_STATE_LAST = {}
+  mqtt_bambulab.PENDING_PRINT_METADATA = {}
+  mqtt_bambulab.PENDING_PRINT_REFERENCE = {}
+  mqtt_bambulab.LAST_LAN_PROJECT = {}
+  mqtt_bambulab.FILAMENT_TRACKER = FilamentUsageTracker()
+  mqtt_bambulab.PRINT_RUN_REGISTRY.reset()
+
+  mqtt_bambulab.processMessage(
+    {
+      "print": {
+        "command": "project_file",
+        "url": "file:///sdcard/Swatch Samples BLANK x5.gcode.3mf",
+        "subtask_name": "Swatch Samples BLANK x5",
+        "task_id": "0",
+        "subtask_id": "0",
+        "use_ams": True,
+        "ams_mapping": [0],
+      }
+    }
+  )
+
+  now["value"] += (mqtt_bambulab.HISTORY_REUSE_DEBOUNCE_SECONDS + 1)
+  mqtt_bambulab.processMessage(
+    {
+      "print": {
+        "gcode_state": "RUNNING",
+        "gcode_file": "/data/Metadata/plate_1.gcode",
+        "print_type": "local",
+        "task_id": "3234",
+        "subtask_id": "0",
+        "subtask_name": "Other job",
+      }
+    }
+  )
+
+  assert len(calls) == 2
+  assert calls[0][1] == "lan"
+  assert calls[1][1] == "local"
